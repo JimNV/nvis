@@ -10,13 +10,13 @@ window.onload = function() {
 
     let stream0 = renderer.loadStream([ "images/lena.png" ]);
     let stream1 = renderer.loadStream([ "images/texture.png" ]);
-    let stream2 = renderer.loadStream([ "images/plane.png" ]);
+    // let stream2 = renderer.loadStream([ "images/plane.png" ]);
     renderer.addWindow(stream0);
     renderer.addWindow(stream1);
-    renderer.addWindow(stream2);
+    // renderer.addWindow(stream2);
 
     //let differenceShader = renderer.loadShader("glsl/difference.json");
-    
+
     // let differenceStream = renderer.addStream();
     // differenceStream.setShader(differenceShader);
 	// differenceStream.addInputStream(stream0);
@@ -97,7 +97,7 @@ function NvisShaderUI(object)
     //             el.checked = _object[key].value;
     //             el.setAttribute("onclick", "renderer.shaderUI(" + key + ")");
     //             el.innerHTML = object[key].name;
-                
+
     //         }
     //         else if (type == "float")
     //         {
@@ -119,14 +119,16 @@ function NvisShaderUI(object)
         //_object[key].value = value;
         let key = elementId.replace(/\-.*$/, "");
         let element = document.getElementById(elementId);
-        _object[key].value = (_object[key].type == "bool" ? element.checked : element.value);
+        let type = _object[key].type;
+        _object[key].value = (type == "bool" ? element.checked : (type == "dropdown" ? element.selectedIndex : element.value));
 
         let elementValue = document.getElementById(elementId + "Value");
         if (elementValue !== null)
         {
             elementValue.innerHTML = element.value;
         }
-        console.log(_object[key].value);
+
+        console.log(key + ": " +_object[key].value);
     }
 
     let _setUniforms = function (glContext, shaderProgram)
@@ -150,60 +152,112 @@ function NvisShaderUI(object)
             {
     			glContext.uniform1f(uniform, _object[key].value);
             }
+
+            if (type == "dropdown")
+            {
+    			glContext.uniform1i(uniform, _object[key].value);
+            }
         }
     }
 
     let _getDOM = function (streamId)
     {
-        let _dom = document.createDocumentFragment();
+        _dom = document.createDocumentFragment();
+
+        let table = document.createElement("table");
+        table.style.marginLeft = "50px";
 
         for (let key of Object.keys(_object))
         {
-            let br = document.createElement("br");
             let label = document.createElement("label");
             label.setAttribute("for", key);
             label.innerHTML = _object[key].name;
 
             let elementId = (key + "-" + streamId);  //  need uniqueness
 
-            let el = document.createElement("input");
-            el.setAttribute("id", elementId);
+            let callbackString = "renderer.streamUpdateParameter(" + streamId + ", \"" + elementId + "\")";
 
+            let row = document.createElement("tr");
+
+            let el = undefined;
             let type = _object[key].type;
-            if (type == "bool")
+            if (type == "bool" || type == "float")
             {
-                el.setAttribute("type", "checkbox");
-                if (_object[key].value)
+                el = document.createElement("input");
+                el.setAttribute("id", elementId);
+
+                if (type == "bool")
                 {
-                    el.setAttribute("checked", true);
+                    el.setAttribute("type", "checkbox");
+                    if (_object[key].value)
+                    {
+                        el.setAttribute("checked", true);
+                    }
+                    else
+                    {
+                        el.removeAttribute("checked");
+                    }
+                    el.setAttribute("onclick", callbackString);
+                }
+                else if (type == "float")
+                {
+                    el.setAttribute("type", "range");
+                    el.setAttribute("min", (_object[key].min ? _object[key].min : 0.0));
+                    el.setAttribute("max", (_object[key].max ? _object[key].max : 1.0));
+                    el.setAttribute("value", (_object[key].value ? _object[key].value : 0.0));
+                    el.setAttribute("step", (_object[key].step ? _object[key].step : 0.1));
+                    el.setAttribute("oninput", callbackString);
+                    let oEl = document.createElement("span");
+                    oEl.id = (elementId + "-Value");
+                    oEl.innerHTML = (oEl.innerHTML == "" ? _object[key].value : oEl.innerHTML);
+                    //console.log("oEL: '" + oEl.innerHTML + "'");
+                    label.innerHTML += " (" + oEl.outerHTML + ")";
+                }
+            }
+            else if (type == "dropdown")
+            {
+                el = document.createElement("select");
+                el.setAttribute("id", elementId);
+                el.setAttribute("onchange", callbackString);
+                for (let optionId = 0; optionId < _object[key].alternatives.length; optionId++)
+                {
+                    let oEl = document.createElement("option");
+                    if (_object[key].value == optionId)
+                    {
+                        oEl.setAttribute("selected", true);
+                    }
+                    //oEl.setAttribute("value", _object[key].alternatives[optionId].value);
+                    oEl.innerHTML = _object[key].alternatives[optionId];
+                    el.appendChild(oEl);
+                }
+            }
+
+            if (el !== undefined)
+            {
+                if (type == "bool")
+                {
+                    let cell = document.createElement("td");
+                    cell.setAttribute("multicolumn", 2);
+                    cell.innerHTML = el.outerHTML + label.outerHTML;
+
+                    row.appendChild(cell);
                 }
                 else
                 {
-                    el.removeAttribute("checked");
-                }
-                el.setAttribute("onclick", "renderer.streamUpdateParameter(" + streamId + ", \"" + elementId + "\")");
-                //el.innerHTML = object[key].name;
-                
-            }
-            else if (type == "float")
-            {
-                el.setAttribute("type", "range");
-                el.setAttribute("min", (_object[key].min ? _object[key].min : 0.0));
-                el.setAttribute("max", (_object[key].max ? _object[key].max : 1.0));
-                el.setAttribute("value", (_object[key].value ? _object[key].value : 0.0));
-                el.setAttribute("step", (_object[key].step ? _object[key].step : 0.1));
-                el.setAttribute("oninput", "renderer.streamUpdateParameter(" + streamId + ", \"" + elementId + "\")");
-                let oEl = document.createElement("span");
-                oEl.id = (elementId + "-Value");
-                oEl.innerHTML = (oEl.innerHTML == "" ? _object[key].value : oEl.innerHTML);
-                console.log("oEL: '" + oEl.innerHTML + "'");
-                label.innerHTML += " (" + oEl.outerHTML + ")";
-            }
+                    let elCell = document.createElement("td");
+                    elCell.innerHTML = el.outerHTML;
+                    let labelCell = document.createElement("td");
+                    labelCell.innerHTML = label.outerHTML;
 
-            _dom.appendChild(el);
-            _dom.appendChild(label);
-            _dom.appendChild(br);
+                    row.appendChild(labelCell);
+                    row.appendChild(elCell);
+                }
+
+                table.appendChild(row);
+            }
         }
+
+        _dom.appendChild(table);
 
         return _dom;
     }
@@ -496,15 +550,15 @@ function NvisStream(glContext)
 
                 let texture = _glContext.createTexture();
                 _textures.push(texture);
-        
+
                 const image = new Image();
                 image.src = _fileNames[fileId];
                 console.log("Loading " + image.src);
                 image.onload = function() {
-                    
+
                     _glContext.bindTexture(_glContext.TEXTURE_2D, texture);
                     _glContext.texImage2D(_glContext.TEXTURE_2D, TextureFormat.level, TextureFormat.internalFormat, TextureFormat.srcFormat, TextureFormat.srcType, image);
-        
+
                     _glContext.texParameteri(_glContext.TEXTURE_2D, _glContext.TEXTURE_WRAP_S, _glContext.CLAMP_TO_EDGE);
                     _glContext.texParameteri(_glContext.TEXTURE_2D, _glContext.TEXTURE_WRAP_T, _glContext.CLAMP_TO_EDGE);
                     _glContext.texParameteri(_glContext.TEXTURE_2D, _glContext.TEXTURE_MIN_FILTER, _glContext.NEAREST);
@@ -535,7 +589,7 @@ function NvisStream(glContext)
         _glContext.texParameteri(_glContext.TEXTURE_2D, _glContext.TEXTURE_WRAP_T, _glContext.CLAMP_TO_EDGE);
         _glContext.texParameteri(_glContext.TEXTURE_2D, _glContext.TEXTURE_MIN_FILTER, _glContext.NEAREST);
         _glContext.texParameteri(_glContext.TEXTURE_2D, _glContext.TEXTURE_MAG_FILTER, _glContext.NEAREST);
-        
+
         _glContext.bindTexture(_glContext.TEXTURE_2D, null);  //  TODO: Chrome requirement?
 
         //  TODO: bind framebuffer to non-filestreams
@@ -554,10 +608,10 @@ function NvisStream(glContext)
         _glContext.texParameteri(_glContext.TEXTURE_2D, _glContext.TEXTURE_WRAP_T, _glContext.CLAMP_TO_EDGE);
         _glContext.texParameteri(_glContext.TEXTURE_2D, _glContext.TEXTURE_MIN_FILTER, _glContext.NEAREST);
         _glContext.texParameteri(_glContext.TEXTURE_2D, _glContext.TEXTURE_MAG_FILTER, _glContext.NEAREST);
-    
+
         _frameBuffer = _glContext.createFramebuffer();
         _glContext.bindFramebuffer(_glContext.FRAMEBUFFER, _frameBuffer);
- 
+
         let attachmentPoint = _glContext.COLOR_ATTACHMENT0;
         _glContext.framebufferTexture2D(_glContext.FRAMEBUFFER, attachmentPoint, _glContext.TEXTURE_2D, _outputTexture, TextureFormat.level);
 
@@ -574,7 +628,7 @@ function NvisStream(glContext)
             let texture = _glContext.createTexture();
             _textures.push(texture);
             _fileNames.push(fileNames[fileId]);
-    
+
             const image = new Image();
             image.src = fileNames[fileId];
 
@@ -618,21 +672,21 @@ function NvisStream(glContext)
 
                     const image = new Image();
                     image.src = event.target.result;
-        
+
                     image.onload = function() {
-        
+
                         _setupTexture(texture, image);
                         numFilesLoaded++;
-        
+
                         if (numFilesLoaded == files.length)
                         {
                             _dimensions = { w: image.width, h: image.height };
                             callback(_dimensions);
                         }
                     }
-        
+
                 }
-	
+
 				reader.readAsDataURL(file);
 			}
         }
@@ -1008,11 +1062,11 @@ function NvisWindows(glContext, canvas)
         //  top-right
         _textureCoordinates[2] = 1.0;
         _textureCoordinates[3] = 0.0;
-        
+
         //  bottom-left
         _textureCoordinates[4] = 0.0;
         _textureCoordinates[5] = 1.0;
-        
+
         //  bottom-right
         _textureCoordinates[6] = 1.0;
         _textureCoordinates[7] = 1.0;
@@ -1088,12 +1142,12 @@ function NvisWindows(glContext, canvas)
 		let height = pageHeight - 2 * _layout.border;
 		let dw = (width % w);
 		let dh = (height % _layout.h);
-		
+
 		_canvas.width = (width - dw);
         _canvas.height = (height - dh);
         _canvas.style.borderRight = (_layout.border + dw) + "px solid black";
         _canvas.style.borderBottom = (_layout.border + dh) + "px solid black";
-		
+
 		//  clear canvas
 		_glContext.viewport(0, 0, _canvas.width, _canvas.height);
         _glContext.clearColor(1.0, 0.8, 0.8, 1.0);
@@ -1156,7 +1210,7 @@ function NvisWindows(glContext, canvas)
 			_windows[windowId].setStream(streams[nextStreamId]);
 		}
 	}
-	
+
 	let _decStream = function (position, streams)
 	{
 		let windowId = _getWindowId(position);
@@ -1419,7 +1473,7 @@ function NvisRenderer()
                 this.frameId += this.direction;
                 this.frameId = Math.max(this.frameId, 0);
                 this.frameId = Math.min(this.frameId, this.numFrames - 1);
-    
+
                 if (this.pingPong)
                 {
                     if (this.frameId == 0 || this.frameId == this.numFrames - 1)
@@ -1447,7 +1501,7 @@ function NvisRenderer()
         _canvas.style.padding = "0px";
         _canvas.style.display = "block";
         document.body.appendChild(_canvas);
-		
+
 		_helpPopup = document.createElement("div");
         _helpPopup.style.font = "20px Arial";
 		_helpPopup.style.color = "black";
@@ -1527,14 +1581,14 @@ function NvisRenderer()
 		document.body.appendChild(_helpPopup);
 	    document.body.appendChild(_fileInput);
 	    document.body.appendChild(_infoPopup);
-    
+
         _glContext = _canvas.getContext("webgl");
         if (_glContext === null)
         {
             alert("Unable to initialize WebGL!");
             return;
         }
-    
+
 		_windows = new NvisWindows(_glContext, _canvas);
 
 		_defaultShader = new NvisShader(_glContext);
@@ -1615,7 +1669,7 @@ function NvisRenderer()
         _uiPopup.innerHTML += "<br/>";
         _uiPopup.innerHTML += "<input id=\"bAutomaticLayout\" type=\"checkbox\" onclick=\"_toggleAutomaticLayout()\"> Automatic window layout";
 		_uiPopup.innerHTML += "<br/>";
-		
+
 		let w = window.getComputedStyle(_uiPopup).getPropertyValue("width");
 		let h = window.getComputedStyle(_uiPopup).getPropertyValue("height");
 		let x = Math.trunc((_canvas.width - w.substring(0, w.indexOf('px'))) / 2);
@@ -1860,7 +1914,7 @@ function NvisRenderer()
 
         if (files[0].type.match(/image.*/))
         {
-            files.sort(function (a, b) { return a.name.localeCompare(b.name); });              
+            files.sort(function (a, b) { return a.name.localeCompare(b.name); });
             let newStream = NvisStream(_glContext);
             newStream.drop(files, _newStreamCallback);
             newStream.setShader(_defaultShader);
@@ -1879,20 +1933,20 @@ function NvisRenderer()
 			if (file.type.match(/image.*/))
 			{
 				let reader = new FileReader();
-	
+
 				reader.onload = function(event) {
 					let stream = _addStream(event.target.result);
                     stream.setFileName(file.name);
 					stream.setShader(_defaultShader);
 					_windows.add(stream);
 				}
-	
+
 				reader.readAsDataURL(file);
 			}
             else if (file.type.match(/application\/json/))
             {
 				let reader = new FileReader();
-	
+
 				reader.onload = function(event) {
 
 					//console.log("JSON source: " + event.target.result);
@@ -1908,7 +1962,7 @@ function NvisRenderer()
 
                     let shader = _addShader(lcJsonObject);
 				}
-	
+
 				reader.readAsText(file);
             }
             else if (file.name.match(/.exr$/))
@@ -1917,7 +1971,7 @@ function NvisRenderer()
             }
 		}
 
-		_canvas.style.border = _settings.layout.border + "px solid black";	
+		_canvas.style.border = _settings.layout.border + "px solid black";
 	}
 
 	let _onFileDragEnter = function (event)
@@ -1937,11 +1991,19 @@ function NvisRenderer()
     	event.preventDefault();
 	}
 
-    var _render = function ()
+    let _renderFrameBuffers = function ()
+    {
+        //  TODO: enable hierarchical rendering
+
+
+    }
+
+    let _render = function ()
     {
         _glContext.clearColor(0.2, 0.2, 0.2, 1.0);
         _glContext.clear(_glContext.COLOR_BUFFER_BIT);
 
+        //_renderFrameBuffers();
 		_windows.render(_animation.frameId);
 
         _animation.update();
@@ -1970,7 +2032,7 @@ function NvisRenderer()
                 {
                     _shaders.push(newShader);
                     let newStream = new NvisStream(_glContext);
-                    newStream.setupOutputTexture(_streams[0].getDimensions());
+                    // newStream.setupOutputTexture(_streams[0].getDimensions());
                     _streams.push(newStream);
                     newStream.setShader(newShader);
                     for (let inputId = 0; inputId < newShader.getNumInputs(); inputId++)
