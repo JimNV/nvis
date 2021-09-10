@@ -1,6 +1,6 @@
 'use strict';
 
-let nvis = function () {
+var nvis = new function () {
     let _renderer = undefined;
     let _streams = [];
 
@@ -129,7 +129,7 @@ let nvis = function () {
 
                 let elementId = (key + "-" + streamId);  //  need uniqueness
 
-                let callbackString = "this.streamUpdateParameter(" + streamId + ", \"" + elementId + "\")";
+                let callbackString = "nvis.streamUpdateParameter(" + streamId + ", \"" + elementId + "\")";
 
                 let row = document.createElement("tr");
 
@@ -245,7 +245,8 @@ let nvis = function () {
         let _fragmentShader = _glContext.createShader(_glContext.FRAGMENT_SHADER);
         let _shaderProgram = _glContext.createProgram();
 
-        let _bReady = false;
+        let _bVertexReady = false;
+        let _bFragmentReady = false;
 
         let _fragmentSource = "";
         let _vertexSource = `attribute vec2 aVertexPosition;
@@ -267,21 +268,14 @@ void main()
 }`;
 
         let _init = function () {
-            _bReady = _compile(_vertexShader, _vertexSource);
+            _bVertexReady = _compile(_vertexShader, _vertexSource);
             if (_fileName === undefined) {
-                _setDefault();
+                _bFragmentReady = _compile(_fragmentShader, _defaultFragmentSource);
+                _attach();
             }
             else {
                 _load(_fileName);
                 _ui = new NvisShaderUI(json.ui);
-            }
-        }
-
-        let _loadHandler = function () {
-            if (this.status == 200 && this.responseText !== null) {
-                _fragmentSource = this.responseText;
-                _bReady = _compile(_fragmentShader, _fragmentSource);
-                _attach();
             }
         }
 
@@ -299,7 +293,8 @@ void main()
         }
 
         let _attach = function () {
-            if (_bReady) {
+            //if (_isReady()) {
+                console.log("Attaching shader: " + _fileName);
                 _glContext.attachShader(_shaderProgram, _vertexShader);
                 _glContext.attachShader(_shaderProgram, _fragmentShader);
                 _glContext.linkProgram(_shaderProgram);
@@ -307,21 +302,24 @@ void main()
                 if (!_glContext.getProgramParameter(_shaderProgram, _glContext.LINK_STATUS)) {
                     alert("Could not initialize shader!");
                 }
-            }
-        }
-
-        let _setDefault = function () {
-            _bReady = _compile(_fragmentShader, _defaultFragmentSource);
-            _attach();
+            //}
         }
 
         let _load = function (fileName) {
-            _bReady = false;
+            _bFragmentReady = false;
 
             let xhr = new XMLHttpRequest();
             xhr.open("GET", fileName);
             xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
-            xhr.onload = _loadHandler;
+            xhr.onload = function (event)
+            {
+                if (this.status == 200 && this.responseText !== null) {
+                    console.log("=====  Shader loaded (" + fileName + ")");
+                    _fragmentSource = this.responseText;
+                    _bFragmentReady = _compile(_fragmentShader, _fragmentSource);
+                    _attach();
+                }
+            }
             xhr.send();
         }
 
@@ -330,7 +328,7 @@ void main()
         }
 
         let _isReady = function () {
-            return _bReady;
+            return _bVertexReady && _bFragmentReady;
         }
 
         let _setUniforms = function () {
@@ -358,7 +356,6 @@ void main()
         _init();
 
         return {
-            attach: _attach,
             load: _load,
             getProgram: _getProgram,
             isReady: _isReady,
@@ -662,8 +659,6 @@ void main()
 
                     let sEl = document.createElement("select");
                     sEl.id = eId;
-                    //sEl.onclick = "renderer.setStreamInput(" + streamId + ", " + i + ")";
-                    //sEl.onchange = "alert(\"" + streamId + "\")";
                     sEl.setAttribute("onchange", "nvis.streamUpdateInput(" + streamId + ", " + inputId + ")");
                     for (let i = 0; i < streams.length; i++) {
                         if (i != streamId) {
@@ -715,53 +710,44 @@ void main()
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    function NvisOverlay() {
-        let _position = { x: 10, y: 10 };
-        let _size = { w: 120, h: 25 };
+    class NvisOverlay {
 
-        let _text = "";
+        constructor() {
+            this.position = { x: 10, y: 10 };
+            this.size = { w: 120, h: 25 };
+            this.text = "";
+            this.overlay = document.createElement("div");;
 
-        let _overlay = {};
+            this.overlay.style.display = "none";
+            this.overlay.style.position = "absolute";
+            this.overlay.style.color = "white";
+            this.overlay.style.font = "20px Consolas";
+            this.overlay.style.backgroundColor = "green";
+            // this.overlay.style.left = _canvas.offsetLeft;
+            // this.overlay.style.top = (_canvas.height + _canvas.offsetTop) + "px";
+            this.overlay.style.left = this.position.x + "px";
+            this.overlay.style.top = this.position.y + "px";
+            // this.overlay.style.width = _canvas.width + "px";
+            // this.overlay.style.height = "50px";
+            this.overlay.style.width = this.size.w + "px";
+            this.overlay.style.height = this.size.h + "px";
 
-        let _init = function () {
-            _overlay = document.createElement("div");
-            _overlay.style.display = "none";
-            _overlay.style.position = "absolute";
-            _overlay.style.color = "white";
-            _overlay.style.font = "20px Consolas";
-            _overlay.style.backgroundColor = "green";
-            // _overlay.style.left = _canvas.offsetLeft;
-            // _overlay.style.top = (_canvas.height + _canvas.offsetTop) + "px";
-            _overlay.style.left = _position.x + "px";
-            _overlay.style.top = _position.y + "px";
-            // _overlay.style.width = _canvas.width + "px";
-            // _overlay.style.height = "50px";
-            _overlay.style.width = _size.w + "px";
-            _overlay.style.height = _size.h + "px";
-
-            _setText("Testing...");
+            this.#setText("Testing...");
         }
 
-        let _getNode = function () {
-            return _overlay;
+        #setText(text) {
+            this.text = text;
+            this.overlay.innerHTML = text;
         }
 
-        let _setText = function (text) {
-            _text = text;
-            _overlay.innerHTML = _text;
+        getNode() {
+            return this.overlay;
         }
 
-        let _resize = function (position, dimensions) {
+        resize(position, dimensions) {
             //console.log("overlay resize: " + position.x + ", " + position.y);
-            _overlay.style.left = position.x + "px";
-            _overlay.style.top = position.y + "px";
-        }
-
-        _init();
-
-        return {
-            getNode: _getNode,
-            resize: _resize,
+            this.overlay.style.left = position.x + "px";
+            this.overlay.style.top = position.y + "px";
         }
     }
 
@@ -1092,7 +1078,142 @@ void main()
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    function NvisWindow(glContext, canvas) {
+    class NvisWindow {
+
+        constructor(glContext, canvas) {
+            this.glContext = glContext;
+            this.canvas = canvas;
+
+            this.stream = undefined;
+
+            this.position = { x: 0, y: 0 };
+            this.dimensions = { w: 0, h: 0 };
+
+            this.vertexPositions = new Float32Array([-1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0]);
+            this.vertexPositionBuffer = glContext.createBuffer();
+            this.textureCoordinateBuffer = glContext.createBuffer();
+
+            this.overlay = new NvisOverlay();
+
+            this.canvas.parentNode.insertBefore(this.overlay.getNode(), this.canvas.nextSibling);
+
+            this.resize({ x: 0.0, y: 0.0 }, { w: 1.0, h: 1.0 });
+
+            this.TextureUnits = [
+                this.glContext.TEXTURE0,
+                this.glContext.TEXTURE1,
+                this.glContext.TEXTURE2,
+                this.glContext.TEXTURE3,
+                this.glContext.TEXTURE4,
+                this.glContext.TEXTURE5,
+                this.glContext.TEXTURE6,
+                this.glContext.TEXTURE7,
+            ];
+        }
+
+
+        resize(winPos, winDim) {
+            if (this.stream === undefined) {
+                return;
+            }
+            else if (this.stream.getDimensions() === undefined) {
+                return;
+            }
+
+            let gl = this.glContext;
+
+            //  incoming position/size is in third quadrant [0, 1]
+            this.position = winPos;
+            this.dimensions = winDim;
+
+            let x = _clamp(2.0 * winPos.x - 1.0, -1.0, 1.0);
+            let y = _clamp(1.0 - 2.0 * winPos.y, -1.0, 1.0);
+            let width = 2.0 * this.dimensions.w;
+            let height = 2.0 * this.dimensions.h;
+
+            let xx = _clamp(x + width, -1.0, 1.0);
+            let yy = _clamp(y - height, -1.0, 1.0);
+
+            this.vertexPositions[0] = x;
+            this.vertexPositions[1] = y;
+            this.vertexPositions[2] = xx;
+            this.vertexPositions[3] = y;
+            this.vertexPositions[4] = x;
+            this.vertexPositions[5] = yy;
+            this.vertexPositions[6] = xx;
+            this.vertexPositions[7] = yy;
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, this.vertexPositions, gl.STATIC_DRAW);
+
+            //  TODO: fix overlay...
+            this.overlay.resize({ x: this.position.x * 100, y: this.position.y * 100 }, this.dimensions);
+        }
+
+        getStream() {
+            return this.stream;
+        }
+
+        setStream = function (stream) {
+            this.stream = stream;
+        }
+
+        render(frameId) {
+            let gl = this.glContext;
+            let shader = this.stream.getShader();
+
+            if (this.stream !== undefined && shader !== undefined) {
+
+                let shaderProgram = shader.getProgram();
+                gl.useProgram(shaderProgram);
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
+
+                let aVertexPosition = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+                gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(aVertexPosition);
+
+                // tell webgl how to pull out the texture coordinates from buffer
+                let aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+                gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(aTextureCoord);
+
+                if (this.stream.isFileStream()) {
+                    // Tell WebGL we want to affect texture unit 0
+                    gl.activeTexture(gl.TEXTURE0);
+
+                    // Bind the texture to texture unit 0
+                    gl.bindTexture(gl.TEXTURE_2D, this.stream.getTexture(frameId));
+
+                    // Tell the shader we bound the texture to texture unit 0
+                    let uSampler = gl.getUniformLocation(shaderProgram, 'uSampler');
+                    gl.uniform1i(uSampler, 0);
+                }
+                else {
+                    for (let inputId = 0; inputId < this.stream.getShader().getNumInputs(); inputId++) {
+                        let activeTexture = this.TextureUnits[inputId];
+                        gl.activeTexture(activeTexture);
+                        gl.bindTexture(gl.TEXTURE_2D, this.stream.getInputStream(inputId).getTexture(frameId));
+                        gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
+                    }
+
+                    shader.setUniforms();
+                }
+
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            }
+        }
+
+        updateTextureCoordinates(textureCoordinates) {
+            let gl = this.glContext;
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, textureCoordinates, gl.STATIC_DRAW);
+        }
+    }
+
+    function cNvisWindow(glContext, canvas) {
         let _glContext = glContext;
         let _canvas = canvas;
 
@@ -1160,6 +1281,11 @@ void main()
         let _render = function (frameId) {
             let shader = _stream.getShader();
             if (_stream !== undefined && shader !== undefined) {
+
+                //  debug
+                if (!shader.isReady())
+                    return;
+
                 let shaderProgram = shader.getProgram();
                 _glContext.useProgram(shaderProgram);
 
@@ -1470,7 +1596,7 @@ void main()
                     options += (">" + fileName + "</option>");
                 }
                 let select = ("<select id=\"windowStream-" + windowId + "\"");
-                select += (" onchange=\"renderer.setWindowStream(" + windowId + ")\"");
+                select += (" onchange=\"nvis.setWindowStream(" + windowId + ")\"");
                 select += (" id=\"windowStream\">" + options + "</select>");
                 _uiPopup.innerHTML += select;
                 _uiPopup.innerHTML += "<br/>";
@@ -1787,7 +1913,7 @@ void main()
             xhr.onload = function () {
                 if (this.status == 200 && this.responseText !== null) {
                     let jsonObject = JSON.parse(this.responseText);
-
+                    console.log("=====  Shader JSON loaded (" + jsonFileName + ")");
                     //  convert top-level keys to lowercase
                     let lcJsonObject = {};
                     for (let key of Object.keys(jsonObject)) {
@@ -1902,12 +2028,20 @@ void main()
         _streams[streamId].setInputStream(inputId, _streams[inputStreamId]);
     }
 
-    _init();
+    let _setWindowStream = function (windowId) {
+        _renderer.setWindowStream(windowId);
+        // let elementId = ("windowStream-" + windowId);
+        // let newStreamId = document.getElementById(elementId).selectedIndex;
+        // _windows.getWindow(windowId).setStream(_streams[newStreamId]);
+    }
 
     return {
+        init: _init,
         stream: _stream,
         shader: _shader,
+        //  below need to be visible to handle UI events
         streamUpdateParameter: _streamUpdateParameter,
         streamUpdateInput: _streamUpdateInput,
+        setWindowStream: _setWindowStream,
     }
 }
