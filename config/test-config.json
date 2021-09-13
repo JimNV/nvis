@@ -1,0 +1,54 @@
+{
+    "name": "Test configuration",
+    "layout": {
+        "width": 3
+    },
+    "shaders": [
+        "glsl/difference.json"
+    ],
+    "windows": [
+        "Lena",
+        "Texture/Plane"
+    ],
+    "streams": [
+        {
+            "name": "Lena",
+            "window": true,
+            "files": [
+                "images/lena.png"
+            ]
+        },
+        {
+            "name": "Texture",
+            "window": false,
+            "files": [
+                "images/texture.png"
+            ]
+        },
+        {
+            "name": "Plane",
+            "window": true,
+            "files": [
+                "images/plane.png"
+            ]
+        },
+        {
+            "name": "Lena/Texture",
+            "window": true,
+            "shader": 0,
+            "inputs": [
+                0,
+                1
+            ]
+        },
+        {
+            "name": "Texture/Plane",
+            "window": true,
+            "shader": 0,
+            "inputs": [
+                1,
+                2
+            ]
+        }
+    ]
+}

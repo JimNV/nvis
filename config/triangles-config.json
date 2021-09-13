@@ -1,0 +1,40 @@
+{
+    "name": "Test configuration",
+    "streams": [
+        {
+            "name": "Reference stream",
+            "window": false,
+            "files": [
+                "images/triangle.0000.png",
+                "images/triangle.0001.png",
+                "images/triangle.0002.png",
+                "images/triangle.0003.png",
+                "images/triangle.0004.png",
+                "images/triangle.0005.png",
+                "images/triangle.0006.png",
+                "images/triangle.0007.png",
+                "images/triangle.0008.png"
+            ]
+        },
+        {
+            "name": "Test stream",
+            "window": false,
+            "files": [
+                "images/triangle.0001.png",
+                "images/triangle.0002.png",
+                "images/triangle.0003.png",
+                "images/triangle.0004.png",
+                "images/triangle.0005.png",
+                "images/triangle.0006.png",
+                "images/triangle.0007.png",
+                "images/triangle.0008.png",
+                "images/triangle.0009.png"
+            ]
+        },
+        {
+            "window": true,
+            "name": "Difference stream",
+            "shader": "glsl/difference.json"
+        }
+    ]
+}
