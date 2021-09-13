@@ -202,14 +202,9 @@ var nvis = new function () {
         let _glContext = glContext;
         let _jsonText = jsonText;
         let _jsonObject = {};
-        // let _name = (json === undefined ? "Stream" : json.name);
-        // let _fileName = (json === undefined ? undefined : json.filename);
-        // let _numInputs = (json === undefined ? undefined : json.inputs);
         let _name = undefined;
         let _fileName = undefined;
         let _numInputs = undefined;
-
-        let _ui = undefined;
 
         let _source = undefined;
 
@@ -242,7 +237,7 @@ void main()
         let _init = function () {
             //if (_jsonText !== undefined)
             //{
-                _jsonObject = JSON.parse(_jsonText);
+            _jsonObject = JSON.parse(_jsonText);
             //}
             //console.log("=====  Shader JSON loaded (" + jsonFileName + ")");
             //  convert top-level keys to lowercase
@@ -262,7 +257,6 @@ void main()
             }
             else {
                 _load(_fileName);
-                //_ui = new NvisShaderUI(_json.ui);
             }
         }
 
@@ -291,8 +285,7 @@ void main()
             if (!_glContext.getProgramParameter(_shaderProgram, _glContext.LINK_STATUS)) {
                 alert("Could not initialize shader!");
             }
-            if (newStreamCallback !== undefined)
-            {
+            if (newStreamCallback !== undefined) {
                 newStreamCallback();
             }
         }
@@ -303,8 +296,7 @@ void main()
             let xhr = new XMLHttpRequest();
             xhr.open("GET", fileName);
             xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
-            xhr.onload = function (event)
-            {
+            xhr.onload = function (event) {
                 if (this.status == 200 && this.responseText !== null) {
                     console.log("=====  Shader loaded (" + fileName + ")");
                     _fragmentSource = this.responseText;
@@ -323,22 +315,8 @@ void main()
             return _bVertexReady && _bFragmentReady;
         }
 
-        let _setUniforms = function () {
-            if (_ui !== undefined) {
-                _ui.setUniforms(_glContext, _shaderProgram);
-            }
-        }
-
-        let _getUI = function (streamId) {
-            return (_ui !== undefined ? _ui.getDOM(streamId) : undefined);
-        }
-
         let _getName = function () {
             return _name;
-        }
-
-        let _updateParameter = function (elementId) {
-            _ui.update(elementId);
         }
 
         let _getNumInputs = function () {
@@ -352,10 +330,7 @@ void main()
             load: _load,
             getProgram: _getProgram,
             isReady: _isReady,
-            setUniforms: _setUniforms,
-            getUI: _getUI,
             getName: _getName,
-            updateParameter: _updateParameter,
             getNumInputs: _getNumInputs,
         }
     }
@@ -440,16 +415,25 @@ void main()
             pixel: new Uint8Array([0, 0, 255, 255]),
         }
 
-        let _setUniforms = function (shaderProgram) {
-            if (_shaderJSONObject === undefined)
-            {
-                return;
+        let _setUniforms = function (shader) {
+            //  lazily get the UI JSON from the shader
+            if (!_bUIReady) {
+                let shaderJSONText = shader.getJSONText();
+                if (shaderJSONText === undefined) {
+                    return;
+                }
+                _shaderJSONObject = JSON.parse(shaderJSONText);
+                _bUIReady = true;
             }
+            
+            // if (_shaderJSONObject === undefined) {
+            //     return;
+            // }
 
             let object = _shaderJSONObject.UI;
             for (let key of Object.keys(object)) {
                 let type = object[key].type;
-                let uniform = _glContext.getUniformLocation(shaderProgram, key);
+                let uniform = _glContext.getUniformLocation(shader.getProgram(), key);
 
                 if (uniform === undefined) {
                     continue;
@@ -720,14 +704,6 @@ void main()
 
 
         let _getUI = function (streamId, streams, shaders) {
-            //  lazily get the UI JSON from the shader
-            if (!_bUIReady) {
-                let shaderJSONText = shaders[_shaderId].getJSONText();
-                if (shaderJSONText !== undefined) {
-                    _shaderJSONObject = JSON.parse(shaderJSONText);
-                }
-                _bUIReady = true;
-            }
 
             //  streamId is needed since the stream itself does not know its id
             let ui = document.createDocumentFragment();
@@ -1293,7 +1269,7 @@ void main()
                     gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
                 }
 
-                stream.setUniforms(shaderProgram);
+                stream.setUniforms(shader);
             }
 
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -1570,6 +1546,7 @@ void main()
             _uiPopup.innerHTML += "<input id=\"bAutomaticLayout\" type=\"checkbox\" onclick=\"_toggleAutomaticLayout()\"> Automatic window layout";
             _uiPopup.innerHTML += "<br/>";
 
+            //  center popup
             let w = window.getComputedStyle(_uiPopup).getPropertyValue("width");
             let h = window.getComputedStyle(_uiPopup).getPropertyValue("height");
             let x = Math.trunc((_canvas.width - w.substring(0, w.indexOf('px'))) / 2);
@@ -1969,8 +1946,7 @@ void main()
         _renderer.loadShader(fileName);
     }
 
-    let _config = function (fileName)
-    {
+    let _config = function (fileName) {
         let xhr = new XMLHttpRequest();
         xhr.open("GET", fileName);
         xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
@@ -1996,8 +1972,7 @@ void main()
                         } else if (shaderId !== undefined) {
                             newStream = _renderer.addShaderStream(shaderId + 1);
                             let inputStreamIds = streams[objectId].inputs;
-                            if (inputStreamIds !== undefined)
-                            {
+                            if (inputStreamIds !== undefined) {
                                 newStream.setInputStreamIds(inputStreamIds);
                             }
                         }
