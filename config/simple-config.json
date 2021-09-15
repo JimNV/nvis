@@ -1,33 +1,11 @@
 {
     "name": "Test configuration",
-    "layout": {
-        "width": 3
-    },
-    "shaders": [
-        "glsl/difference.json"
-    ],
     "streams": [
         {
             "name": "Lena",
             "window": true,
             "files": [
-                "images/lena.png"
-            ]
-        },
-        {
-            "name": "Texture",
-            "window": false,
-            "files": [
-                "images/texture.png"
-            ]
-        },
-        {
-            "name": "Lena/Texture",
-            "window": true,
-            "shader": 0,
-            "inputs": [
-                0,
-                1
+                "images/wolf.png"
             ]
         }
     ]
