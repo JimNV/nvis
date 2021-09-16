@@ -367,24 +367,45 @@ var nvis = new function () {
 
         let _fragmentSource = "";
         let _vertexSource = `precision highp float;
-attribute vec2 aVertexPosition;
-attribute vec2 aTextureCoord;
-varying vec2 vTextureCoord;
-void main()
-{
-    gl_Position = vec4(aVertexPosition, 0.0, 1.0);
-    vTextureCoord = aTextureCoord;
-}`;
+        attribute vec2 aVertexPosition;
+        attribute vec2 aTextureCoord;
+        varying vec2 vTextureCoord;
+        void main()
+        {
+            gl_Position = vec4(aVertexPosition, 0.0, 1.0);
+            vTextureCoord = aTextureCoord;
+        }`;
         let _defaultFragmentSource = `precision highp float;
-varying vec2 vTextureCoord;
-uniform sampler2D uSampler;
-void main()
-{
-    if (vTextureCoord.x < 0.0 || vTextureCoord.x > 1.0 || vTextureCoord.y < 0.0 || vTextureCoord.y > 1.0)
-        gl_FragColor = vec4(0.5, 0.1, 0.1, 1.0);
-    else
-        gl_FragColor = texture2D(uSampler, vTextureCoord);
-}`;
+        varying vec2 vTextureCoord;
+        uniform sampler2D uSampler;
+        uniform vec2 uDimensions;
+
+        float modi(float a, float b) {
+            return floor(a - floor((a + 0.5) / b) * b);
+        }
+
+        void main()
+        {
+            if (vTextureCoord.x < 0.0 || vTextureCoord.x > 1.0 || vTextureCoord.y < 0.0 || vTextureCoord.y > 1.0)
+                gl_FragColor = vec4(0.1, 0.1, 0.1, 1.0);
+            else
+            {
+                vec4 c = texture2D(uSampler, vTextureCoord);
+
+                float xx = (vTextureCoord.x * uDimensions.x) / 16.0;
+                float yy = (vTextureCoord.y * uDimensions.y) / 16.0;
+                gl_FragColor = vec4(c.r, c.g, c.b, 1.0);
+                if (c.a < 1.0)
+                {
+                    vec4 gridColor = vec4(0.6, 0.6, 0.6, 1.0);
+                    if (modi(xx, 2.0) == 0.0 ^^ modi(yy, 2.0) == 0.0)
+                        gridColor = vec4(0.5, 0.5, 0.5, 1.0);
+                    
+
+                    gl_FragColor = gridColor + vec4(gl_FragColor.rgb * gl_FragColor.a, 1.0);
+                }
+            }
+        }`;
 
         let _init = function () {
             //if (_jsonText !== undefined)
@@ -617,9 +638,6 @@ void main()
             console.log(key + ": " + object.value);
         }
 
-        // let _updateParameter = function (elementId) {
-        //     _uiUpdate(elementId);
-        // }
 
         let _setupTexture = function (texture, image) {
             _glContext.bindTexture(_glContext.TEXTURE_2D, texture);
@@ -988,7 +1006,9 @@ void main()
             this.streamPxDimensions = undefined;
             this.winPxDimensions = undefined;
             this.windows = [];
-    
+            
+            this.boundAdjust = this.adjust.bind(this);
+
             this.textureCoordinates = new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
     
             this.lineDrawer = new NvisDraw(this.glContext, "trianglestrip");
@@ -1010,7 +1030,7 @@ void main()
                 highFactor: Math.pow(Math.E, Math.log(2) / 4.0),
                 level: 1.0,
                 winAspectRatio: 1.0,
-                position: { x: 0.0, y: 0.0 },  //  mouse position at zoom (pixels)
+                mouseWinOffset: { x: 0.0, y: 0.0 },  //  mouse position at zoom [0, 1]
                 offset: { x: 0.0, y: 0.0 },
             }
     
@@ -1055,18 +1075,76 @@ void main()
             return this.windows.length;
         }
 
-        getOffset(position) {
-            if (!this.insideWindow(position)) {
+        getWindowPixelCoordinates(mousePosition) {
+            if (!this.insideWindow(mousePosition)) {
                 return undefined;
             }
 
-            let w = this.layout.w;
-            let h = this.layout.h;
+            let coords = {
+                x: (mousePosition.x - this.layout.border) % (this.canvas.width / this.layout.w),
+                y: (mousePosition.y - this.layout.border) % (this.canvas.height / this.layout.h)
+            }
 
-            let xx = (position.x - this.layout.border) % (this.canvas.width / w);
-            let yy = (position.y - this.layout.border) % (this.canvas.height / h);
+            // console.log("NvisWindows.getWindowPixelCoordinates(): " + JSON.stringify(coords));
 
-            return { x: xx / this.winPxDimensions.w, y: yy / this.winPxDimensions.h };
+            return coords;
+        }
+
+        getWindowOffset(mousePosition) {
+            let wPixelCoord = this.getWindowPixelCoordinates(mousePosition);
+            if (wPixelCoord === undefined) {
+                return undefined;
+            }
+
+            let offset = {
+                x: wPixelCoord.x / this.winPxDimensions.w,
+                y: wPixelCoord.y / this.winPxDimensions.h
+            }
+
+            // console.log("NvisWindows.getWindowOffset(): " + JSON.stringify(offset));
+
+            return offset;
+        }
+
+        getStreamOffset(mousePosition) {
+            // let streamOffset = this.getStreamOffset(mousePosition);
+            // console.log("NvisWindows.getStreamOffset(): " + JSON.stringify(streamOffset));
+        }
+
+        getStreamPixelCoordinates(mousePosition) {
+            
+            if (!this.insideWindow(mousePosition)) {
+                return undefined;
+            }
+
+            let wp = this.getWindowPixelCoordinates(mousePosition);
+            let z = this.zoomSettings.level;
+            let ox = this.zoomSettings.offset.x;
+            let oy = this.zoomSettings.offset.y;
+            let ww = this.winPxDimensions.w;
+            let wh = this.winPxDimensions.h;
+            let sw = this.streamPxDimensions.w;
+            let sh = this.streamPxDimensions.h;
+
+            let bx = Math.max(ww - sw * z, 0.0) / 2.0;
+            let by = Math.max(wh - sh * z, 0.0) / 2.0;
+            let xx = (wp.x - bx) / z;
+            let yy = (wp.y - by) / z;
+            if (ww < sw * z) {
+                xx += ox * sw;
+            }
+            if (wh < sh * z) {
+                yy += oy* sh;
+            }
+
+            let offset = { x: xx, y: yy };
+
+            if (xx < 0.0 || xx >= sw || yy < 0.0 || yy >= sh) {
+                return undefined;
+            }
+            // console.log("NvisWindows.getStreamPixelCoordinates(): " + JSON.stringify(offset));
+
+            return offset;
         }
 
         add(streamId = 0) {
@@ -1123,67 +1201,50 @@ void main()
             console.log("     zoom level: " + this.zoomSettings.level);
             console.log("     win aspect ratio: " + this.zoomSettings.winAspectRatio);
             console.log("     offset: " + this.zoomSettings.offset.x + ", " + this.zoomSettings.offset.y);
-            console.log("     position: " + this.zoomSettings.position.x + ", " + this.zoomSettings.position.y);
+            console.log("     mouseWinOffset: " + this.zoomSettings.mouseWinOffset.x + ", " + this.zoomSettings.mouseWinOffset.y);
             console.log("     win dim (px): " + this.winPxDimensions.w + "x" + this.winPxDimensions.h);
             console.log("     stream dim (px): " + JSON.stringify(this.streamPxDimensions));
 
             //  top-left
             this.textureCoordinates[0] = 0.0;
             this.textureCoordinates[1] = 0.0;
-
             //  top-right
             this.textureCoordinates[2] = 1.0;
             this.textureCoordinates[3] = 0.0;
-
             //  bottom-left
             this.textureCoordinates[4] = 0.0;
             this.textureCoordinates[5] = 1.0;
-
             //  bottom-right
             this.textureCoordinates[6] = 1.0;
             this.textureCoordinates[7] = 1.0;
 
             //  zoom
-            let xx = 1.0 / this.zoomSettings.level;
-            let yy = 1.0 / this.zoomSettings.level;
+            let zw = this.zoomSettings.level * this.streamPxDimensions.w;
+            let zh = this.zoomSettings.level * this.streamPxDimensions.h;
+            let tx = this.winPxDimensions.w / zw;
+            let ty = this.winPxDimensions.h / zh;
 
-            //  stream aspect
-            // let streamAspect = this.streamPxDimensions.h / this.streamPxDimensions.w;
-
-            let aY = this.streamPxDimensions.h / this.winPxDimensions.h;
-            let aX = this.streamPxDimensions.w / this.winPxDimensions.w;
-
-            // this.textureCoordinates[0] = 0.0;
-            // this.textureCoordinates[1] = 0.0;
-            this.textureCoordinates[2] = xx / aX;
-            // this.textureCoordinates[3] = 0.0;
-            // this.textureCoordinates[4] = 0.0;
-            this.textureCoordinates[5] = yy / aY;
-            this.textureCoordinates[6] = xx / aX;
-            this.textureCoordinates[7] = yy / aY;
-
-            //  window aspect
-            // if (this.zoomSettings.winAspectRatio < 1.0) {
-            //     //  w > h
-            //     this.textureCoordinates[5] = this.zoomSettings.winAspectRatio / this.zoomSettings.level;
-            //     this.textureCoordinates[7] = this.zoomSettings.winAspectRatio / this.zoomSettings.level;
-            // }
-            // else {
-            //     //  h > w
-            //     this.textureCoordinates[5] = this.zoomSettings.winAspectRatio / this.zoomSettings.level;
-            //     this.textureCoordinates[7] = this.zoomSettings.winAspectRatio / this.zoomSettings.level;
-            // }
+            this.textureCoordinates[2] = tx;  //  top-right, X
+            this.textureCoordinates[5] = ty;  //  bottom-left, Y
+            this.textureCoordinates[6] = tx;  //  bottom-right, X
+            this.textureCoordinates[7] = ty;  //  bottom-right, Y
 
             //  offsets
+            if (zw < this.winPxDimensions.w) {
+                this.zoomSettings.offset.x = (1.0 - tx) / 2.0;
+            } else {
+                this.zoomSettings.offset.x = Math.min(Math.max(this.zoomSettings.offset.x, 0.0), 1.0 - tx);
+            }
+            if (zh < this.winPxDimensions.h) {
+                this.zoomSettings.offset.y = (1.0 - ty) / 2.0;
+            } else {
+                this.zoomSettings.offset.y = Math.min(Math.max(this.zoomSettings.offset.y, 0.0), 1.0 - ty);
+            }
+
             for (let i = 0; i < 8; i += 2) {
                 this.textureCoordinates[i] += this.zoomSettings.offset.x;
                 this.textureCoordinates[i + 1] += this.zoomSettings.offset.y;
             }
-
-            // for (let i = 0; i < 8; i++)
-            // {
-            // 	this.textureCoordinates[i] = _clamp(this.textureCoordinates[i], 0.0, 1.0);
-            // }
 
             //  update windows with new coordinates
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
@@ -1252,20 +1313,30 @@ void main()
         {
             //  x and y are in pixels
             this.zoomSettings.offset = {
-                x: this.zoomSettings.offset.x + x / (this.winPxDimensions.w * this.zoomSettings.level),
-                y: this.zoomSettings.offset.y + y / (this.winPxDimensions.h * this.zoomSettings.level)
+                x: this.zoomSettings.offset.x + x / (this.streamPxDimensions.w * this.zoomSettings.level),
+                y: this.zoomSettings.offset.y + y / (this.streamPxDimensions.h * this.zoomSettings.level)
             };
 
             this.updateTextureCoordinates();
         }
 
         zoom(direction, position, bHigh = false) {
-            let pos = this.getOffset(position);
+            let pos = this.getWindowOffset(position);
             if (pos !== undefined) {
+
+                // let px = ;
+                // let py = ;
+
+                let dx = (this.zoomSettings.offset.x + pos.x) * this.streamPxDimensions.w;
+                let dy = (this.zoomSettings.offset.y / this.zoomSettings.level + pos.y) * this.streamPxDimensions.h;
+                console.log("dx = " + dx + ", dy = " + dy);
+                this.translate(dx, dy);
+
                 let factor = (bHigh ? this.zoomSettings.highFactor : this.zoomSettings.lowFactor);
                 this.zoomSettings.level *= (direction > 0 ? factor : 1.0 / factor);
                 this.zoomSettings.level = Math.max(this.zoomSettings.level, 1.0);  //  TODO: is this what we want?
-                this.zoomSettings.position = pos;
+                this.zoomSettings.mouseWinOffset = pos;
+
 
                 this.updateTextureCoordinates();
             }
@@ -1296,7 +1367,7 @@ void main()
                 this.windows[windowId].render(frameId, streams, shaders);
             }
 
-            this.lineDrawer.render();
+            //this.lineDrawer.render();
         }
 
         // return {
@@ -1342,7 +1413,7 @@ void main()
 
             this.overlay = new NvisOverlay();
 
-            this.canvas.parentNode.insertBefore(this.overlay.getNode(), this.canvas.nextSibling);
+            //this.canvas.parentNode.insertBefore(this.overlay.getNode(), this.canvas.nextSibling);
 
             this.resize({ x: 0.0, y: 0.0 }, { w: 1.0, h: 1.0 });
 
@@ -1443,6 +1514,9 @@ void main()
                 // Tell the shader we bound the texture to texture unit 0
                 let uSampler = gl.getUniformLocation(shaderProgram, 'uSampler');
                 gl.uniform1i(uSampler, 0);
+
+                let streamDim = stream.getDimensions();
+                gl.uniform2f(gl.getUniformLocation(shaderProgram, "uDimensions"), streamDim.w, streamDim.h);
             }
             else {
                 for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
@@ -1454,6 +1528,12 @@ void main()
 
                 stream.setUniforms(shader);
             }
+            
+            //gl.clearColor(1.0, 1.0, 0.0, 1.0);
+            // gl.clear(gl.COLOR_BUFFER_BIT);
+
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         }
@@ -1654,14 +1734,16 @@ void main()
 
             _shaders.push(new NvisShader(_glContext));
 
-            window.onresize = _windows.adjust;
+            window.addEventListener("resize", _windows.boundAdjust);
 
-            _canvas.onclick = _onClick;
-            _canvas.onmousedown = _onMouseDown;
-            _canvas.onmousemove = _onMouseMove;
-            _canvas.onmouseup = _onMouseUp;
-            _canvas.onwheel = _onWheel;
+            _canvas.addEventListener("click", _onClick);
+            _canvas.addEventListener("mousedown", _onMouseDown);
+            _canvas.addEventListener("mousemove", _onMouseMove);
+            _canvas.addEventListener("mouseup", _onMouseUp);
+            _canvas.addEventListener("mouseleave", _onMouseUp);
+            _canvas.addEventListener("wheel", _onWheel);
 
+            //  TODO: change to addEventListener
             document.body.onpaste = _onFileDrop;
             document.body.ondrop = _onFileDrop;
             document.body.ondragenter = _onFileDragEnter;
@@ -1875,7 +1957,10 @@ void main()
         }
 
         let _onClick = function (event) {
-            console.log("_canvas.onclick()");
+            let pCoord = _windows.getStreamPixelCoordinates(_input.mouse.position);
+            //let pos = this.getWindowOffset(position);
+
+            console.log("_canvas.onclick(): " + JSON.stringify(pCoord));
         }
 
         let _onMouseDown = function (event) {
@@ -2023,7 +2108,7 @@ void main()
 
         let _render = function () {
             _glContext.clearColor(0.2, 0.2, 0.2, 1.0);
-            //_glContext.clear(_glContext.COLOR_BUFFER_BIT);
+            _glContext.clear(_glContext.COLOR_BUFFER_BIT);
 
             //_renderFrameBuffers();
             _windows.render(_animation.frameId, _streams, _shaders);
