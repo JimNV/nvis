@@ -1030,14 +1030,17 @@ var nvis = new function () {
                 highFactor: Math.pow(Math.E, Math.log(2) / 4.0),
                 level: 1.0,
                 winAspectRatio: 1.0,
-                mouseWinOffset: { x: 0.0, y: 0.0 },  //  mouse position at zoom [0, 1]
-                offset: { x: 0.0, y: 0.0 },
+                mouseWinCoords: { x: 0.0, y: 0.0 },  //  mouse position at zoom [0, 1]
+                streamOffset: { x: 0.0, y: 0.0 },  //  top-left relative stream offset [0, 1]
             }
     
         }
 
-        insideWindow(position) {
-            return !(position.x < this.layout.border || position.x > this.canvas.width + this.layout.border || position.y < this.layout.border || position.y > this.canvas.height + this.layout.border);
+        insideWindow(canvasPxCoords) {
+            return !(canvasPxCoords.x < this.layout.border ||
+                canvasPxCoords.x >= this.canvas.width + this.layout.border ||
+                canvasPxCoords.y < this.layout.border ||
+                canvasPxCoords.y >= this.canvas.height + this.layout.border);
         }
 
         setStreamPxDimensions(pxDimensions) {
@@ -1047,13 +1050,13 @@ var nvis = new function () {
             this.streamPxDimensions = pxDimensions;
         }
 
-        getWindowId(position) {
-            if (!this.insideWindow(position)) {
+        getWindowId(canvasPxCoords) {
+            if (!this.insideWindow(canvasPxCoords)) {
                 return undefined;
             }
 
-            let xx = (position.x - this.layout.border) / this.canvas.width;
-            let yy = (position.y - this.layout.border) / this.canvas.height;
+            let xx = (canvasPxCoords.x - this.layout.border) / this.canvas.width;
+            let yy = (canvasPxCoords.y - this.layout.border) / this.canvas.height;
 
             let w = this.layout.w;
             let h = this.layout.h;
@@ -1075,52 +1078,39 @@ var nvis = new function () {
             return this.windows.length;
         }
 
-        getWindowPixelCoordinates(mousePosition) {
-            if (!this.insideWindow(mousePosition)) {
+        getWindowCoordinates(canvasPxCoords, bPixels = false) {
+            
+            if (!this.insideWindow(canvasPxCoords)) {
                 return undefined;
             }
 
             let coords = {
-                x: (mousePosition.x - this.layout.border) % (this.canvas.width / this.layout.w),
-                y: (mousePosition.y - this.layout.border) % (this.canvas.height / this.layout.h)
+                x: (canvasPxCoords.x - this.layout.border) % (this.canvas.width / this.layout.w),
+                y: (canvasPxCoords.y - this.layout.border) % (this.canvas.height / this.layout.h)
             }
 
-            // console.log("NvisWindows.getWindowPixelCoordinates(): " + JSON.stringify(coords));
-
-            return coords;
-        }
-
-        getWindowOffset(mousePosition) {
-            let wPixelCoord = this.getWindowPixelCoordinates(mousePosition);
-            if (wPixelCoord === undefined) {
-                return undefined;
-            }
-
-            let offset = {
-                x: wPixelCoord.x / this.winPxDimensions.w,
-                y: wPixelCoord.y / this.winPxDimensions.h
+            if (!bPixels) {
+                coords = {
+                    x: coords.x / this.winPxDimensions.w,
+                    y: coords.y / this.winPxDimensions.h
+                }
             }
 
             // console.log("NvisWindows.getWindowOffset(): " + JSON.stringify(offset));
 
-            return offset;
+            return coords;
         }
 
-        getStreamOffset(mousePosition) {
-            // let streamOffset = this.getStreamOffset(mousePosition);
-            // console.log("NvisWindows.getStreamOffset(): " + JSON.stringify(streamOffset));
-        }
-
-        getStreamPixelCoordinates(mousePosition) {
+        getStreamCoordinates(canvasPxCoords, bPixels = false) {
             
-            if (!this.insideWindow(mousePosition)) {
+            if (!this.insideWindow(canvasPxCoords)) {
                 return undefined;
             }
 
-            let wp = this.getWindowPixelCoordinates(mousePosition);
+            let wpc = this.getWindowCoordinates(canvasPxCoords, true);
             let z = this.zoomSettings.level;
-            let ox = this.zoomSettings.offset.x;
-            let oy = this.zoomSettings.offset.y;
+            let ox = this.zoomSettings.streamOffset.x;
+            let oy = this.zoomSettings.streamOffset.y;
             let ww = this.winPxDimensions.w;
             let wh = this.winPxDimensions.h;
             let sw = this.streamPxDimensions.w;
@@ -1128,23 +1118,33 @@ var nvis = new function () {
 
             let bx = Math.max(ww - sw * z, 0.0) / 2.0;
             let by = Math.max(wh - sh * z, 0.0) / 2.0;
-            let xx = (wp.x - bx) / z;
-            let yy = (wp.y - by) / z;
+            let xx = (wpc.x - bx) / z;
+            let yy = (wpc.y - by) / z;
             if (ww < sw * z) {
                 xx += ox * sw;
             }
             if (wh < sh * z) {
-                yy += oy* sh;
+                yy += oy * sh;
             }
 
-            let offset = { x: xx, y: yy };
+            let coords = {
+                x: xx,
+                y: yy
+            };
 
-            if (xx < 0.0 || xx >= sw || yy < 0.0 || yy >= sh) {
-                return undefined;
+            if (xx < 0.0 || xx >= sw) {
+                coords.x = undefined;
+            } else if (!bPixels) {
+                coords.x = coords.x / sw;
             }
-            // console.log("NvisWindows.getStreamPixelCoordinates(): " + JSON.stringify(offset));
+            if (yy < 0.0 || yy >= sh) {
+                coords.y = undefined;
+            } else if (!bPixels) {
+                coords.y = coords.y / sh;
+            }
+            // console.log("NvisWindows.getStreamPixelCoordinates(): " + JSON.stringify(coords));
 
-            return offset;
+            return coords;
         }
 
         add(streamId = 0) {
@@ -1192,18 +1192,20 @@ var nvis = new function () {
             this.windows[windowId].setStreamId(streamId);
         }
 
+        debugZoom(title) {
+            console.log("---------------------  " + title + "  ---------------------");
+            console.log("     zoom level: " + this.zoomSettings.level);
+            console.log("     win aspect ratio: " + this.zoomSettings.winAspectRatio);
+            console.log("     stream rel offset: " + this.zoomSettings.streamOffset.x + ", " + this.zoomSettings.streamOffset.y);
+            console.log("     mouseWinCoords: " + this.zoomSettings.mouseWinCoords.x + ", " + this.zoomSettings.mouseWinCoords.y);
+            console.log("     win dim (px): " + this.winPxDimensions.w + "x" + this.winPxDimensions.h);
+            console.log("     stream dim (px): " + JSON.stringify(this.streamPxDimensions));
+        }
+
         updateTextureCoordinates() {
             if (this.streamPxDimensions === undefined) {
                 return;
             }
-
-            console.log("-----------------  updateTextureCoordinates()  -----------------");
-            console.log("     zoom level: " + this.zoomSettings.level);
-            console.log("     win aspect ratio: " + this.zoomSettings.winAspectRatio);
-            console.log("     offset: " + this.zoomSettings.offset.x + ", " + this.zoomSettings.offset.y);
-            console.log("     mouseWinOffset: " + this.zoomSettings.mouseWinOffset.x + ", " + this.zoomSettings.mouseWinOffset.y);
-            console.log("     win dim (px): " + this.winPxDimensions.w + "x" + this.winPxDimensions.h);
-            console.log("     stream dim (px): " + JSON.stringify(this.streamPxDimensions));
 
             //  top-left
             this.textureCoordinates[0] = 0.0;
@@ -1231,19 +1233,19 @@ var nvis = new function () {
 
             //  offsets
             if (zw < this.winPxDimensions.w) {
-                this.zoomSettings.offset.x = (1.0 - tx) / 2.0;
+                this.zoomSettings.streamOffset.x = (1.0 - tx) / 2.0;
             } else {
-                this.zoomSettings.offset.x = Math.min(Math.max(this.zoomSettings.offset.x, 0.0), 1.0 - tx);
+                this.zoomSettings.streamOffset.x = Math.min(Math.max(this.zoomSettings.streamOffset.x, 0.0), 1.0 - tx);
             }
             if (zh < this.winPxDimensions.h) {
-                this.zoomSettings.offset.y = (1.0 - ty) / 2.0;
+                this.zoomSettings.streamOffset.y = (1.0 - ty) / 2.0;
             } else {
-                this.zoomSettings.offset.y = Math.min(Math.max(this.zoomSettings.offset.y, 0.0), 1.0 - ty);
+                this.zoomSettings.streamOffset.y = Math.min(Math.max(this.zoomSettings.streamOffset.y, 0.0), 1.0 - ty);
             }
 
             for (let i = 0; i < 8; i += 2) {
-                this.textureCoordinates[i] += this.zoomSettings.offset.x;
-                this.textureCoordinates[i + 1] += this.zoomSettings.offset.y;
+                this.textureCoordinates[i] += this.zoomSettings.streamOffset.x;
+                this.textureCoordinates[i + 1] += this.zoomSettings.streamOffset.y;
             }
 
             //  update windows with new coordinates
@@ -1309,34 +1311,41 @@ var nvis = new function () {
             this.updateTextureCoordinates();
         }
 
-        translate(x, y)
+        translate(canvasOffset, bPixels = true)
         {
-            //  x and y are in pixels
-            this.zoomSettings.offset = {
-                x: this.zoomSettings.offset.x + x / (this.streamPxDimensions.w * this.zoomSettings.level),
-                y: this.zoomSettings.offset.y + y / (this.streamPxDimensions.h * this.zoomSettings.level)
-            };
+            //  bPixels: x and y are in pixels
+            if (bPixels) {
+                canvasOffset = {
+                    x: canvasOffset.x / (this.streamPxDimensions.w * this.zoomSettings.level),
+                    y: canvasOffset.y / (this.streamPxDimensions.h * this.zoomSettings.level)
+                }
+            }
+
+            this.zoomSettings.streamOffset.x += canvasOffset.x;
+            this.zoomSettings.streamOffset.y += canvasOffset.y;
 
             this.updateTextureCoordinates();
         }
 
-        zoom(direction, position, bHigh = false) {
-            let pos = this.getWindowOffset(position);
-            if (pos !== undefined) {
+        zoom(direction, canvasPxCoords, bHigh = false) {
+            let winRelCoords = this.getWindowCoordinates(canvasPxCoords);
+            if (winRelCoords !== undefined) {
 
-                // let px = ;
-                // let py = ;
-
-                let dx = (this.zoomSettings.offset.x + pos.x) * this.streamPxDimensions.w;
-                let dy = (this.zoomSettings.offset.y / this.zoomSettings.level + pos.y) * this.streamPxDimensions.h;
-                console.log("dx = " + dx + ", dy = " + dy);
-                this.translate(dx, dy);
+                let oldStreamCoords = this.getStreamCoordinates(canvasPxCoords);
 
                 let factor = (bHigh ? this.zoomSettings.highFactor : this.zoomSettings.lowFactor);
                 this.zoomSettings.level *= (direction > 0 ? factor : 1.0 / factor);
                 this.zoomSettings.level = Math.max(this.zoomSettings.level, 1.0);  //  TODO: is this what we want?
-                this.zoomSettings.mouseWinOffset = pos;
+                this.zoomSettings.mouseWinCoords = winRelCoords;
 
+                let newStreamCoords = this.getStreamCoordinates(canvasPxCoords);
+
+                if (oldStreamCoords.x !== undefined && newStreamCoords.x !== undefined) {
+                    this.zoomSettings.streamOffset.x += (oldStreamCoords.x - newStreamCoords.x);
+                }
+                if (oldStreamCoords.y !== undefined && newStreamCoords.y !== undefined) {
+                    this.zoomSettings.streamOffset.y += (oldStreamCoords.y - newStreamCoords.y);
+                }
 
                 this.updateTextureCoordinates();
             }
@@ -1344,8 +1353,8 @@ var nvis = new function () {
             return this.zoomSettings.level;
         }
 
-        incStream(position, streams) {
-            let windowId = this.getWindowId(position);
+        incStream(canvasPxCoords, streams) {
+            let windowId = this.getWindowId(canvasPxCoords);
             if (windowId !== undefined) {
                 let streamId = this.windows[windowId].getStreamId();
                 let nextStreamId = (streamId + 1) % streams.length;
@@ -1353,8 +1362,8 @@ var nvis = new function () {
             }
         }
 
-        decStream(position, streams) {
-            let windowId = this.getWindowId(position);
+        decStream(canvasPxCoords, streams) {
+            let windowId = this.getWindowId(canvasPxCoords);
             if (windowId !== undefined) {
                 let streamId = this.windows[windowId].getStreamId();
                 let nextStreamId = (streamId + streams.length - 1) % streams.length;
@@ -1567,8 +1576,8 @@ var nvis = new function () {
 
         let _input = {
             mouse: {
-                position: { x: 0, y: 0 },
-                previousPosition: { x: 0, y: 0 },
+                canvasCoords: { x: 0, y: 0 },
+                previousCanvasCoords: { x: 0, y: 0 },
                 clickPosition: { x: 0, y: 0 },
                 down: false,
             },
@@ -1760,7 +1769,7 @@ var nvis = new function () {
 
         var _onWheel = function (event) {
             event.preventDefault();
-            let level = _windows.zoom(-Math.sign(event.deltaY), _input.mouse.position, _input.keyboard.shift);
+            let level = _windows.zoom(-Math.sign(event.deltaY), _input.mouse.canvasCoords, _input.keyboard.shift);
             _popupInfo("zoom = " + level.toFixed(2) + "x (" + (level * 100.0).toFixed(1) + "%)");
         }
 
@@ -1853,20 +1862,20 @@ var nvis = new function () {
                     _animation.dec();
                     break;
                 case 38:  //  ArrowUp
-                    _windows.incStream(_input.mouse.position, _streams);
+                    _windows.incStream(_input.mouse.canvasCoords, _streams);
                     break;
                 case 39:  //  ArrowRight
                     _animation.inc();
                     break;
                 case 40:  //  ArrowDown
-                    _windows.decStream(_input.mouse.position, _streams);
+                    _windows.decStream(_input.mouse.canvasCoords, _streams);
                     break;
                 default:
                     switch (key) {
                         case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
                             let streamId = parseInt(key) - 1;
                             if (streamId < _streams.length) {
-                                _windows.setWindowStreamId(_windows.getWindowId(_input.mouse.position), streamId);
+                                _windows.setWindowStreamId(_windows.getWindowId(_input.mouse.canvasCoords), streamId);
                             }
                             break;
                         case ' ':
@@ -1879,7 +1888,7 @@ var nvis = new function () {
                             _animation.togglePingPong();
                             break;
                         case 'd':
-                            _windows.delete(_input.mouse.position);
+                            _windows.delete(_input.mouse.canvasCoords);
                             break;
                         case 'o':
                             document.getElementById("fileInput").click();
@@ -1957,8 +1966,7 @@ var nvis = new function () {
         }
 
         let _onClick = function (event) {
-            let pCoord = _windows.getStreamPixelCoordinates(_input.mouse.position);
-            //let pos = this.getWindowOffset(position);
+            let pCoord = _windows.getStreamCoordinates(_input.mouse.canvasCoords, true);
 
             console.log("_canvas.onclick(): " + JSON.stringify(pCoord));
         }
@@ -1969,10 +1977,14 @@ var nvis = new function () {
         }
 
         let _onMouseMove = function (event) {
-            _input.mouse.previousPosition = _input.mouse.position;
-            _input.mouse.position = { x: event.clientX, y: event.clientY };
+            _input.mouse.previousCanvasCoords = _input.mouse.canvasCoords;
+            _input.mouse.canvasCoords = { x: event.clientX, y: event.clientY };
             if (_input.mouse.down) {
-                _windows.translate(_input.mouse.previousPosition.x - _input.mouse.position.x, _input.mouse.previousPosition.y - _input.mouse.position.y);
+                let canvasOffset = {
+                    x: _input.mouse.previousCanvasCoords.x - _input.mouse.canvasCoords.x,
+                    y: _input.mouse.previousCanvasCoords.y - _input.mouse.canvasCoords.y
+                }
+                _windows.translate(canvasOffset);
             }
         }
 
