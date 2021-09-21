@@ -238,7 +238,7 @@ var nvis = new function () {
                     this.mode = this.glContext.LINES;
                     break;
             }
-            
+
             this.pointSize = 1.0;
 
             this.vertexPositionBuffer = this.glContext.createBuffer();
@@ -293,19 +293,22 @@ var nvis = new function () {
             }
         }
 
+
         clear() {
             this.numVertices = 0;
         }
+
 
         setPointSize(size) {
             this.pointSize = size;
         }
 
-        addVertex(position, color = { r: 1.0, g: 1.0, b: 1.0, a: 1.0}) {
+
+        addVertex(position, color = { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }) {
             let vp = this.numVertices * 2;
             let cp = this.numVertices * 4;
-            this.vertexPositions[vp] = position.x;
-            this.vertexPositions[vp + 1] = position.y;
+            this.vertexPositions[vp] = position.x * 2.0 - 1.0;
+            this.vertexPositions[vp + 1] = -position.y * 2.0 + 1.0;
             this.vertexColors[cp] = color.r
             this.vertexColors[cp + 1] = color.g;
             this.vertexColors[cp + 2] = color.b;
@@ -313,6 +316,7 @@ var nvis = new function () {
             this.numVertices++;
         }
 
+    
         render() {
             let gl = this.glContext;
 
@@ -339,6 +343,109 @@ var nvis = new function () {
 
             gl.drawArrays(this.mode, 0, this.numVertices);
         }
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    class NvisGridDrawer extends NvisDraw {
+
+        constructor(glContext) {
+            super(glContext, "lines");
+
+            this.color = { r: 0.8, g: 0.8, b: 0.8, a: 1.0 };
+            this.offset = { x: 0.0, y: 0.0 };  //  pixels
+            this.pixelSize = { w: 0.0, w: 0.0 };
+        }
+
+        update(windowId, offset, pixelSize, layout, alpha = 1.0)
+        {
+            //  only update if there's a change
+            if (this.offset.x == offset.x && this.offset.y == offset.y && this.pixelSize.w == pixelSize.w) {
+                return;
+            }
+
+            let dim = { w: 1.0 / layout.w, h: 1.0 / layout.h };
+            let winOffset = { x: (windowId % layout.w) * dim.w, y: Math.floor(windowId / layout.w) * dim.h };
+
+            // console.log("NvisGridDrawer():  offset = " + JSON.stringify(offset) + ", pixelSize = " + JSON.stringify(pixelSize));
+            // console.log("NvisGridDrawer():  dim = " + JSON.stringify(dim) + ", alpha = " + alpha);
+
+            this.offset = offset;
+            this.pixelSize = pixelSize;
+
+            this.clear();
+
+            let value = 0.6;
+            this.color.r = value;
+            this.color.g = value;
+            this.color.b = value;
+            this.color.a = alpha;
+
+            let x = winOffset.x + offset.x;
+            let y = winOffset.y + offset.y;
+            while (x < winOffset.x + dim.w) {
+                this.addVertex({ x: x, y: winOffset.y }, this.color);
+                this.addVertex({ x: x, y: winOffset.y + dim.h }, this.color);
+                x += pixelSize.w;
+            }
+            while (y < winOffset.y + dim.h) {
+                this.addVertex({ x: winOffset.x, y: y }, this.color);
+                this.addVertex({ x: winOffset.x + dim.w, y: y }, this.color);
+                y += pixelSize.h;
+            }
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    class NvisPixelDrawer extends NvisDraw {
+
+        constructor(glContext) {
+            super(glContext, "trianglestrip");
+
+            this.color = { r: 0.8, g: 0.8, b: 0.0, a: 1.0 };
+
+            this.offset = { x: 0.0, y: 0.0 };  //  pixels
+            this.pixelSize = { w: 0.0, h: 0.0 };
+        }
+
+        update(windowId, offset, pixelSize, layout, alpha = 1.0)
+        {
+            //  only update if there's a change
+            if (this.offset.x == offset.x && this.offset.y == offset.y && this.pixelSize.w == pixelSize.w) {
+                return;
+            }
+
+            let dim = { w: 1.0 / layout.w, h: 1.0 / layout.h };
+            let winOffset = { x: (windowId % layout.w) * dim.w, y: Math.floor(windowId / layout.w) * dim.h };
+
+            // console.log("NvisPixelDrawer():  offset = " + JSON.stringify(offset) + ", pixelSize = " + JSON.stringify(pixelSize));
+            // console.log("NvisPixelDrawer():  dim = " + JSON.stringify(dim) + ", alpha = " + alpha);
+
+            this.offset = offset;
+            this.pixelSize = pixelSize;
+
+            this.clear();
+
+            let x = winOffset.x + offset.x;
+            let y = winOffset.y + offset.y;
+ 
+            this.addVertex({ x: x, y: y }, this.color);
+            this.addVertex({ x: x, y: y + pixelSize.h }, this.color);
+            this.addVertex({ x: x + pixelSize.w, y: y }, this.color);
+            this.addVertex({ x: x + pixelSize.w, y: y + pixelSize.h }, this.color);
+         }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -550,7 +657,7 @@ var nvis = new function () {
         }
     }
 
-    
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -617,6 +724,7 @@ var nvis = new function () {
             }
         }
 
+
         uiUpdate(elementId) {
             //_object[key].value = value;
             let key = elementId.replace(/\-.*$/, "");
@@ -679,11 +787,11 @@ var nvis = new function () {
 
 
         load(fileNames, callback) {
-            
+
             let gl = this.glContext;
             let numFilesLoaded = 0;
             let self = this;
-            
+
             for (let fileId = 0; fileId < fileNames.length; fileId++) {
                 let texture = gl.createTexture();
                 this.textures.push(texture);
@@ -710,7 +818,7 @@ var nvis = new function () {
             let gl = this.glContext;
             let numFilesLoaded = 0;
             let self = this;
-            
+
             for (let fileId = 0; fileId < files.length; fileId++) {
                 if (!files[fileId].type.match(/image.*/)) {
                     continue;
@@ -773,7 +881,7 @@ var nvis = new function () {
             this.inputStreamIds[inputId] = streamId;
         }
 
-        
+
         setInputStreamIds(streamIds) {
             this.inputStreamIds = streamIds;
         }
@@ -784,7 +892,7 @@ var nvis = new function () {
             return this.textures[index];
         }
 
-        
+
         getFileName() {
             //  TODO: fix
             //  TODO: remove bFileStream, use shaderId instead
@@ -904,7 +1012,7 @@ var nvis = new function () {
             if (this.shaderId != 0) {
 
                 let shader = shaders[this.shaderId];
-                
+
                 for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
                     let eId = ("input-" + streamId + "-" + inputId);
                     let label = document.createElement("label");
@@ -1002,50 +1110,53 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+
     class NvisWindows {
         constructor(glContext, canvas) {
             this.glContext = glContext;
             this.canvas = canvas;
-    
+
             this.streamPxDimensions = undefined;
             this.winPxDimensions = undefined;
             this.windows = [];
-            
+
             this.boundAdjust = this.adjust.bind(this);
 
             this.textureCoordinates = new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
-    
-            this.lineDrawer = new NvisDraw(this.glContext, "trianglestrip");
-            //this.lineDrawer.clear();
-            this.lineDrawer.setPointSize(Math.random() * 100.0);
-            this.lineDrawer.addVertex({ x: -0.5, y: -0.5 }, { r: 1.0, g: 1.0, b: 0.0 });
-            this.lineDrawer.addVertex({ x: -0.5, y: 0.5 }, { r: 1.0, g: 0.0, b: 0.0 });
-            this.lineDrawer.addVertex({ x: 0.5, y: -0.5 }, { r: 0.0, g: 1.0, b: 1.0 });
-            this.lineDrawer.addVertex({ x: 0.5, y: 0.5 }, { r: 0.0, g: 0.0, b: 1.0, a: 0.0 });
-    
-            this.layout = {
-                bAutomatic: false,
-                w: 1, h: 1,
-                border: 50,
+
+            // this.layout = {
+            //     bAutomatic: false,
+            //     w: 1, h: 1,
+            //     border: 50,
+            // }
+
+            this.settings = {
+                layout: {
+                    bAutomatic: false,
+                    w: 1, h: 1,
+                    border: 50,
+                },
+                zoom: {
+                    lowFactor: Math.pow(Math.E, Math.log(2) / 8.0),
+                    highFactor: Math.pow(Math.E, Math.log(2) / 4.0),
+                    level: 1.0,
+                    winAspectRatio: 1.0,
+                    mouseWinCoords: { x: 0.0, y: 0.0 },  //  mouse position at zoom [0, 1]
+                    streamOffset: { x: 0.0, y: 0.0 },  //  top-left relative stream offset [0, 1]
+                }
             }
-    
-            this.zoomSettings = {
-                lowFactor: Math.pow(Math.E, Math.log(2) / 8.0),
-                highFactor: Math.pow(Math.E, Math.log(2) / 4.0),
-                level: 1.0,
-                winAspectRatio: 1.0,
-                mouseWinCoords: { x: 0.0, y: 0.0 },  //  mouse position at zoom [0, 1]
-                streamOffset: { x: 0.0, y: 0.0 },  //  top-left relative stream offset [0, 1]
-            }
-    
+
         }
 
+
         insideWindow(canvasPxCoords) {
-            return !(canvasPxCoords.x < this.layout.border ||
-                canvasPxCoords.x >= this.canvas.width + this.layout.border ||
-                canvasPxCoords.y < this.layout.border ||
-                canvasPxCoords.y >= this.canvas.height + this.layout.border);
+            let border = this.settings.layout.border;
+            return !(canvasPxCoords.x < border ||
+                canvasPxCoords.x >= this.canvas.width + border ||
+                canvasPxCoords.y < border ||
+                canvasPxCoords.y >= this.canvas.height + border);
         }
+
 
         setStreamPxDimensions(pxDimensions) {
             if (this.streamPxDimensions !== undefined && pxDimensions.w != this.streamPxDimensions.w && pxDimensions.h != this.streamPxDimensions.h) {
@@ -1054,16 +1165,19 @@ var nvis = new function () {
             this.streamPxDimensions = pxDimensions;
         }
 
+
         getWindowId(canvasPxCoords) {
             if (!this.insideWindow(canvasPxCoords)) {
                 return undefined;
             }
 
-            let xx = (canvasPxCoords.x - this.layout.border) / this.canvas.width;
-            let yy = (canvasPxCoords.y - this.layout.border) / this.canvas.height;
+            let layout = this.settings.layout;
 
-            let w = this.layout.w;
-            let h = this.layout.h;
+            let xx = (canvasPxCoords.x - layout.border) / this.canvas.width;
+            let yy = (canvasPxCoords.y - layout.border) / this.canvas.height;
+
+            let w = layout.w;
+            let h = layout.h;
 
             let windowId = Math.trunc(yy * h) * w + Math.trunc(xx * w);
 
@@ -1074,26 +1188,31 @@ var nvis = new function () {
             return windowId;
         }
 
+
         getWindow(windowId) {
             return this.windows[windowId];
         }
+
 
         getNumWindows() {
             return this.windows.length;
         }
 
-        getWindowCoordinates(canvasPxCoords, bPixels = false) {
-            
+
+        getWindowCoordinates(canvasPxCoords, bToPixels = false) {
+
             if (!this.insideWindow(canvasPxCoords)) {
                 return undefined;
             }
 
+            let layout = this.settings.layout;
+
             let coords = {
-                x: (canvasPxCoords.x - this.layout.border) % (this.canvas.width / this.layout.w),
-                y: (canvasPxCoords.y - this.layout.border) % (this.canvas.height / this.layout.h)
+                x: (canvasPxCoords.x - layout.border) % (this.canvas.width / layout.w),
+                y: (canvasPxCoords.y - layout.border) % (this.canvas.height / layout.h)
             }
 
-            if (!bPixels) {
+            if (!bToPixels) {
                 coords = {
                     x: coords.x / this.winPxDimensions.w,
                     y: coords.y / this.winPxDimensions.h
@@ -1105,16 +1224,35 @@ var nvis = new function () {
             return coords;
         }
 
-        getStreamCoordinates(canvasPxCoords, bPixels = false) {
-            
+
+        getCanvasCoordinates(windowId, windowPxCoords)
+        {
+            let layout = this.settings.layout;
+
+            let position = {
+                x: windowId % layout.w,
+                y: Math.floor(windowId / layout.w)
+            }
+
+            let coords = {
+                x: windowPxCoords.x + (this.canvas.width / layout.w) * position.x,
+                y: windowPxCoords.y + (this.canvas.height / layout.h) * position.y
+            }
+            // console.log("NvisWindows.getWindowOffset(): " + JSON.stringify(offset));
+
+            return coords;
+        }
+
+        getStreamCoordinates(canvasPxCoords, bToPixels = false) {
+
             if (!this.insideWindow(canvasPxCoords)) {
                 return undefined;
             }
 
             let wpc = this.getWindowCoordinates(canvasPxCoords, true);
-            let z = this.zoomSettings.level;
-            let ox = this.zoomSettings.streamOffset.x;
-            let oy = this.zoomSettings.streamOffset.y;
+            let z = this.settings.zoom.level;
+            let ox = this.settings.zoom.streamOffset.x;
+            let oy = this.settings.zoom.streamOffset.y;
             let ww = this.winPxDimensions.w;
             let wh = this.winPxDimensions.h;
             let sw = this.streamPxDimensions.w;
@@ -1124,6 +1262,7 @@ var nvis = new function () {
             let by = Math.max(wh - sh * z, 0.0) / 2.0;
             let xx = (wpc.x - bx) / z;
             let yy = (wpc.y - by) / z;
+
             if (ww < sw * z) {
                 xx += ox * sw;
             }
@@ -1138,18 +1277,19 @@ var nvis = new function () {
 
             if (xx < 0.0 || xx >= sw) {
                 coords.x = undefined;
-            } else if (!bPixels) {
+            } else if (!bToPixels) {
                 coords.x = coords.x / sw;
             }
             if (yy < 0.0 || yy >= sh) {
                 coords.y = undefined;
-            } else if (!bPixels) {
+            } else if (!bToPixels) {
                 coords.y = coords.y / sh;
             }
             // console.log("NvisWindows.getStreamPixelCoordinates(): " + JSON.stringify(coords));
 
             return coords;
         }
+
 
         add(streamId = 0) {
             let win = new NvisWindow(this.glContext, this.canvas);
@@ -1163,6 +1303,7 @@ var nvis = new function () {
             return win;
         }
 
+
         delete(position) {
             let windowId = this.getWindowId(position);
             if (this.windows.length > 1 && windowId !== undefined) {
@@ -1171,6 +1312,7 @@ var nvis = new function () {
             }
         }
 
+
         resize() {
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
                 let position = { x: (windowId % w) * size.w, y: Math.trunc(windowId / w) * size.h };
@@ -1178,33 +1320,40 @@ var nvis = new function () {
             }
         }
 
+
         inc() {
-            if (!this.layout.bAutomatic) {
-                this.layout.w = Math.min(this.layout.w + 1, this.windows.length);
+            let layout = this.settings.layout;
+            if (!layout.bAutomatic) {
+                layout.w = Math.min(layout.w + 1, this.windows.length);
             }
             this.adjust();
         }
 
+
         dec() {
-            if (!this.layout.bAutomatic) {
-                this.layout.w = Math.max(this.layout.w - 1, 1);
+            let layout = this.settings.layout;
+            if (!layout.bAutomatic) {
+                layout.w = Math.max(layout.w - 1, 1);
             }
             this.adjust();
         }
+
 
         setWindowStreamId(windowId, streamId) {
             this.windows[windowId].setStreamId(streamId);
         }
 
+
         debugZoom(title) {
             console.log("---------------------  " + title + "  ---------------------");
-            console.log("     zoom level: " + this.zoomSettings.level);
-            console.log("     win aspect ratio: " + this.zoomSettings.winAspectRatio);
-            console.log("     stream rel offset: " + this.zoomSettings.streamOffset.x + ", " + this.zoomSettings.streamOffset.y);
-            console.log("     mouseWinCoords: " + this.zoomSettings.mouseWinCoords.x + ", " + this.zoomSettings.mouseWinCoords.y);
-            console.log("     win dim (px): " + this.winPxDimensions.w + "x" + this.winPxDimensions.h);
+            console.log("     zoom level: " + this.settings.zoom.level);
+            console.log("     win aspect ratio: " + this.settings.zoom.winAspectRatio);
+            console.log("     stream rel offset: " + JSON.stringify(this.settings.zoom.streamOffset));
+            console.log("     mouseWinCoords: " + JSON.stringify(this.settings.zoom.mouseWinCoords));
+            console.log("     win dim (px): " + JSON.stringify(this.winPxDimensions));
             console.log("     stream dim (px): " + JSON.stringify(this.streamPxDimensions));
         }
+
 
         updateTextureCoordinates() {
             if (this.streamPxDimensions === undefined) {
@@ -1225,8 +1374,8 @@ var nvis = new function () {
             this.textureCoordinates[7] = 1.0;
 
             //  zoom
-            let zw = this.zoomSettings.level * this.streamPxDimensions.w;
-            let zh = this.zoomSettings.level * this.streamPxDimensions.h;
+            let zw = this.settings.zoom.level * this.streamPxDimensions.w;
+            let zh = this.settings.zoom.level * this.streamPxDimensions.h;
             let tx = this.winPxDimensions.w / zw;
             let ty = this.winPxDimensions.h / zh;
 
@@ -1237,20 +1386,22 @@ var nvis = new function () {
 
             //  offsets
             if (zw < this.winPxDimensions.w) {
-                this.zoomSettings.streamOffset.x = (1.0 - tx) / 2.0;
+                this.settings.zoom.streamOffset.x = (1.0 - tx) / 2.0;
             } else {
-                this.zoomSettings.streamOffset.x = Math.min(Math.max(this.zoomSettings.streamOffset.x, 0.0), 1.0 - tx);
+                this.settings.zoom.streamOffset.x = Math.min(Math.max(this.settings.zoom.streamOffset.x, 0.0), 1.0 - tx);
             }
             if (zh < this.winPxDimensions.h) {
-                this.zoomSettings.streamOffset.y = (1.0 - ty) / 2.0;
+                this.settings.zoom.streamOffset.y = (1.0 - ty) / 2.0;
             } else {
-                this.zoomSettings.streamOffset.y = Math.min(Math.max(this.zoomSettings.streamOffset.y, 0.0), 1.0 - ty);
+                this.settings.zoom.streamOffset.y = Math.min(Math.max(this.settings.zoom.streamOffset.y, 0.0), 1.0 - ty);
             }
 
             for (let i = 0; i < 8; i += 2) {
-                this.textureCoordinates[i] += this.zoomSettings.streamOffset.x;
-                this.textureCoordinates[i + 1] += this.zoomSettings.streamOffset.y;
+                this.textureCoordinates[i] += this.settings.zoom.streamOffset.x;
+                this.textureCoordinates[i + 1] += this.settings.zoom.streamOffset.y;
             }
+
+            this.debugZoom("updateTextureCoordinates()");
 
             //  update windows with new coordinates
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
@@ -1258,39 +1409,42 @@ var nvis = new function () {
             }
         }
 
+
         adjust() {
             if (this.windows.length == 0) {
                 return;
             }
 
-            //  first, determine layout width/height
-            if (this.layout.bAutomatic) {
-                let canvasAspect = this.canvas.height / this.canvas.width;
-                this.layout.w = Math.round(Math.sqrt(Math.pow(2, Math.ceil(Math.log2(this.windows.length / canvasAspect)))));
-            }
-            this.layout.w = Math.max(Math.min(this.layout.w, this.windows.length), 1);
-            this.layout.h = Math.ceil(this.windows.length / this.layout.w);
+            let layout = this.settings.layout;
 
-            let w = this.layout.w;
-            let h = this.layout.h;
+            //  first, determine layout width/height
+            if (layout.bAutomatic) {
+                let canvasAspect = this.canvas.height / this.canvas.width;
+                layout.w = Math.round(Math.sqrt(Math.pow(2, Math.ceil(Math.log2(this.windows.length / canvasAspect)))));
+            }
+            layout.w = Math.max(Math.min(layout.w, this.windows.length), 1);
+            layout.h = Math.ceil(this.windows.length / layout.w);
+
+            let w = layout.w;
+            let h = layout.h;
 
             //  next, determine canvas dimensions and border
-            this.canvas.style.border = this.layout.border + "px solid black";
+            this.canvas.style.border = layout.border + "px solid black";
             let pageWidth = (window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth);
             let pageHeight = (window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight);
-            let width = pageWidth - 2 * this.layout.border;
-            let height = pageHeight - 2 * this.layout.border;
+            let width = pageWidth - 2 * layout.border;
+            let height = pageHeight - 2 * layout.border;
             let dw = (width % w);
-            let dh = (height % this.layout.h);
+            let dh = (height % h);
 
             this.canvas.width = (width - dw);
             this.canvas.height = (height - dh);
-            this.canvas.style.borderRight = (this.layout.border + dw) + "px solid black";
-            this.canvas.style.borderBottom = (this.layout.border + dh) + "px solid black";
+            this.canvas.style.borderRight = (layout.border + dw) + "px solid black";
+            this.canvas.style.borderBottom = (layout.border + dh) + "px solid black";
 
             //  set viewport to match canvas size
             this.glContext.viewport(0, 0, this.canvas.width, this.canvas.height);
-    
+
             // this.glContext.clearColor(1.0, 0.8, 0.8, 1.0);
             // this.glContext.clear(this.glContext.COLOR_BUFFER_BIT);
 
@@ -1301,7 +1455,7 @@ var nvis = new function () {
             let tw = this.canvas.width;
             let th = this.canvas.height;
             this.winPxDimensions = { w: tw / w, h: th / h };
-            this.zoomSettings.winAspectRatio = this.winPxDimensions.h / this.winPxDimensions.w;
+            this.settings.zoom.winAspectRatio = this.winPxDimensions.h / this.winPxDimensions.w;
 
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
                 let position = {
@@ -1315,21 +1469,22 @@ var nvis = new function () {
             this.updateTextureCoordinates();
         }
 
-        translate(canvasOffset, bPixels = true)
-        {
+
+        translate(canvasOffset, bPixels = true) {
             //  bPixels: x and y are in pixels
             if (bPixels) {
                 canvasOffset = {
-                    x: canvasOffset.x / (this.streamPxDimensions.w * this.zoomSettings.level),
-                    y: canvasOffset.y / (this.streamPxDimensions.h * this.zoomSettings.level)
+                    x: canvasOffset.x / (this.streamPxDimensions.w * this.settings.zoom.level),
+                    y: canvasOffset.y / (this.streamPxDimensions.h * this.settings.zoom.level)
                 }
             }
 
-            this.zoomSettings.streamOffset.x += canvasOffset.x;
-            this.zoomSettings.streamOffset.y += canvasOffset.y;
+            this.settings.zoom.streamOffset.x += canvasOffset.x;
+            this.settings.zoom.streamOffset.y += canvasOffset.y;
 
             this.updateTextureCoordinates();
         }
+
 
         zoom(direction, canvasPxCoords, bHigh = false) {
             let winRelCoords = this.getWindowCoordinates(canvasPxCoords);
@@ -1337,25 +1492,26 @@ var nvis = new function () {
 
                 let oldStreamCoords = this.getStreamCoordinates(canvasPxCoords);
 
-                let factor = (bHigh ? this.zoomSettings.highFactor : this.zoomSettings.lowFactor);
-                this.zoomSettings.level *= (direction > 0 ? factor : 1.0 / factor);
-                this.zoomSettings.level = Math.max(this.zoomSettings.level, 1.0);  //  TODO: is this what we want?
-                this.zoomSettings.mouseWinCoords = winRelCoords;
+                let factor = (bHigh ? this.settings.zoom.highFactor : this.settings.zoom.lowFactor);
+                this.settings.zoom.level *= (direction > 0 ? factor : 1.0 / factor);
+                this.settings.zoom.level = Math.min(Math.max(this.settings.zoom.level, 1.0), 256.0);  //  TODO: is this what we want?
+                this.settings.zoom.mouseWinCoords = winRelCoords;
 
                 let newStreamCoords = this.getStreamCoordinates(canvasPxCoords);
 
                 if (oldStreamCoords.x !== undefined && newStreamCoords.x !== undefined) {
-                    this.zoomSettings.streamOffset.x += (oldStreamCoords.x - newStreamCoords.x);
+                    this.settings.zoom.streamOffset.x += (oldStreamCoords.x - newStreamCoords.x);
                 }
                 if (oldStreamCoords.y !== undefined && newStreamCoords.y !== undefined) {
-                    this.zoomSettings.streamOffset.y += (oldStreamCoords.y - newStreamCoords.y);
+                    this.settings.zoom.streamOffset.y += (oldStreamCoords.y - newStreamCoords.y);
                 }
 
                 this.updateTextureCoordinates();
             }
 
-            return this.zoomSettings.level;
+            return this.settings.zoom.level;
         }
+
 
         incStream(canvasPxCoords, streams) {
             let windowId = this.getWindowId(canvasPxCoords);
@@ -1366,6 +1522,7 @@ var nvis = new function () {
             }
         }
 
+
         decStream(canvasPxCoords, streams) {
             let windowId = this.getWindowId(canvasPxCoords);
             if (windowId !== undefined) {
@@ -1375,39 +1532,22 @@ var nvis = new function () {
             }
         }
 
+
         render(frameId, streams, shaders) {
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
-                this.windows[windowId].render(frameId, streams, shaders);
+                this.windows[windowId].render(windowId, frameId, streams, shaders, this.settings);
             }
-
-            //this.lineDrawer.render();
         }
 
-        // return {
-        //     setStreamPxDimensions: _setStreamPxDimensions,
-        //     getWindowId: _getWindowId,
-        //     getWindow: _getWindow,
-        //     getNumWindows: _getNumWindows,
-        //     add: _add,
-        //     delete: _delete,
-        //     resize: _resize,
-        //     inc: _inc,
-        //     dec: _dec,
-        //     setWindowStreamId: _setWindowStreamId,
-        //     adjust: _adjust,
-        //     translate: _translate,
-        //     zoom: _zoom,
-        //     incStream: _incStream,
-        //     decStream: _decStream,
-        //     render: _render,
-        // }
     }
+
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
+
 
     class NvisWindow {
 
@@ -1416,6 +1556,9 @@ var nvis = new function () {
             this.canvas = canvas;
 
             this.streamId = undefined;
+
+            this.gridDrawer = new NvisGridDrawer(this.glContext);
+            this.pixelDrawer = new NvisPixelDrawer(this.glContext);
 
             // this.position = { x: 0, y: 0 };
             // this.dimensions = { w: 0, h: 0 };
@@ -1442,6 +1585,7 @@ var nvis = new function () {
             ];
         }
 
+
         resize(position, dimensions) {
             if (this.streamId === undefined) {
                 return;
@@ -1452,8 +1596,6 @@ var nvis = new function () {
             // }
 
             let gl = this.glContext;
-
-            //  incoming position/size is in third quadrant [0, 1]
 
             let x = _clamp(2.0 * position.x - 1.0, -1.0, 1.0);
             let y = _clamp(1.0 - 2.0 * position.y, -1.0, 1.0);
@@ -1479,15 +1621,18 @@ var nvis = new function () {
             this.overlay.resize({ x: position.x * 100, y: position.y * 100 }, dimensions);
         }
 
+
         getStreamId() {
             return this.streamId;
         }
+
 
         setStreamId(streamId) {
             this.streamId = streamId;
         }
 
-        render(frameId, streams, shaders) {
+
+        render(windowId, frameId, streams, shaders, settings) {
             let gl = this.glContext;
 
             let stream = streams[this.streamId];
@@ -1544,7 +1689,7 @@ var nvis = new function () {
 
                 stream.setUniforms(shader);
             }
-            
+
             //gl.clearColor(1.0, 1.0, 0.0, 1.0);
             // gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -1552,20 +1697,61 @@ var nvis = new function () {
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            let layout = settings.layout;
+            let winDim = { w: this.canvas.width / layout.w, h: this.canvas.height / layout.h };
+            let streamDim = stream.getDimensions();
+
+            if (streamDim === undefined) {
+                return;
+            }
+
+
+            let z = settings.zoom.level;
+            let sw = streamDim.w;
+            let sh = streamDim.h;
+            let ww = winDim.w;
+            let wh = winDim.h;
+
+            let pixelSize = {
+                w: z / (ww * layout.w),
+                h: z / (wh * layout.h)
+            }
+            let isw = 1.0 / sw;
+            let ish = 1.0 / sh;
+            let offset = {
+                x: (isw - (settings.zoom.streamOffset.x % isw)) * (sw * pixelSize.w),
+                y: (ish - (settings.zoom.streamOffset.y % ish)) * (sh * pixelSize.h),
+            }
+            if (settings.zoom.level > 10.0) {
+                let alpha = Math.min(1.0, (z - 10.0) / 10.0);
+
+                this.gridDrawer.update(windowId, offset, pixelSize, layout, alpha);
+                this.gridDrawer.render();
+
+                this.pixelDrawer.update(windowId, offset, pixelSize, layout, alpha);
+                this.pixelDrawer.render();
+            }
+
+
         }
+
 
         updateTextureCoordinates(textureCoordinates) {
             let gl = this.glContext;
             gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, textureCoordinates, gl.STATIC_DRAW);
         }
+
     }
+
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
+
 
     function NvisRenderer() {
         let _glContext = undefined;
@@ -2053,7 +2239,7 @@ var nvis = new function () {
 
             if (files[0].type.match(/image.*/)) {
                 files.sort(function (a, b) { return a.name.localeCompare(b.name); });
-                let newStream = NvisStream(_glContext);
+                let newStream = new NvisStream(_glContext);
                 newStream.drop(files, _newStreamCallback);
                 _streams.push(newStream);
                 _animation.numFrames = newStream.getNumImages();  //  TODO: check
