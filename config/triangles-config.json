@@ -1,9 +1,12 @@
 {
     "name": "Test configuration",
+    "shaders": [
+        "glsl/difference.json"
+    ],
     "streams": [
         {
             "name": "Reference stream",
-            "window": false,
+            "window": true,
             "files": [
                 "images/triangle.0000.png",
                 "images/triangle.0001.png",
@@ -18,7 +21,7 @@
         },
         {
             "name": "Test stream",
-            "window": false,
+            "window": true,
             "files": [
                 "images/triangle.0001.png",
                 "images/triangle.0002.png",
@@ -34,7 +37,11 @@
         {
             "window": true,
             "name": "Difference stream",
-            "shader": "glsl/difference.json"
+            "shader": 0,
+            "inputs": [
+                0,
+                1
+            ]
         }
     ]
 }
