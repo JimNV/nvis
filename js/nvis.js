@@ -651,6 +651,1125 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    const s_length_base = [  //  31
+        3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
+        35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258, 0, 0
+    ];
+    const s_length_extra = [  //  32
+        0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+        1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4,
+        4, 4, 5, 5, 5, 5, 0, 0, 0
+    ];
+    const s_dist_base = [  //  32
+        1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33,
+        49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537,
+        2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577, 0, 0
+    ];
+    const s_dist_extra = [  //  19
+        0, 0, 0, 0, 1, 1, 2, 2, 3, 3,
+        4, 4, 5, 5, 6, 6, 7, 7, 8, 8,
+        9, 9, 10, 10, 11, 11, 12, 12, 13, 13
+    ];
+    const s_length_dezigzag = [  //  3
+        16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15
+    ];
+    const s_min_table_sizes = [257, 1, 4];
+
+    // const s_tdefl_len_sym = [ 257, 258, 259, 260, 261, 262, 263, 264, 265, 265, 266, 266, 267, 267, 268, 268, 269, 269, 269, 269, 270, 270, 270, 270, 271, 271, 271, 271, 272, 272, 272, 272, 273, 273, 273, 273, 273, 273, 273, 273, 274, 274, 274, 274, 274, 274, 274, 274, 275, 275, 275, 275, 275, 275, 275, 275, 276, 276, 276, 276, 276, 276, 276, 276, 277, 277, 277, 277, 277, 277, 277, 277, 277, 277, 277, 277, 277, 277, 277, 277, 278, 278, 278, 278, 278, 278, 278, 278, 278, 278, 278, 278, 278, 278, 278, 278, 279, 279, 279, 279, 279, 279, 279, 279, 279, 279, 279, 279, 279, 279, 279, 279, 280, 280, 280, 280, 280, 280, 280, 280, 280, 280, 280, 280, 280, 280, 280, 280, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 281, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 282, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 283, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 284, 285 ];
+    // const s_tdefl_len_extra = [ 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0 ];
+    // const s_tdefl_small_dist_sym = [ 0, 1, 2, 3, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17 ];
+    // const s_tdefl_small_dist_extra = [ 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7 ];
+    // const s_tdefl_large_dist_sym = [ 0, 0, 18, 19, 20, 20, 21, 21, 22, 22, 22, 22, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29 ];
+    // const s_tdefl_large_dist_extra = [ 0, 0, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13 ];
+    // const s_tdefl_packed_code_size_syms_swizzle = [ 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 ];
+    // const mz_bitmasks = [ 0x0000, 0x0001, 0x0003, 0x0007, 0x000F, 0x001F, 0x003F, 0x007F, 0x00FF, 0x01FF, 0x03FF, 0x07FF, 0x0FFF, 0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF ];
+    // const s_tdefl_num_probes = [ 0, 1, 6, 32, 16, 32, 128, 256, 512, 768, 1500 ];
+
+
+    const TINFL_MAX_HUFF_TABLES = 3;
+    const TINFL_MAX_HUFF_SYMBOLS_0 = 288;
+    const TINFL_MAX_HUFF_SYMBOLS_1 = 32;
+    const TINFL_MAX_HUFF_SYMBOLS_2 = 19;
+    const TINFL_FAST_LOOKUP_BITS = 10;
+    const TINFL_FAST_LOOKUP_SIZE = 1 << TINFL_FAST_LOOKUP_BITS;
+
+//     struct tinfl_decompressor {
+//         mz_uint32 m_state;
+//         mz_uint32 m_num_bits;
+//         mz_uint32 m_zhdr0;
+//         mz_uint32 m_zhdr1;
+//         mz_uint32 m_z_adler32;
+//         mz_uint32 m_final;
+//         mz_uint32 m_type;
+//         mz_uint32 m_check_adler32;
+//         mz_uint32 m_dist;
+//         mz_uint32 m_counter;
+//         mz_uint32 m_num_extra;
+//         mz_uint32 m_table_sizes[TINFL_MAX_HUFF_TABLES];
+//         tinfl_bit_buf_t m_bit_buf;
+//         size_t m_dist_from_out_buf_start;
+//         tinfl_huff_table m_tables[TINFL_MAX_HUFF_TABLES];
+//         mz_uint8 m_raw_header[4];
+//         mz_uint8 m_len_codes[TINFL_MAX_HUFF_SYMBOLS_0 + TINFL_MAX_HUFF_SYMBOLS_1 + 137];
+//       };
+
+//     tinfl_status tinfl_decompress(tinfl_decompressor *r,
+//                                 const mz_uint8 *pIn_buf_next,
+//                                 size_t *pIn_buf_size,
+//                                 mz_uint8 *pOut_buf_start,
+//                                 mz_uint8 *pOut_buf_next,
+//                                 size_t *pOut_buf_size,
+//                                 const mz_uint32 decomp_flags) {
+
+//         tinfl_status status = TINFL_STATUS_FAILED;
+//         mz_uint32 num_bits, dist, counter, num_extra;
+//         tinfl_bit_buf_t bit_buf;
+
+//         const mz_uint8 *pIn_buf_cur = pIn_buf_next;
+//         const mz_uint8 *pIn_buf_end = pIn_buf_next + * pIn_buf_size;
+//         const mz_uint8 *pOut_buf_cur = pOut_buf_next;
+//         const mz_uint8 *pOut_buf_end = pOut_buf_next + * pOut_buf_size;
+        
+//         size_t out_buf_size_mask = (decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF) ? (size_t) - 1 : ((pOut_buf_next - pOut_buf_start) + * pOut_buf_size) - 1;
+
+//         size_t dist_from_out_buf_start;
+
+//         // Ensure the output buffer's size is a power of 2, unless the output buffer
+//         // is large enough to hold the entire output file (in which case it doesn't
+//         // matter).
+//         if (((out_buf_size_mask + 1) & out_buf_size_mask) || (pOut_buf_next < pOut_buf_start)) {
+//             *pIn_buf_size = 0;
+//             *pOut_buf_size = 0;
+//             return TINFL_STATUS_BAD_PARAM;
+//         }
+
+//         num_bits = r->m_num_bits;
+//         bit_buf = r->m_bit_buf;
+//         dist = r->m_dist;
+//         counter = r->m_counter;
+//         num_extra = r->m_num_extra;
+//         dist_from_out_buf_start = r->m_dist_from_out_buf_start;
+//         TINFL_CR_BEGIN
+
+//         bit_buf = 0;
+//         num_bits = 0;
+//         dist = 0;
+//         counter = 0;
+//         num_extra = 0;
+//         r->m_zhdr0 = 0;
+//         r->m_zhdr1 = 0;
+//         r->m_z_adler32 = 1;
+//         r->m_check_adler32 = 1;
+
+//         if (decomp_flags & TINFL_FLAG_PARSE_ZLIB_HEADER) {
+//             TINFL_GET_BYTE(1, r->m_zhdr0);
+//             TINFL_GET_BYTE(2, r->m_zhdr1);
+//             counter = (((r->m_zhdr0 * 256 + r->m_zhdr1) % 31 != 0) || (r->m_zhdr1 & 32) || ((r->m_zhdr0 & 15) != 8));
+//             if (!(decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) {
+//                 counter |= (((1U << (8U + (r->m_zhdr0 >> 4))) > 32768U) || ((out_buf_size_mask + 1) < (size_t)(1ULL << (8U + (r->m_zhdr0 >> 4)))));
+//             }
+//             if (counter) {
+//                 TINFL_CR_RETURN_FOREVER(36, TINFL_STATUS_FAILED);
+//             }
+//         }
+
+//     do {
+//         TINFL_GET_BITS(3, r->m_final, 3);
+//         r->m_type = r->m_final >> 1;
+//         if (r->m_type == 0) {
+//             TINFL_SKIP_BITS(5, num_bits & 7);
+//             for (counter = 0; counter < 4; ++counter) {
+//                 if (num_bits)
+//                     TINFL_GET_BITS(6, r->m_raw_header[counter], 8);
+//                 else
+//                     TINFL_GET_BYTE(7, r->m_raw_header[counter]);
+//             }
+//             if ((counter = (r->m_raw_header[0] | (r->m_raw_header[1] << 8))) !=
+//                 (mz_uint)(0xFFFF ^
+//                     (r->m_raw_header[2] | (r->m_raw_header[3] << 8)))) {
+//                 TINFL_CR_RETURN_FOREVER(39, TINFL_STATUS_FAILED);
+//             }
+//             while ((counter) && (num_bits)) {
+//                 TINFL_GET_BITS(51, dist, 8);
+//                 while (pOut_buf_cur >= pOut_buf_end) {
+//                     TINFL_CR_RETURN(52, TINFL_STATUS_HAS_MORE_OUTPUT);
+//                 }
+//                 *pOut_buf_cur++ = (mz_uint8)dist;
+//                 counter--;
+//             }
+//             while (counter) {
+//                 size_t n;
+//                 while (pOut_buf_cur >= pOut_buf_end) {
+//                     TINFL_CR_RETURN(9, TINFL_STATUS_HAS_MORE_OUTPUT);
+//                 }
+//                 while (pIn_buf_cur >= pIn_buf_end) {
+//                     if (decomp_flags & TINFL_FLAG_HAS_MORE_INPUT) {
+//                         TINFL_CR_RETURN(38, TINFL_STATUS_NEEDS_MORE_INPUT);
+//                     } else {
+//                         TINFL_CR_RETURN_FOREVER(40, TINFL_STATUS_FAILED);
+//                     }
+//                 }
+//                 n = MZ_MIN(MZ_MIN((size_t)(pOut_buf_end - pOut_buf_cur), (size_t)(pIn_buf_end - pIn_buf_cur)), counter);
+//                 TINFL_MEMCPY(pOut_buf_cur, pIn_buf_cur, n);
+//                 pIn_buf_cur += n;
+//                 pOut_buf_cur += n;
+//                 counter -= (mz_uint)n;
+//             }
+//         } else if (r->m_type == 3) {
+//             TINFL_CR_RETURN_FOREVER(10, TINFL_STATUS_FAILED);
+//         } else {
+//             if (r->m_type == 1) {
+//                 mz_uint8 * p = r->m_tables[0].m_code_size;
+//                 mz_uint i;
+//                 r->m_table_sizes[0] = 288;
+//                 r->m_table_sizes[1] = 32;
+//                 TINFL_MEMSET(r->m_tables[1].m_code_size, 5, 32);
+//                 for (i = 0; i <= 143; ++i) * p++ = 8;
+//                 for (; i <= 255; ++i) * p++ = 9;
+//                 for (; i <= 279; ++i) * p++ = 7;
+//                 for (; i <= 287; ++i) * p++ = 8;
+//             } else {
+//                 for (counter = 0; counter < 3; counter++) {
+//                     TINFL_GET_BITS(11, r->m_table_sizes[counter], "\05\05\04"[counter]);
+//                     r->m_table_sizes[counter] += s_min_table_sizes[counter];
+//                 }
+//                 MZ_CLEAR_OBJ(r->m_tables[2].m_code_size);
+//                 for (counter = 0; counter < r->m_table_sizes[2]; counter++) {
+//                     mz_uint s;
+//                     TINFL_GET_BITS(14, s, 3);
+//                     r->m_tables[2].m_code_size[s_length_dezigzag[counter]] = (mz_uint8)s;
+//                 }
+//                 r->m_table_sizes[2] = 19;
+//             }
+//             for (; (int)r->m_type >= 0; r->m_type--) {
+//                 int tree_next, tree_cur;
+//                 tinfl_huff_table * pTable;
+//                 mz_uint i, j, used_syms, total, sym_index, next_code[17], total_syms[16];
+//                 pTable = & r->m_tables[r->m_type];
+//                 MZ_CLEAR_OBJ(total_syms);
+//                 MZ_CLEAR_OBJ(pTable->m_look_up);
+//                 MZ_CLEAR_OBJ(pTable->m_tree);
+//                 for (i = 0; i < r->m_table_sizes[r->m_type]; ++i)
+//                     total_syms[pTable->m_code_size[i]]++;
+//                 used_syms = 0, total = 0;
+//                 next_code[0] = next_code[1] = 0;
+//                 for (i = 1; i <= 15; ++i) {
+//                     used_syms += total_syms[i];
+//                     next_code[i + 1] = (total = ((total + total_syms[i]) << 1));
+//                 }
+//                 if ((65536 != total) && (used_syms > 1)) {
+//                     TINFL_CR_RETURN_FOREVER(35, TINFL_STATUS_FAILED);
+//                 }
+//                 for (tree_next = -1, sym_index = 0; sym_index < r->m_table_sizes[r->m_type]; ++sym_index) {
+//                     mz_uint rev_code = 0, l, cur_code, code_size = pTable->m_code_size[sym_index];
+//                     if (!code_size)
+//                         continue;
+//                     cur_code = next_code[code_size]++;
+//                     for (l = code_size; l > 0; l--, cur_code >>= 1)
+//                         rev_code = (rev_code << 1) | (cur_code & 1);
+//                     if (code_size <= TINFL_FAST_LOOKUP_BITS) {
+//                         mz_int16 k = (mz_int16)((code_size << 9) | sym_index);
+//                         while (rev_code < TINFL_FAST_LOOKUP_SIZE) {
+//                             pTable->m_look_up[rev_code] = k;
+//                             rev_code += (1 << code_size);
+//                         }
+//                         continue;
+//                     }
+//                     if (0 == (tree_cur = pTable->m_look_up[rev_code & (TINFL_FAST_LOOKUP_SIZE - 1)])) {
+//                         pTable->m_look_up[rev_code & (TINFL_FAST_LOOKUP_SIZE - 1)] = (mz_int16)tree_next;
+//                         tree_cur = tree_next;
+//                         tree_next -= 2;
+//                     }
+//                     rev_code >>= (TINFL_FAST_LOOKUP_BITS - 1);
+//                     for (j = code_size; j > (TINFL_FAST_LOOKUP_BITS + 1); j--) {
+//                         tree_cur -= ((rev_code >>= 1) & 1);
+//                         if (!pTable->m_tree[-tree_cur - 1]) {
+//                             pTable->m_tree[-tree_cur - 1] = (mz_int16)tree_next;
+//                             tree_cur = tree_next;
+//                             tree_next -= 2;
+//                         } else
+//                             tree_cur = pTable->m_tree[-tree_cur - 1];
+//                     }
+//                     tree_cur -= ((rev_code >>= 1) & 1);
+//                     pTable->m_tree[-tree_cur - 1] = (mz_int16)sym_index;
+//                 }
+//                 if (r->m_type == 2) {
+//                     for (counter = 0; counter < (r->m_table_sizes[0] + r->m_table_sizes[1]);) {
+//                         mz_uint s;
+//                         TINFL_HUFF_DECODE(16, dist, &r->m_tables[2]);
+//                         if (dist < 16) {
+//                             r->m_len_codes[counter++] = (mz_uint8)dist;
+//                             continue;
+//                         }
+//                         if ((dist == 16) && (!counter)) {
+//                             TINFL_CR_RETURN_FOREVER(17, TINFL_STATUS_FAILED);
+//                         }
+//                         num_extra = "\02\03\07"[dist - 16];
+//                         TINFL_GET_BITS(18, s, num_extra);
+//                         s += "\03\03\013"[dist - 16];
+//                         TINFL_MEMSET(r->m_len_codes + counter, (dist == 16) ? r->m_len_codes[counter - 1] : 0, s);
+//                         counter += s;
+//                     }
+//                     if ((r->m_table_sizes[0] + r->m_table_sizes[1]) != counter) {
+//                         TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
+//                     }
+//                     TINFL_MEMCPY(r->m_tables[0].m_code_size, r->m_len_codes, r->m_table_sizes[0]);
+//                     TINFL_MEMCPY(r->m_tables[1].m_code_size, r->m_len_codes + r->m_table_sizes[0], r->m_table_sizes[1]);
+//                 }
+//             }
+//             for (;;) {
+//                 mz_uint8 *pSrc;
+//                 for (;;) {
+//                     if (((pIn_buf_end - pIn_buf_cur) < 4) || ((pOut_buf_end - pOut_buf_cur) < 2)) {
+//                         TINFL_HUFF_DECODE(23, counter, & r->m_tables[0]);
+//                         if (counter >= 256)
+//                             break;
+//                         while (pOut_buf_cur >= pOut_buf_end) {
+//                             TINFL_CR_RETURN(24, TINFL_STATUS_HAS_MORE_OUTPUT);
+//                         }
+//                         *pOut_buf_cur++ = (mz_uint8)counter;
+//                     } else {
+//                         int sym2;
+//                         mz_uint code_len;
+// #if TINFL_USE_64BIT_BITBUF
+//                         if (num_bits < 30) {
+//                             bit_buf |= (((tinfl_bit_buf_t)MZ_READ_LE32(pIn_buf_cur)) << num_bits);
+//                             pIn_buf_cur += 4;
+//                             num_bits += 32;
+//                         }
+// #else
+//                         if (num_bits < 15) {
+//                             bit_buf |= (((tinfl_bit_buf_t)MZ_READ_LE16(pIn_buf_cur)) << num_bits);
+//                             pIn_buf_cur += 2;
+//                             num_bits += 16;
+//                         }
+// #endif
+//                         if ((sym2 = r->m_tables[0].m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= 0)
+//                             code_len = sym2 >> 9;
+//                         else {
+//                             code_len = TINFL_FAST_LOOKUP_BITS;
+//                             do {
+//                                 sym2 = r->m_tables[0].m_tree[~sym2 + ((bit_buf >> code_len++) & 1)];
+//                             } while (sym2 < 0);
+//                         }
+//                         counter = sym2;
+//                         bit_buf >>= code_len;
+//                         num_bits -= code_len;
+//                         if (counter & 256)
+//                             break;
+
+// #if!TINFL_USE_64BIT_BITBUF
+//                         if (num_bits < 15) {
+//                             bit_buf |= (((tinfl_bit_buf_t)MZ_READ_LE16(pIn_buf_cur)) << num_bits);
+//                             pIn_buf_cur += 2;
+//                             num_bits += 16;
+//                         }
+// #endif
+//                         if ((sym2 = r->m_tables[0].m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= 0)
+//                             code_len = sym2 >> 9;
+//                         else {
+//                             code_len = TINFL_FAST_LOOKUP_BITS;
+//                             do {
+//                                 sym2 = r->m_tables[0].m_tree[~sym2 + ((bit_buf >> code_len++) & 1)];
+//                             } while (sym2 < 0);
+//                         }
+//                         bit_buf >>= code_len;
+//                         num_bits -= code_len;
+
+//                         pOut_buf_cur[0] = (mz_uint8)counter;
+//                         if (sym2 & 256) {
+//                             pOut_buf_cur++;
+//                             counter = sym2;
+//                             break;
+//                         }
+//                         pOut_buf_cur[1] = (mz_uint8)sym2;
+//                         pOut_buf_cur += 2;
+//                     }
+//                 }
+//                 if ((counter &= 511) == 256)
+//                     break;
+
+//                 num_extra = s_length_extra[counter - 257];
+//                 counter = s_length_base[counter - 257];
+//                 if (num_extra) {
+//                     mz_uint extra_bits;
+//                     TINFL_GET_BITS(25, extra_bits, num_extra);
+//                     counter += extra_bits;
+//                 }
+
+//                 TINFL_HUFF_DECODE(26, dist, & r->m_tables[1]);
+//                 num_extra = s_dist_extra[dist];
+//                 dist = s_dist_base[dist];
+//                 if (num_extra) {
+//                     mz_uint extra_bits;
+//                     TINFL_GET_BITS(27, extra_bits, num_extra);
+//                     dist += extra_bits;
+//                 }
+
+//                 dist_from_out_buf_start = pOut_buf_cur - pOut_buf_start;
+//                 if ((dist > dist_from_out_buf_start) && (decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) {
+//                     TINFL_CR_RETURN_FOREVER(37, TINFL_STATUS_FAILED);
+//                 }
+
+//                 pSrc = pOut_buf_start + ((dist_from_out_buf_start - dist) & out_buf_size_mask);
+
+//                 if ((MZ_MAX(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
+//                     while (counter--) {
+//                         while (pOut_buf_cur >= pOut_buf_end) {
+//                             TINFL_CR_RETURN(53, TINFL_STATUS_HAS_MORE_OUTPUT);
+//                         }
+//                         *pOut_buf_cur++ = pOut_buf_start[(dist_from_out_buf_start++ - dist) & out_buf_size_mask];
+//                     }
+//                     continue;
+//                 }
+// #if MINIZ_USE_UNALIGNED_LOADS_AND_STORES
+//                 else if ((counter >= 9) && (counter <= dist)) {
+//                     const mz_uint8 * pSrc_end = pSrc + (counter & ~7);
+//                     do {
+//                         ((mz_uint32 *)pOut_buf_cur)[0] = ((const mz_uint32 *)pSrc)[0];
+//                         ((mz_uint32 *)pOut_buf_cur)[1] = ((const mz_uint32 *)pSrc)[1];
+//                         pOut_buf_cur += 8;
+//                     } while ((pSrc += 8) < pSrc_end);
+//                     if ((counter &= 7) < 3) {
+//                         if (counter) {
+//                             pOut_buf_cur[0] = pSrc[0];
+//                             if (counter > 1)
+//                                 pOut_buf_cur[1] = pSrc[1];
+//                             pOut_buf_cur += counter;
+//                         }
+//                         continue;
+//                     }
+//                 }
+// #endif
+//                 do {
+//                     pOut_buf_cur[0] = pSrc[0];
+//                     pOut_buf_cur[1] = pSrc[1];
+//                     pOut_buf_cur[2] = pSrc[2];
+//                     pOut_buf_cur += 3;
+//                     pSrc += 3;
+//                 } while ((int)(counter -= 3) > 2);
+
+//                 if ((int)counter > 0) {
+//                     pOut_buf_cur[0] = pSrc[0];
+//                     if ((int)counter > 1) pOut_buf_cur[1] = pSrc[1];
+//                     pOut_buf_cur += counter;
+//                 }
+//             }
+//         }
+//     } while (!(r->m_final & 1));
+
+//     if (decomp_flags & TINFL_FLAG_PARSE_ZLIB_HEADER) {
+//     TINFL_SKIP_BITS(32, num_bits & 7);
+//     for (counter = 0; counter < 4; ++counter) {
+//         mz_uint s;
+//         if (num_bits)
+//             TINFL_GET_BITS(41, s, 8);
+//         else
+//             TINFL_GET_BYTE(42, s);
+//         r->m_z_adler32 = (r->m_z_adler32 << 8) | s;
+//     }
+// }
+// TINFL_CR_RETURN_FOREVER(34, TINFL_STATUS_DONE);
+// TINFL_CR_FINISH
+
+// common_exit:
+// r->m_num_bits = num_bits;
+// r->m_bit_buf = bit_buf;
+// r->m_dist = dist;
+// r->m_counter = counter;
+// r->m_num_extra = num_extra;
+// r->m_dist_from_out_buf_start = dist_from_out_buf_start;
+// * pIn_buf_size = pIn_buf_cur - pIn_buf_next;
+// * pOut_buf_size = pOut_buf_cur - pOut_buf_next;
+// if ((decomp_flags & (TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_COMPUTE_ADLER32)) && (status >= 0)) {
+//     const mz_uint8 *ptr = pOut_buf_next;
+//     size_t buf_len = * pOut_buf_size;
+//     mz_uint32 i;
+//     mz_uint32 s1 = r->m_check_adler32 & 0xffff;
+//     mz_uint32s2 = r->m_check_adler32 >> 16;
+//     size_t block_len = buf_len % 5552;
+//     while (buf_len) {
+//         for (i = 0; i + 7 < block_len; i += 8, ptr += 8) {
+//             s1 += ptr[0], s2 += s1;
+//             s1 += ptr[1], s2 += s1;
+//             s1 += ptr[2], s2 += s1;
+//             s1 += ptr[3], s2 += s1;
+//             s1 += ptr[4], s2 += s1;
+//             s1 += ptr[5], s2 += s1;
+//             s1 += ptr[6], s2 += s1;
+//             s1 += ptr[7], s2 += s1;
+//         }
+//         for (; i < block_len; ++i) s1 += * ptr++, s2 += s1;
+//         s1 %= 65521U, s2 %= 65521U;
+//         buf_len -= block_len;
+//         block_len = 5552;
+//     }
+//     r->m_check_adler32 = (s2 << 16) + s1;
+//     if ((status == TINFL_STATUS_DONE) && (decomp_flags & TINFL_FLAG_PARSE_ZLIB_HEADER) && (r->m_check_adler32 != r->m_z_adler32))
+//         status = TINFL_STATUS_ADLER32_MISMATCH;
+// }
+// return status;
+// }
+
+    class NvisDeflate {
+        
+        constructor(bufferView, offset, length) {
+            this.bufferView = bufferView;
+            this.offset = offset;
+            this.length = length;
+
+
+        }
+
+        getByte() {
+            let value = this.bufferView.getUint8(this.offset);
+            this.offset++;
+            return value;
+        }
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    class NvisBitBuffer {
+
+        constructor(buffer, params = { offset: 0, littleEndian: true }) {
+            this.buffer = buffer;  //  i.e., ArrayBuffer
+            this.size = BigInt(buffer.byteLength);
+
+            this.bitPointer = 0;  //  within current byte, not total
+            this.bytePointer = 0;
+            this.offset = (params === undefined || params.offset === undefined ? 0 : params.offset);
+            this.littleEndian = (params === undefined || params.littleEndian === undefined ? true : params.littleEndian);
+
+            this.view = new DataView(this.buffer, params.offset);
+        }
+
+        static bits(value, msb, lsb) {
+            return (value & ((1 << (msb + 1)) - 1)) >> lsb;
+        }
+
+        readBits(numBits) {
+            let value = BigInt(0);
+            let n = numBits;
+
+            //  buffer size is in integer bytes
+            if (this.bytePointer + Math.ceil((this.bitPointer + n) / 8) > this.size) {
+                return undefined;
+            }
+
+            //  leading bits, first byte
+            let nextBitPointer = this.bitPointer + n;
+            let msb = Math.min(nextBitPointer - 1, 7);
+            value = NvisBitBuffer.bits(this.peekUint8(), msb, this.bitPointer);
+            n -= (msb - this.bitPointer + 1);
+            this.bitPointer = nextBitPointer;
+            if (nextBitPointer > 7) {
+                this.bitPointer = 0;
+                this.bytePointer++;
+            }
+
+            //  whole bytes
+            while (n > 8) {
+                value |= (this.peekUint8() << (numBits - n));
+                this.bytePointer++;
+                n -= 8;
+            }
+
+            //  remaining bits, last byte
+            if (n > 0) {
+                value |= ((this.peekUint8() & ((1 << n) - 1)) << (numBits - n));
+                this.bitPointer += n;
+            }
+
+            return value;
+        }
+
+        seek(byte, bit = 0) {
+            this.bytePointer = byte;
+            this.bitPointer = bit;
+        }
+
+        skip(bytes = 1, bits = 0) {
+            this.bytePointer += bytes;
+            if (bits > 0) {
+                this.bytePointer += Math.floor(bits / 8);
+                this.bitPointer += bits;
+                this.bitPointer %= 8;
+            }
+        }
+
+        //  functions below only work on byte boundary
+
+        peekUint8() {
+            let value = this.view.getUint8(this.bytePointer, this.littleEndian);
+            return value;
+        }
+
+        readUint8() {
+            let value = this.view.getUint8(this.bytePointer, this.littleEndian);
+            this.bytePointer++;
+            return value;
+        }
+
+        readUint32() {
+            let value = this.view.getUint32(this.bytePointer, this.littleEndian);
+            this.bytePointer += 4;
+            return value;
+        }
+
+        readUint64() {
+            let value = this.view.getBigUint64(this.bytePointer, this.littleEndian);
+            this.bytePointer += 8;
+            return value;
+        }
+
+        readInt32() {
+            let value = this.view.getInt32(this.bytePointer, this.littleEndian);
+            this.bytePointer += 4;
+            return value;
+        }
+
+        readFloat16() {
+            let value = this.view.getuInt16(this.bytePointer, this.littleEndian);
+            //  TODO: convert to half
+            this.bytePointer += 2;
+            return value;
+        }
+
+        readFloat32() {
+            let value = this.view.getFloat32(this.bytePointer, this.littleEndian);
+            this.bytePointer += 4;
+            return value;
+        }
+
+        readString() {
+            let c = '';
+            let s = "";
+            while ((c = this.readUint8()) != 0) {
+                s += String.fromCharCode(c);
+            }
+            return s;
+        }
+
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    
+    const EXR_UINT = 0;
+    const EXR_HALF = 1;
+    const EXR_FLOAT = 2;
+    
+    const EXR_NO_COMPRESSION = 0;
+    const EXR_RLE_COMPRESSION = 1;
+    const EXR_ZIPS_COMPRESSION = 2;
+    const EXR_ZIP_COMPRESSION = 3;
+    const EXR_PIZ_COMPRESSION = 4;
+    const EXR_PXR24_COMPRESSION = 5;
+    const EXR_B44_COMPRESSION = 6;
+    const EXR_B44A_COMPRESSION = 7;
+
+    const EXR_NO_COMPRESSION_SCANLINES = 1;
+    const EXR_RLE_COMPRESSION_SCANLINES = 1;
+    const EXR_ZIPS_COMPRESSION_SCANLINES = 1;
+    const EXR_ZIP_COMPRESSION_SCANLINES = 16;
+    const EXR_PIZ_COMPRESSION_SCANLINES = 32;
+    const EXR_PXR24_COMPRESSION_SCANLINES = 16;
+    const EXR_B44_COMPRESSION_SCANLINES = 32;
+    const EXR_B44A_COMPRESSION_SCANLINES = 32;
+
+    class NvisEXRFile {
+
+        constructor(fileName, buffer) {
+            this.fileName = fileName;
+            this.buffer = new NvisBitBuffer(buffer);
+
+            console.log("EXR File...");
+
+            let b = this.buffer;
+
+            let magicNumber = b.readInt32();
+            let versionField = b.readInt32();
+            let version = {
+                version: (versionField & 0xf),
+                singleTile: (((versionField >> (9 - 1)) & 1) == 1),
+                longNames: (((versionField >> (10 - 1)) & 1) == 1),
+                nonImage: (((versionField >> (11 - 1)) & 1) == 1),
+                multiPart: (((versionField >> (12 - 1)) & 1) == 1),
+            }
+            console.log("Magic number: " + magicNumber);  //  should be decimal 20000630
+            console.log("Version field: " + JSON.stringify(version));
+            
+
+            //  attributes
+            this.attributes = {};
+            while (b.peekUint8() != 0) {
+                let attrib = this.readAttribute();
+                this.attributes[attrib.name] = attrib;
+            }
+            b.skip();
+            console.log(JSON.stringify(this.attributes));
+
+            //  offset table
+            this.offsetTable = [];
+            let dataWindowBox = this.attributes.dataWindow.values;
+            let numOffsets = dataWindowBox.yMax - dataWindowBox.yMin + 1;
+            let compression = this.attributes["compression"].value;
+            if (compression == EXR_ZIP_COMPRESSION) {
+                numOffsets = Math.floor(numOffsets / EXR_ZIP_COMPRESSION_SCANLINES) + (numOffsets % EXR_ZIP_COMPRESSION_SCANLINES > 0 ? 1 : 0);
+            }
+            if (compression == EXR_PIZ_COMPRESSION) {
+                numOffsets = Math.floor(numOffsets / EXR_PIZ_COMPRESSION_SCANLINES) + (numOffsets % EXR_PIZ_COMPRESSION_SCANLINES > 0 ? 1 : 0);
+            }
+            if (compression == EXR_PXR24_COMPRESSION) {
+                numOffsets = Math.floor(numOffsets / EXR_PXR24_COMPRESSION_SCANLINES) + (numOffsets % EXR_PXR24_COMPRESSION_SCANLINES > 0 ? 1 : 0);
+            }
+            if (compression == EXR_B44_COMPRESSION) {
+                numOffsets = Math.floor(numOffsets / EXR_B44_COMPRESSION_SCANLINES) + (numOffsets % EXR_B44_COMPRESSION_SCANLINES > 0 ? 1 : 0);
+            }
+            if (compression == EXR_B44A_COMPRESSION_SCANLINES) {
+                numOffsets = Math.floor(numOffsets / EXR_B44A_COMPRESSION_SCANLINES) + (numOffsets % EXR_B44A_COMPRESSION_SCANLINES > 0 ? 1 : 0);
+            }
+            for (let i = 0; i < numOffsets; i++) {
+                let offset = b.readUint64();
+                this.offsetTable.push({ offset: offset });
+                if (i > 0) {
+                    this.offsetTable[i - 1].size = offset - this.offsetTable[i - 1].offset;
+                }
+            }
+            if (numOffsets > 1) {
+                this.offsetTable[numOffsets - 1].size = b.size - this.offsetTable[numOffsets - 1].offset;
+            }
+
+            console.log("numOffsets: " + numOffsets);
+            console.log("size: " + b.size);
+            console.log("offsetTable:");
+            for (let i = 0; i < numOffsets; i++) {
+                console.log("   " + this.offsetTable[i].offset + ", " + this.offsetTable[i].size);
+            }
+
+            //  pixels
+            for (let sl = 0; sl < numOffsets; sl++) {
+                b.seek(Number(this.offsetTable[sl].offset));
+
+                let scanLine = b.readUint32();
+                let dataSize = b.readUint32();
+
+                let z = {};
+
+                //  https://datatracker.ietf.org/doc/html/rfc1950
+
+                let CMF = b.readUint8();
+                let FLG = b.readUint8();
+                console.log("CMF: " + CMF + ", FLG: " + FLG + ", next: 0x" + b.peekUint8().toString(16));
+                z.cmf = {};
+                z.cmf.cm = NvisBitBuffer.bits(CMF, 3, 0);  //  compression method, should be = 8
+                z.cmf.info = NvisBitBuffer.bits(CMF, 7, 4);  //   base-2 logarithm of the LZ77 window size, minus eight (CINFO=7 indicates a 32K window size)
+                z.flg = {};
+                z.flg.fcheck = NvisBitBuffer.bits(FLG, 4, 0);  //  to make (CMF * 256 + FLG % 31) == 0
+                z.flg.fdict = NvisBitBuffer.bits(FLG, 5, 5);  //  
+                z.flg.flevel = NvisBitBuffer.bits(FLG, 7, 6);  //  0: fastest, 1: fast, 2: default, 3: maximum/slowest 
+                z.dictId = (z.flg.fdict == 1 ? b.readUint32() : undefined);
+
+                //  https://datatracker.ietf.org/doc/html/rfc1951
+                
+                let bFinalBlock = false;
+                do {
+
+                bFinalBlock = (b.readBits(1) == 1);
+                let blockType = b.readBits(2);
+
+                if (blockType == 0) {
+                    //  no compression
+                    //  TODO: this
+                    console.log("TODO: handle blocks with no compression");
+                }
+                
+                if (blockType == 1 || blockType == 2) {
+                    //  compression with Huffman codes
+
+                    const huffman = {
+                        tableSizes: new Array(TINFL_MAX_HUFF_TABLES).fill(0),
+                        tables: []
+                    }
+                    for (let i = 0; i < TINFL_MAX_HUFF_TABLES; i++) {
+                        huffman.tables.push({
+                            codeSize: new Array(TINFL_MAX_HUFF_SYMBOLS_0).fill(0),
+                            lookUp: new Array(TINFL_FAST_LOOKUP_SIZE).fill(0),
+                            tree: new Array(TINFL_MAX_HUFF_SYMBOLS_0 * 2).fill(0)
+                        });
+                    }
+
+                    if (blockType == 1) {
+                        //  compression with fixed Huffman codes
+                        //  TODO: this
+                        console.log("TODO: handle blocks compressed with fixed Huffman codes");
+                    } else {
+                        //  compression with dynamic Huffman codes
+                        huffman.tableSizes = [
+                            b.readBits(5) + s_min_table_sizes[0],
+                            b.readBits(5) + s_min_table_sizes[1],
+                            b.readBits(4) + s_min_table_sizes[2]
+                        ];
+                        for (let counter = 0; counter < huffman.tableSizes[2]; counter++) {
+                            huffman.tables[2].codeSize[s_length_dezigzag[counter]] = b.readBits(3);
+                        }
+                        huffman.tableSizes[2] = 19;
+                    }
+
+                    let nextCode = new Array(17);
+                    let totalSymbols = new Array(16).fill(0);
+                    for (let iType = blockType; iType >= 0; iType--)  //  [(2,) 1, 0]
+                    {
+                        let curHuffmanTable = huffman.tables[iType];
+                        for (let i = 0; i < huffman.tableSizes[iType]; i++) {
+                            totalSymbols[curHuffmanTable.codeSize[i]]++;
+                        }
+
+                        let total = 0;
+                        let usedSymbols = 0;
+                        nextCode[0] = 0;
+                        nextCode[1] = 0;
+                        for (i = 1; i <= 15; i++) {
+                            usedSymbols += totalSymbols[i];
+                            total = ((total + totalSymbols[i]) << 1);
+                            nextCode[i + 1] = total;
+                        }
+
+                        if ((total != 65536) && (usedSymbols > 1)) {
+                            //  error
+                            console.log("Huffman table generation error");
+                        }
+
+                        let treeNext = -1;
+                        for (let symbolIndex = 0; symbolIndex < huffman.tableSizes[iType]; symbolIndex++) {
+
+                            let codeSize = curHuffmanTable.codeSize[symbolIndex];
+                            if (codeSize == 0) {
+                                continue;
+                            }
+
+                            let currentCode = nextCode[codeSize]++;
+
+                            let reverseCode = 0;
+                            for (let l = codeSize; l > 0; l--) {
+                                reverseCode = (reverseCode << 1) | (currentCode & 1);
+                                currentCode >>= 1;
+                            }
+
+                            if (codeSize <= TINFL_FAST_LOOKUP_BITS) {
+                                let k = ((codeSize << 9) | symbolIndex);
+                                while (reverseCode < TINFL_FAST_LOOKUP_SIZE) {
+                                    curHuffmanTable.lookUp[reverseCode] = k;
+                                    reverseCode += (1 << codeSize);
+                                }
+                                continue;
+                            }
+
+                            let treeCurrent = curHuffmanTable.lookUp[reverseCode & (TINFL_FAST_LOOKUP_SIZE - 1)];
+                            if (treeCurrent == 0) {
+                                curHuffmanTable.lookUp[reverseCode & (TINFL_FAST_LOOKUP_SIZE - 1)] = treeNext;
+                                treeCurrent = treeNext;
+                                treeNext -= 2;
+                            }
+
+                            reverseCode >>= (TINFL_FAST_LOOKUP_BITS - 1);
+                            for (j = codeSize; j > (TINFL_FAST_LOOKUP_BITS + 1); j--) {
+                                treeCurrent -= ((reverseCode >>= 1) & 1);
+                                if (!curHuffmanTable.tree[-treeCurrent - 1]) {
+                                    curHuffmanTable.tree[-treeCurrent - 1] = treeNext;
+                                    treeCurrent = treeNext;
+                                    treeNext -= 2;
+                                } else {
+                                    treeCurrent = curHuffmanTable.tree[-treeCurrent - 1];
+                                }
+                            }
+                            treeCurrent -= ((reverseCode >>= 1) & 1);
+                            curHuffmanTable.tree[-treeCurrent - 1] = symbolIndex;
+                        }
+        
+                    }
+
+                    if (blockType == 2) {
+                        for (counter = 0; counter < (huffman.tableSizes[0] + huffman.tableSizes[1]);) {
+                            mz_uint s;
+
+                            //huffmanDecode(16, dist, &r->m_tables[2]);
+                            //  Huffman decode
+                            //    huffmanDecode(state_index, sym, pHuff) {
+
+                            let curHuffmanTable = huffman.tables[2];
+                            let codeLength = 0;
+
+                            int temp;
+                            mz_uint code_len, c;
+
+
+                            if (num_bits < 15) {
+                                if ((pIn_buf_end - pIn_buf_cur) < 2) {
+
+                                    // huffmanBitbufferFill(state_index, pHuff);
+                                    // huffmanBitbufferFill(state_index, pHuff) {
+                                        do {
+                                            temp = curHuffmanTable.lookUp[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)];
+                                            if (temp >= 0) {
+                                                codeLength = temp >> 9;
+                                                if ((codeLength) && (num_bits >= codeLength)) break;
+                                            } else if (num_bits > TINFL_FAST_LOOKUP_BITS) {
+                                                codeLength = TINFL_FAST_LOOKUP_BITS;
+                                                do {
+                                                    temp = curHuffmanTable.tree[~temp + ((bit_buf >> codeLength++) & 1)];
+                                                } while ((temp < 0) && (num_bits >= (codeLength + 1)));
+                                                if (temp >= 0) break;
+                                            }
+                                            TINFL_GET_BYTE(state_index, c);
+                                            bit_buf |= (((tinfl_bit_buf_t)c) << num_bits);
+                                            num_bits += 8;
+                                        } while (num_bits < 15);
+                                        /////////////
+
+                                    }
+                            
+                                } else {
+                                    bit_buf |= (((tinfl_bit_buf_t)pIn_buf_cur[0]) << num_bits) | (((tinfl_bit_buf_t)pIn_buf_cur[1]) << (num_bits + 8));
+                                    pIn_buf_cur += 2;
+                                    num_bits += 16;
+                                }
+                            }
+                            if ((temp = curHuffmanTable.lookUp[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= 0) {
+                                codeLength = temp >> 9;
+                                temp &= 511;
+                            } else {
+                                codeLength = TINFL_FAST_LOOKUP_BITS;
+                                do {
+                                    temp = curHuffmanTable.tree[~temp + ((bit_buf >> codeLength++) & 1)];
+                                } while (temp < 0);
+                            }
+                            sym = temp;
+                            bit_buf >>= codeLength;
+                            num_bits -= codeLength;
+                ////////
+
+
+                            if (dist < 16) {
+                                r->m_len_codes[counter++] = (mz_uint8)dist;
+                                continue;
+                            }
+                            if ((dist == 16) && (!counter)) {
+                                TINFL_CR_RETURN_FOREVER(17, TINFL_STATUS_FAILED);
+                            }
+                            num_extra = "\02\03\07"[dist - 16];
+                            TINFL_GET_BITS(18, s, num_extra);
+                            s += "\03\03\013"[dist - 16];
+                            TINFL_MEMSET(r->m_len_codes + counter, (dist == 16) ? r->m_len_codes[counter - 1] : 0, s);
+                            counter += s;
+                        }
+                        if ((r->m_table_sizes[0] + r->m_table_sizes[1]) != counter) {
+                            TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
+                        }
+                        TINFL_MEMCPY(r->m_tables[0].m_code_size, r->m_len_codes, r->m_table_sizes[0]);
+                        TINFL_MEMCPY(r->m_tables[1].m_code_size, r->m_len_codes + r->m_table_sizes[0], r->m_table_sizes[1]);
+                    }
+                }
+
+
+                if (blockType == 3) {
+                    //  reserved (error)
+                }
+
+                let s = "";
+                s += scanLine + ", " + dataSize;
+                s += ", z: " + JSON.stringify(z);
+                for (let i = 0; i < 10; i++)
+                    s += ", 0x" + b.readUint8().toString(16);
+                console.log(s);
+                console.log("bFinalBlock: " + bFinalBlock + ", blockType: " + blockType);
+
+                } while (!bFinalBlock);
+            }
+        }
+
+        huffmanBitbufferFill(state_index, pHuff) {
+            do {
+                temp = (pHuff) -> m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)];
+                if (temp >= 0) {
+                    code_len = temp >> 9;
+                    if ((code_len) && (num_bits >= code_len)) break;
+                } else if (num_bits > TINFL_FAST_LOOKUP_BITS) {
+                    code_len = TINFL_FAST_LOOKUP_BITS;
+                    do {
+                        temp = (pHuff) -> m_tree[~temp + ((bit_buf >> code_len++) & 1)];
+                    } while ((temp < 0) && (num_bits >= (code_len + 1)));
+                    if (temp >= 0) break;
+                }
+                TINFL_GET_BYTE(state_index, c);
+                bit_buf |= (((tinfl_bit_buf_t)c) << num_bits);
+                num_bits += 8;
+            } while (num_bits < 15);
+        }
+
+        huffmanDecode(state_index, sym, pHuff) {
+            int temp;
+            mz_uint code_len, c;
+            if (num_bits < 15) {
+                if ((pIn_buf_end - pIn_buf_cur) < 2) {
+                    huffmanBitbufferFill(state_index, pHuff);
+                } else {
+                    bit_buf |= (((tinfl_bit_buf_t)pIn_buf_cur[0]) << num_bits) |
+                        (((tinfl_bit_buf_t)pIn_buf_cur[1]) << (num_bits + 8));
+                    pIn_buf_cur += 2;
+                    num_bits += 16;
+                }
+            }
+            if ((temp = (pHuff) -> m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= 0) {
+                code_len = temp >> 9, temp &= 511;
+            } else {
+                code_len = TINFL_FAST_LOOKUP_BITS;
+                do {
+                    temp = (pHuff) -> m_tree[~temp + ((bit_buf >> code_len++) & 1)];
+                } while (temp < 0);
+            }
+            sym = temp;
+            bit_buf >>= code_len;
+            num_bits -= code_len;
+        }
+
+
+        readAttribute() {
+            let b = this.buffer;
+
+            let attrib = {};
+            attrib.name = b.readString();
+            attrib.type = b.readString();
+            attrib.size = b.readInt32();
+            
+            //  https://openexr.readthedocs.io/en/latest/OpenEXRFileLayout.html
+
+            if (attrib.type == "box2i") {
+                attrib.values = {
+                    xMin: b.readInt32(),
+                    yMin: b.readInt32(),
+                    xMax: b.readInt32(),
+                    yMax: b.readInt32()
+                }
+            }
+
+            if (attrib.type == "box2f") {
+                attrib.values = {
+                    xMin: b.readFloat32(),
+                    yMin: b.readFloat32(),
+                    xMax: b.readFloat32(),
+                    yMax: b.readFloat32()
+                }
+            }
+
+            if (attrib.type == "chlist") {
+                attrib.values = [];
+                while (b.peekUint8() != 0) {
+                    let name = b.readString();
+                    let pixelType = b.readInt32();
+                    let pLinear = b.readUint8();
+                    b.skip(3);  //  reserved
+                    let xSampling = b.readInt32();
+                    let ySampling = b.readInt32();
+                    let attribValue = {
+                        name: name,
+                        pixelType: pixelType,
+                        pLinear: pLinear,
+                        xSampling: xSampling,
+                        ySampling: ySampling
+                    }
+                    attrib.values.push(attribValue);
+                }
+                b.skip();
+            }
+
+            if (attrib.type == "chromaticities") {
+            }
+
+            if (attrib.type == "compression") {
+                attrib.value = b.readUint8();
+            }
+
+            if (attrib.type == "double") {
+            }
+            if (attrib.type == "envmap") {
+            }
+
+            if (attrib.type == "float") {
+                attrib.value = b.readFloat32();
+            }
+
+            if (attrib.type == "int") {
+                attrib.value = b.readUint32();
+            }
+
+            if (attrib.type == "keycode") {
+            }
+
+            if (attrib.type == "lineOrder") {
+                attrib.value = b.readUint8();
+            }
+
+            if (attrib.type == "m33f") {
+            }
+            if (attrib.type == "m44f") {
+            }
+            if (attrib.type == "preview") {
+            }
+            if (attrib.type == "rational") {
+            }
+            if (attrib.type == "string") {
+            }
+            if (attrib.type == "stringvector") {
+            }
+            if (attrib.type == "tiledesc") {
+            }
+            if (attrib.type == "timecode") {
+            }
+
+            if (attrib.type == "v2i") {
+                attrib.values = {
+                    x: b.readInt32(),
+                    y: b.readInt32()
+                }
+            }
+
+            if (attrib.type == "v2f") {
+                attrib.values = {
+                    x: b.readFloat32(),
+                    y: b.readFloat32()
+                }
+            }
+
+            if (attrib.type == "v3i") {
+            }
+            if (attrib.type == "v3f") {
+            }
+            
+            return attrib;
+        }
+
+    }
+    
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    
     function NvisFileName(fileName) {
         let _fileName = fileName;
         let _directory = "";
@@ -792,11 +1911,6 @@ var nvis = new function () {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
             gl.bindTexture(gl.TEXTURE_2D, null);  //  TODO: Chrome requirement?
-
-            //  TODO: bind framebuffer to non-filestreams
-            // this.frameBuffer = gl.createFramebuffer();
-            // gl.bindFramebuffer(gl.FRAMEBUFFER, _frameBuffer);
-            // gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
         }
 
 
@@ -1769,7 +2883,7 @@ var nvis = new function () {
 
             if (streamDim === undefined) {
                 //return;
-                streamDim = { w: 512, h: 512 };
+                streamDim = { w: 512, h: 512 };  //  TODO: fix!!!
             }
 
 
@@ -2316,7 +3430,18 @@ var nvis = new function () {
                 _addWindow(_streams.length - 1);
                 _windows.adjust();
             }
+
+            if (files[0].name.match(/.exr$/)) {
+                let reader = new FileReader();
+                reader.onload = function() {
+                    let file = new NvisEXRFile(files[0].name, reader.result);
+                }
+                reader.readAsArrayBuffer(files[0]);
+            }
+
             document.getElementById("fileInput").value = "";  //  force onchange event if same files
+
+            _canvas.style.border = _state.layout.border + "px solid black";
 
             return;
             for (let i = 0; i < files.length; i++) {
@@ -2358,7 +3483,6 @@ var nvis = new function () {
                 }
             }
 
-            _canvas.style.border = _state.layout.border + "px solid black";
         }
 
         let _onFileDragEnter = function (event) {
