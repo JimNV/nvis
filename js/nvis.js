@@ -693,6 +693,73 @@ var nvis = new function () {
     const TINFL_FAST_LOOKUP_BITS = 10;
     const TINFL_FAST_LOOKUP_SIZE = 1 << TINFL_FAST_LOOKUP_BITS;
 
+
+//     // TINFL_HUFF_BITBUF_FILL() is only used rarely, when the number of bytes
+// // remaining in the input buffer falls below 2.
+// // It reads just enough bytes from the input stream that are needed to decode
+// // the next Huffman code (and absolutely no more). It works by trying to fully
+// // decode a
+// // Huffman code by using whatever bits are currently present in the bit buffer.
+// // If this fails, it reads another byte, and tries again until it succeeds or
+// // until the
+// // bit buffer contains >=15 bits (deflate's max. Huffman code size).
+// #define TINFL_HUFF_BITBUF_FILL(state_index, pHuff)                     \
+// do {                                                                 \
+//   temp = (pHuff)->m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]; \
+//   if (temp >= 0) {                                                   \
+//     code_len = temp >> 9;                                            \
+//     if ((code_len) && (num_bits >= code_len)) break;                 \
+//   } else if (num_bits > TINFL_FAST_LOOKUP_BITS) {                    \
+//     code_len = TINFL_FAST_LOOKUP_BITS;                               \
+//     do {                                                             \
+//       temp = (pHuff)->m_tree[~temp + ((bit_buf >> code_len++) & 1)]; \
+//     } while ((temp < 0) && (num_bits >= (code_len + 1)));            \
+//     if (temp >= 0) break;                                            \
+//   }                                                                  \
+//   TINFL_GET_BYTE(state_index, c);                                    \
+//   bit_buf |= (((tinfl_bit_buf_t)c) << num_bits);                     \
+//   num_bits += 8;                                                     \
+// } while (num_bits < 15);
+
+// // TINFL_HUFF_DECODE() decodes the next Huffman coded symbol. It's more complex
+// // than you would initially expect because the zlib API expects the decompressor
+// // to never read
+// // beyond the final byte of the deflate stream. (In other words, when this macro
+// // wants to read another byte from the input, it REALLY needs another byte in
+// // order to fully
+// // decode the next Huffman code.) Handling this properly is particularly
+// // important on raw deflate (non-zlib) streams, which aren't followed by a byte
+// // aligned adler-32.
+// // The slow path is only executed at the very end of the input buffer.
+// #define TINFL_HUFF_DECODE(state_index, sym, pHuff)                             \
+// do {                                                                         \
+//   int temp;                                                                  \
+//   mz_uint code_len, c;                                                       \
+//   if (num_bits < 15) {                                                       \
+//     if ((pIn_buf_end - pIn_buf_cur) < 2) {                                   \
+//       TINFL_HUFF_BITBUF_FILL(state_index, pHuff);                            \
+//     } else {                                                                 \
+//       bit_buf |= (((tinfl_bit_buf_t)pIn_buf_cur[0]) << num_bits) |           \
+//                  (((tinfl_bit_buf_t)pIn_buf_cur[1]) << (num_bits + 8));      \
+//       pIn_buf_cur += 2;                                                      \
+//       num_bits += 16;                                                        \
+//     }                                                                        \
+//   }                                                                          \
+//   if ((temp = (pHuff)->m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= \
+//       0)                                                                     \
+//     code_len = temp >> 9, temp &= 511;                                       \
+//   else {                                                                     \
+//     code_len = TINFL_FAST_LOOKUP_BITS;                                       \
+//     do {                                                                     \
+//       temp = (pHuff)->m_tree[~temp + ((bit_buf >> code_len++) & 1)];         \
+//     } while (temp < 0);                                                      \
+//   }                                                                          \
+//   sym = temp;                                                                \
+//   bit_buf >>= code_len;                                                      \
+//   num_bits -= code_len;                                                      \
+// }                                                                            \
+// MZ_MACRO_END
+
 //     struct tinfl_decompressor {
 //         mz_uint32 m_state;
 //         mz_uint32 m_num_bits;
@@ -1140,7 +1207,7 @@ var nvis = new function () {
 
         constructor(buffer, params = { offset: 0, littleEndian: true }) {
             this.buffer = buffer;  //  i.e., ArrayBuffer
-            this.size = BigInt(buffer.byteLength);
+            this.bitSize = BigInt(buffer.byteLength * 8);
 
             this.bitPointer = 0;  //  within current byte, not total
             this.bytePointer = 0;
@@ -1154,37 +1221,49 @@ var nvis = new function () {
             return (value & ((1 << (msb + 1)) - 1)) >> lsb;
         }
 
-        readBits(numBits) {
+        remainingBits() {
+            return this.bitSize - (this.bytePointer * 8 + this.bitPointer);
+        }
+
+        readBits(numBits, peek = false) {
             let value = BigInt(0);
             let n = numBits;
 
+            let bytePointer = this.bytePointer;
+            let bitPointer = this.bitPointer;
+
             //  buffer size is in integer bytes
-            if (this.bytePointer + Math.ceil((this.bitPointer + n) / 8) > this.size) {
+            if (bytePointer * 8 + (bitPointer + n) > this.bitSize) {
                 return undefined;
             }
 
             //  leading bits, first byte
-            let nextBitPointer = this.bitPointer + n;
+            let nextBitPointer = bitPointer + n;
             let msb = Math.min(nextBitPointer - 1, 7);
-            value = NvisBitBuffer.bits(this.peekUint8(), msb, this.bitPointer);
-            n -= (msb - this.bitPointer + 1);
-            this.bitPointer = nextBitPointer;
+            value = NvisBitBuffer.bits(this.view.getUint8(bytePointer, this.littleEndian), msb, bitPointer);
+            n -= (msb - bitPointer + 1);
+            bitPointer = nextBitPointer;
             if (nextBitPointer > 7) {
-                this.bitPointer = 0;
-                this.bytePointer++;
+                bitPointer = 0;
+                bytePointer++;
             }
 
             //  whole bytes
             while (n > 8) {
-                value |= (this.peekUint8() << (numBits - n));
-                this.bytePointer++;
+                value |= (this.view.getUint8(bytePointer, this.littleEndian) << (numBits - n));
+                bytePointer++;
                 n -= 8;
             }
 
             //  remaining bits, last byte
             if (n > 0) {
-                value |= ((this.peekUint8() & ((1 << n) - 1)) << (numBits - n));
-                this.bitPointer += n;
+                value |= ((this.view.getUint8(bytePointer, this.littleEndian) & ((1 << n) - 1)) << (numBits - n));
+                bitPointer += n;
+            }
+
+            if (!peek) {
+                this.bytePointer = bytePointer;
+                this.bitPointer = bitPointer;
             }
 
             return value;
@@ -1196,12 +1275,16 @@ var nvis = new function () {
         }
 
         skip(bytes = 1, bits = 0) {
-            this.bytePointer += bytes;
-            if (bits > 0) {
-                this.bytePointer += Math.floor(bits / 8);
-                this.bitPointer += bits;
-                this.bitPointer %= 8;
-            }
+            this.bitPointer += (bytes * 8 + bits);
+            this.bytePointer += Math.floor(this.bitPointer / 8);
+            this.bitPointer %= 8;
+
+            // this.bytePointer += bytes;
+            // if (bits > 0) {
+            //     this.bytePointer += Math.floor(bits / 8);
+            //     this.bitPointer += bits;
+            //     this.bitPointer %= 8;
+            // }
         }
 
         //  functions below only work on byte boundary
@@ -1260,6 +1343,20 @@ var nvis = new function () {
     }
 
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    class NvisDeompress {
+
+        constructor() {
+
+        }
+
+    }
+    
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -1349,7 +1446,7 @@ var nvis = new function () {
                 }
             }
             if (numOffsets > 1) {
-                this.offsetTable[numOffsets - 1].size = b.size - this.offsetTable[numOffsets - 1].offset;
+                this.offsetTable[numOffsets - 1].size = (b.bitSize >> 3n) - this.offsetTable[numOffsets - 1].offset;
             }
 
             console.log("numOffsets: " + numOffsets);
@@ -1360,6 +1457,28 @@ var nvis = new function () {
             }
 
             //  pixels
+            let outputSize = 0;
+            for (let c = 0; c < this.attributes.channels.values.length; c++) {
+                let channel = this.attributes.channels.values[c];
+                switch (channel.pixelType) {
+                    case 0:  //  UINT
+                        outputSize += 4;
+                        break;
+                    case 1:  //  HALF
+                        outputSize += 2;
+                        break;
+                    case 2:  //  FLOAT
+                    default:
+                        outputSize += 4;
+                        break;
+                }
+            }
+            let dataDimensions = this.attributes.dataWindow.values;
+            outputSize *= (dataDimensions.xMax - dataDimensions.xMin) * (dataDimensions.yMax - dataDimensions.yMin);
+            let outputBuffer = new NvisBitBuffer(new ArrayBuffer(outputSize));
+
+            console.log("Total output buffer size: " + outputSize);
+
             for (let sl = 0; sl < numOffsets; sl++) {
                 b.seek(Number(this.offsetTable[sl].offset));
 
@@ -1384,266 +1503,296 @@ var nvis = new function () {
 
                 //  https://datatracker.ietf.org/doc/html/rfc1951
                 
+                let inBufferPointer = 0;
                 let bFinalBlock = false;
                 do {
 
-                bFinalBlock = (b.readBits(1) == 1);
-                let blockType = b.readBits(2);
+                    bFinalBlock = (b.readBits(1) == 1);
+                    let blockType = b.readBits(2);
 
-                if (blockType == 0) {
-                    //  no compression
-                    //  TODO: this
-                    console.log("TODO: handle blocks with no compression");
-                }
-                
-                if (blockType == 1 || blockType == 2) {
-                    //  compression with Huffman codes
-
-                    const huffman = {
-                        tableSizes: new Array(TINFL_MAX_HUFF_TABLES).fill(0),
-                        tables: []
-                    }
-                    for (let i = 0; i < TINFL_MAX_HUFF_TABLES; i++) {
-                        huffman.tables.push({
-                            codeSize: new Array(TINFL_MAX_HUFF_SYMBOLS_0).fill(0),
-                            lookUp: new Array(TINFL_FAST_LOOKUP_SIZE).fill(0),
-                            tree: new Array(TINFL_MAX_HUFF_SYMBOLS_0 * 2).fill(0)
-                        });
-                    }
-
-                    if (blockType == 1) {
-                        //  compression with fixed Huffman codes
+                    if (blockType == 0) {
+                        //  no compression
                         //  TODO: this
-                        console.log("TODO: handle blocks compressed with fixed Huffman codes");
-                    } else {
-                        //  compression with dynamic Huffman codes
-                        huffman.tableSizes = [
-                            b.readBits(5) + s_min_table_sizes[0],
-                            b.readBits(5) + s_min_table_sizes[1],
-                            b.readBits(4) + s_min_table_sizes[2]
-                        ];
-                        for (let counter = 0; counter < huffman.tableSizes[2]; counter++) {
-                            huffman.tables[2].codeSize[s_length_dezigzag[counter]] = b.readBits(3);
-                        }
-                        huffman.tableSizes[2] = 19;
+                        console.log("TODO: handle blocks with no compression");
                     }
 
-                    let nextCode = new Array(17);
-                    let totalSymbols = new Array(16).fill(0);
-                    for (let iType = blockType; iType >= 0; iType--)  //  [(2,) 1, 0]
-                    {
-                        let curHuffmanTable = huffman.tables[iType];
-                        for (let i = 0; i < huffman.tableSizes[iType]; i++) {
-                            totalSymbols[curHuffmanTable.codeSize[i]]++;
+                    if (blockType == 3) {
+                        //  reserved (error)
+                        console.log("Reserved block type (3)");
+                    }
+
+                    if (blockType == 1 || blockType == 2) {
+                        //  compression with Huffman codes
+
+                        const huffman = {
+                            tableSizes: new Array(TINFL_MAX_HUFF_TABLES).fill(0),
+                            tables: []
+                        }
+                        for (let i = 0; i < TINFL_MAX_HUFF_TABLES; i++) {
+                            huffman.tables.push({
+                                codeSize: new Array(TINFL_MAX_HUFF_SYMBOLS_0).fill(0),
+                                lookUp: new Array(TINFL_FAST_LOOKUP_SIZE).fill(0),
+                                tree: new Array(TINFL_MAX_HUFF_SYMBOLS_0 * 2).fill(0)
+                            });
                         }
 
-                        let total = 0;
-                        let usedSymbols = 0;
-                        nextCode[0] = 0;
-                        nextCode[1] = 0;
-                        for (i = 1; i <= 15; i++) {
-                            usedSymbols += totalSymbols[i];
-                            total = ((total + totalSymbols[i]) << 1);
-                            nextCode[i + 1] = total;
+                        if (blockType == 1) {
+                            //  compression with fixed Huffman codes
+                            //  TODO: this
+                            console.log("TODO: handle blocks compressed with fixed Huffman codes");
+                        } else {
+                            //  compression with dynamic Huffman codes
+                            huffman.tableSizes = [
+                                b.readBits(5) + s_min_table_sizes[0],
+                                b.readBits(5) + s_min_table_sizes[1],
+                                b.readBits(4) + s_min_table_sizes[2]
+                            ];
+                            for (let counter = 0; counter < huffman.tableSizes[2]; counter++) {
+                                huffman.tables[2].codeSize[s_length_dezigzag[counter]] = b.readBits(3);
+                            }
+                            huffman.tableSizes[2] = 19;
                         }
 
-                        if ((total != 65536) && (usedSymbols > 1)) {
-                            //  error
-                            console.log("Huffman table generation error");
-                        }
-
-                        let treeNext = -1;
-                        for (let symbolIndex = 0; symbolIndex < huffman.tableSizes[iType]; symbolIndex++) {
-
-                            let codeSize = curHuffmanTable.codeSize[symbolIndex];
-                            if (codeSize == 0) {
-                                continue;
+                        let nextCode = new Array(17);
+                        let totalSymbols = new Array(16).fill(0);
+                        for (let iType = blockType; iType >= 0; iType--)  //  [(2,) 1, 0]
+                        {
+                            let curHuffmanTable = huffman.tables[iType];
+                            for (let i = 0; i < huffman.tableSizes[iType]; i++) {
+                                totalSymbols[curHuffmanTable.codeSize[i]]++;
                             }
 
-                            let currentCode = nextCode[codeSize]++;
-
-                            let reverseCode = 0;
-                            for (let l = codeSize; l > 0; l--) {
-                                reverseCode = (reverseCode << 1) | (currentCode & 1);
-                                currentCode >>= 1;
+                            let total = 0;
+                            let usedSymbols = 0;
+                            nextCode[0] = 0;
+                            nextCode[1] = 0;
+                            for (let i = 1; i <= 15; i++) {
+                                usedSymbols += totalSymbols[i];
+                                total = ((total + totalSymbols[i]) << 1);
+                                nextCode[i + 1] = total;
                             }
 
-                            if (codeSize <= TINFL_FAST_LOOKUP_BITS) {
-                                let k = ((codeSize << 9) | symbolIndex);
-                                while (reverseCode < TINFL_FAST_LOOKUP_SIZE) {
-                                    curHuffmanTable.lookUp[reverseCode] = k;
-                                    reverseCode += (1 << codeSize);
+                            if ((total != 65536) && (usedSymbols > 1)) {
+                                //  error
+                                console.log("Huffman table generation error");
+                            }
+
+                            let treeNext = -1;
+                            for (let symbolIndex = 0; symbolIndex < huffman.tableSizes[iType]; symbolIndex++) {
+
+                                let codeSize = curHuffmanTable.codeSize[symbolIndex];
+                                if (codeSize == 0) {
+                                    continue;
                                 }
-                                continue;
-                            }
 
-                            let treeCurrent = curHuffmanTable.lookUp[reverseCode & (TINFL_FAST_LOOKUP_SIZE - 1)];
-                            if (treeCurrent == 0) {
-                                curHuffmanTable.lookUp[reverseCode & (TINFL_FAST_LOOKUP_SIZE - 1)] = treeNext;
-                                treeCurrent = treeNext;
-                                treeNext -= 2;
-                            }
+                                let currentCode = nextCode[codeSize]++;
 
-                            reverseCode >>= (TINFL_FAST_LOOKUP_BITS - 1);
-                            for (j = codeSize; j > (TINFL_FAST_LOOKUP_BITS + 1); j--) {
-                                treeCurrent -= ((reverseCode >>= 1) & 1);
-                                if (!curHuffmanTable.tree[-treeCurrent - 1]) {
-                                    curHuffmanTable.tree[-treeCurrent - 1] = treeNext;
+                                let reverseCode = 0;
+                                for (let l = codeSize; l > 0; l--) {
+                                    reverseCode = (reverseCode << 1) | (currentCode & 1);
+                                    currentCode >>= 1;
+                                }
+
+                                if (codeSize <= TINFL_FAST_LOOKUP_BITS) {
+                                    let k = ((codeSize << 9) | symbolIndex);
+                                    while (reverseCode < TINFL_FAST_LOOKUP_SIZE) {
+                                        curHuffmanTable.lookUp[reverseCode] = k;
+                                        reverseCode += (1 << codeSize);
+                                    }
+                                    continue;
+                                }
+
+                                let treeCurrent = curHuffmanTable.lookUp[reverseCode & (TINFL_FAST_LOOKUP_SIZE - 1)];
+                                if (treeCurrent == 0) {
+                                    curHuffmanTable.lookUp[reverseCode & (TINFL_FAST_LOOKUP_SIZE - 1)] = treeNext;
                                     treeCurrent = treeNext;
                                     treeNext -= 2;
-                                } else {
-                                    treeCurrent = curHuffmanTable.tree[-treeCurrent - 1];
                                 }
+
+                                reverseCode >>= (TINFL_FAST_LOOKUP_BITS - 1);
+                                for (j = codeSize; j > (TINFL_FAST_LOOKUP_BITS + 1); j--) {
+                                    treeCurrent -= ((reverseCode >>= 1) & 1);
+                                    if (!curHuffmanTable.tree[-treeCurrent - 1]) {
+                                        curHuffmanTable.tree[-treeCurrent - 1] = treeNext;
+                                        treeCurrent = treeNext;
+                                        treeNext -= 2;
+                                    } else {
+                                        treeCurrent = curHuffmanTable.tree[-treeCurrent - 1];
+                                    }
+                                }
+                                treeCurrent -= ((reverseCode >>= 1) & 1);
+                                curHuffmanTable.tree[-treeCurrent - 1] = symbolIndex;
                             }
-                            treeCurrent -= ((reverseCode >>= 1) & 1);
-                            curHuffmanTable.tree[-treeCurrent - 1] = symbolIndex;
+
                         }
-        
-                    }
 
-                    if (blockType == 2) {
-                        for (counter = 0; counter < (huffman.tableSizes[0] + huffman.tableSizes[1]);) {
-                            mz_uint s;
+                        if (blockType == 2) {
 
-                            //huffmanDecode(16, dist, &r->m_tables[2]);
-                            //  Huffman decode
-                            //    huffmanDecode(state_index, sym, pHuff) {
+                            let distance = 0;
+                            let numBits = 0;
+                            let lengthCodes = new Array(TINFL_MAX_HUFF_SYMBOLS_0 + TINFL_MAX_HUFF_SYMBOLS_1 + 137).fill(0);
 
-                            let curHuffmanTable = huffman.tables[2];
-                            let codeLength = 0;
+                            let counter = 0;
+                            for (counter = 0; counter < (huffman.tableSizes[0] + huffman.tableSizes[1]); ) {
+                                //mz_uint s;
 
-                            int temp;
-                            mz_uint code_len, c;
+                                //huffmanDecode(16, dist, &r->m_tables[2]);
+                                //  Huffman decode
+                                //    huffmanDecode(state_index, sym, pHuff) {
 
+                                let curHuffmanTable = huffman.tables[2];
+                                let codeLength = 0;
 
-                            if (num_bits < 15) {
-                                if ((pIn_buf_end - pIn_buf_cur) < 2) {
+                                let bitBuffer = 0;
+                                if (false && numBits < 15) {
+                                    if ((pIn_buf_end - pIn_buf_cur) < 2) {
 
-                                    // huffmanBitbufferFill(state_index, pHuff);
-                                    // huffmanBitbufferFill(state_index, pHuff) {
+                                        // huffmanBitbufferFill(state_index, pHuff) {
                                         do {
-                                            temp = curHuffmanTable.lookUp[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)];
+                                            let temp = curHuffmanTable.lookUp[bitBuffer & (TINFL_FAST_LOOKUP_SIZE - 1)];
                                             if (temp >= 0) {
                                                 codeLength = temp >> 9;
-                                                if ((codeLength) && (num_bits >= codeLength)) break;
-                                            } else if (num_bits > TINFL_FAST_LOOKUP_BITS) {
+                                                if ((codeLength) && (numBits >= codeLength)) {
+                                                    break;
+                                                }
+                                            } else if (numBits > TINFL_FAST_LOOKUP_BITS) {
                                                 codeLength = TINFL_FAST_LOOKUP_BITS;
                                                 do {
-                                                    temp = curHuffmanTable.tree[~temp + ((bit_buf >> codeLength++) & 1)];
-                                                } while ((temp < 0) && (num_bits >= (codeLength + 1)));
-                                                if (temp >= 0) break;
+                                                    temp = curHuffmanTable.tree[~temp + ((bitBuffer >> codeLength++) & 1)];
+                                                } while ((temp < 0) && (numBits >= (codeLength + 1)));
+                                                if (temp >= 0) {
+                                                    break;
+                                                }
                                             }
-                                            TINFL_GET_BYTE(state_index, c);
-                                            bit_buf |= (((tinfl_bit_buf_t)c) << num_bits);
-                                            num_bits += 8;
-                                        } while (num_bits < 15);
+                                            let c = b.getUint8();
+                                            bitBuffer |= (c << numBits);
+                                            numBits += 8;
+                                        } while (numBits < 15);
                                         /////////////
 
+                                    } else {
+                                        // bitBuffer |= (((tinfl_bit_buf_t)pIn_buf_cur[0]) << numBits) | (((tinfl_bit_buf_t)pIn_buf_cur[1]) << (numBits + 8));
+                                        // pIn_buf_cur += 2;
+                                        numBits += 16;
                                     }
-                            
-                                } else {
-                                    bit_buf |= (((tinfl_bit_buf_t)pIn_buf_cur[0]) << num_bits) | (((tinfl_bit_buf_t)pIn_buf_cur[1]) << (num_bits + 8));
-                                    pIn_buf_cur += 2;
-                                    num_bits += 16;
                                 }
-                            }
-                            if ((temp = curHuffmanTable.lookUp[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= 0) {
-                                codeLength = temp >> 9;
-                                temp &= 511;
-                            } else {
-                                codeLength = TINFL_FAST_LOOKUP_BITS;
-                                do {
-                                    temp = curHuffmanTable.tree[~temp + ((bit_buf >> codeLength++) & 1)];
-                                } while (temp < 0);
-                            }
-                            sym = temp;
-                            bit_buf >>= codeLength;
-                            num_bits -= codeLength;
-                ////////
+                                let lookupIndex = b.readBits(TINFL_FAST_LOOKUP_BITS, true);
+                                let temp = curHuffmanTable.lookUp[lookupIndex];
+                                //let temp = curHuffmanTable.lookUp[bitBuffer & (TINFL_FAST_LOOKUP_SIZE - 1)];
+                                if (temp >= 0) {
+                                    codeLength = temp >> 9;
+                                    temp &= 511;
+                                } else {
+                                    codeLength = TINFL_FAST_LOOKUP_BITS;
+                                    do {
+                                        temp = curHuffmanTable.tree[~temp + ((bitBuffer >> codeLength++) & 1)];
+                                    } while (temp < 0);
+                                }
 
+                                distance = temp;
+                                b.skip(0, codeLength);
 
-                            if (dist < 16) {
-                                r->m_len_codes[counter++] = (mz_uint8)dist;
-                                continue;
+                                bitBuffer >>= codeLength;
+                                numBits -= codeLength;
+                                ////////
+
+                                if (distance < 16) {
+                                    lengthCodes[counter++] = distance;
+                                    continue;
+                                }
+                                if ((distance == 16) && (!counter)) {
+                                    // TINFL_CR_RETURN_FOREVER(17, TINFL_STATUS_FAILED);
+                                    //  Error, TODO: handle
+                                }
+
+                                //let numExtra = "\02\03\07"[distance - 16];
+                                let numExtra = [2, 3, 7][distance - 16];
+                                
+                                // TINFL_GET_BITS(18, s, num_extra);
+                                let s = b.readBits(numExtra);
+                                
+                                //s += "\03\03\013"[distance - 16];
+                                s += [3, 3, 13][distance - 16];
+                                
+                                // TINFL_MEMSET(r -> m_len_codes + counter, (distance == 16) ? r -> m_len_codes[counter - 1] : 0, s);
+                                for (let i = 0; i < s; i++) {
+                                    lengthCodes[counter + i] = (distance == 16 ? lengthCodes[counter - 1] : 0);
+                                }
+                                counter += s;
                             }
-                            if ((dist == 16) && (!counter)) {
-                                TINFL_CR_RETURN_FOREVER(17, TINFL_STATUS_FAILED);
+                            if ((huffman.tableSizes[0] + huffman.tableSizes[1]) != counter) {
+                                //TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
+                                //  Error, TODO: handle
                             }
-                            num_extra = "\02\03\07"[dist - 16];
-                            TINFL_GET_BITS(18, s, num_extra);
-                            s += "\03\03\013"[dist - 16];
-                            TINFL_MEMSET(r->m_len_codes + counter, (dist == 16) ? r->m_len_codes[counter - 1] : 0, s);
-                            counter += s;
+
+                            huffman.tables[0].codeSize = lengthCodes.slice(0, huffman.tableSizes[0]);
+                            huffman.tables[1].codeSize = lengthCodes.slice(huffman.tableSizes[0], huffman.tableSizes[0] + huffman.tableSizes[1]);
                         }
-                        if ((r->m_table_sizes[0] + r->m_table_sizes[1]) != counter) {
-                            TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
-                        }
-                        TINFL_MEMCPY(r->m_tables[0].m_code_size, r->m_len_codes, r->m_table_sizes[0]);
-                        TINFL_MEMCPY(r->m_tables[1].m_code_size, r->m_len_codes + r->m_table_sizes[0], r->m_table_sizes[1]);
                     }
-                }
+
+                    // for (;;) {
+                    //     for (;;) {
+                        
+                    //     }
+                    // }
 
 
-                if (blockType == 3) {
-                    //  reserved (error)
-                }
-
-                let s = "";
-                s += scanLine + ", " + dataSize;
-                s += ", z: " + JSON.stringify(z);
-                for (let i = 0; i < 10; i++)
-                    s += ", 0x" + b.readUint8().toString(16);
-                console.log(s);
-                console.log("bFinalBlock: " + bFinalBlock + ", blockType: " + blockType);
+                    let s = "";
+                    s += scanLine + ", " + dataSize;
+                    s += ", z: " + JSON.stringify(z);
+                    for (let i = 0; i < 10; i++)
+                        s += ", 0x" + b.readUint8().toString(16);
+                    console.log(s);
+                    console.log("bFinalBlock: " + bFinalBlock + ", blockType: " + blockType);
 
                 } while (!bFinalBlock);
             }
         }
 
-        huffmanBitbufferFill(state_index, pHuff) {
-            do {
-                temp = (pHuff) -> m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)];
-                if (temp >= 0) {
-                    code_len = temp >> 9;
-                    if ((code_len) && (num_bits >= code_len)) break;
-                } else if (num_bits > TINFL_FAST_LOOKUP_BITS) {
-                    code_len = TINFL_FAST_LOOKUP_BITS;
-                    do {
-                        temp = (pHuff) -> m_tree[~temp + ((bit_buf >> code_len++) & 1)];
-                    } while ((temp < 0) && (num_bits >= (code_len + 1)));
-                    if (temp >= 0) break;
-                }
-                TINFL_GET_BYTE(state_index, c);
-                bit_buf |= (((tinfl_bit_buf_t)c) << num_bits);
-                num_bits += 8;
-            } while (num_bits < 15);
-        }
+        // huffmanBitbufferFill(state_index, pHuff) {
+        //     do {
+        //         temp = (pHuff) -> m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)];
+        //         if (temp >= 0) {
+        //             code_len = temp >> 9;
+        //             if ((code_len) && (num_bits >= code_len)) break;
+        //         } else if (num_bits > TINFL_FAST_LOOKUP_BITS) {
+        //             code_len = TINFL_FAST_LOOKUP_BITS;
+        //             do {
+        //                 temp = (pHuff) -> m_tree[~temp + ((bit_buf >> code_len++) & 1)];
+        //             } while ((temp < 0) && (num_bits >= (code_len + 1)));
+        //             if (temp >= 0) break;
+        //         }
+        //         TINFL_GET_BYTE(state_index, c);
+        //         bit_buf |= (((tinfl_bit_buf_t)c) << num_bits);
+        //         num_bits += 8;
+        //     } while (num_bits < 15);
+        // }
 
-        huffmanDecode(state_index, sym, pHuff) {
-            int temp;
-            mz_uint code_len, c;
-            if (num_bits < 15) {
-                if ((pIn_buf_end - pIn_buf_cur) < 2) {
-                    huffmanBitbufferFill(state_index, pHuff);
-                } else {
-                    bit_buf |= (((tinfl_bit_buf_t)pIn_buf_cur[0]) << num_bits) |
-                        (((tinfl_bit_buf_t)pIn_buf_cur[1]) << (num_bits + 8));
-                    pIn_buf_cur += 2;
-                    num_bits += 16;
-                }
-            }
-            if ((temp = (pHuff) -> m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= 0) {
-                code_len = temp >> 9, temp &= 511;
-            } else {
-                code_len = TINFL_FAST_LOOKUP_BITS;
-                do {
-                    temp = (pHuff) -> m_tree[~temp + ((bit_buf >> code_len++) & 1)];
-                } while (temp < 0);
-            }
-            sym = temp;
-            bit_buf >>= code_len;
-            num_bits -= code_len;
-        }
+        // huffmanDecode(state_index, sym, pHuff) {
+        //     int temp;
+        //     mz_uint code_len, c;
+        //     if (num_bits < 15) {
+        //         if ((pIn_buf_end - pIn_buf_cur) < 2) {
+        //             huffmanBitbufferFill(state_index, pHuff);
+        //         } else {
+        //             bit_buf |= (((tinfl_bit_buf_t)pIn_buf_cur[0]) << num_bits) |
+        //                 (((tinfl_bit_buf_t)pIn_buf_cur[1]) << (num_bits + 8));
+        //             pIn_buf_cur += 2;
+        //             num_bits += 16;
+        //         }
+        //     }
+        //     if ((temp = (pHuff) -> m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= 0) {
+        //         code_len = temp >> 9, temp &= 511;
+        //     } else {
+        //         code_len = TINFL_FAST_LOOKUP_BITS;
+        //         do {
+        //             temp = (pHuff) -> m_tree[~temp + ((bit_buf >> code_len++) & 1)];
+        //         } while (temp < 0);
+        //     }
+        //     sym = temp;
+        //     bit_buf >>= code_len;
+        //     num_bits -= code_len;
+        // }
 
 
         readAttribute() {
