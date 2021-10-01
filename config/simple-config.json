@@ -2,10 +2,10 @@
     "name": "Test configuration",
     "streams": [
         {
-            "name": "Lena",
+            "name": "Sponza",
             "window": true,
             "files": [
-                "images/texture.png"
+                "images/sponza.exr"
             ]
         }
     ]

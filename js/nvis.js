@@ -1498,6 +1498,7 @@ var nvis = new function () {
                 }
             }
             let dataDimensions = this.attributes.dataWindow.values;
+            outputSize = 4 * 4;
             this.dimensions = { w: 0, h: 0 };
             this.dimensions.w = (dataDimensions.xMax - dataDimensions.xMin + 1);
             this.dimensions.h = (dataDimensions.yMax - dataDimensions.yMin + 1);
@@ -2014,6 +2015,22 @@ var nvis = new function () {
             return attrib;
         }
 
+        toFloatArray() {
+            let ab = new ArrayBuffer(1024 * 1024 * 4 * 4);
+            let fa = new Float32Array(ab);
+
+            for (let y = 0; y < this.dimensions.h; y++) {
+                for (let x = 0; x < this.dimensions.w; x++) {
+                    let loc = (y * this.dimensions.w + x) * 4;
+                    fa[loc + 0] = Math.random();  //  R
+                    fa[loc + 1] = Math.random();  //  G
+                    fa[loc + 2] = Math.random();  //  B
+                    fa[loc + 3] = 1.0;  //  A
+                }
+            }
+
+            return fa;
+        }
     }
     
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -2151,14 +2168,18 @@ var nvis = new function () {
         }
 
 
-        setupTexture(texture, image, bFloat = false) {
+        setupTexture(texture, image, bFloat = false, dimensions = { w: 0, h: 0 }) {
 
             let gl = this.glContext;
 
-            var ext = gl.getExtension("OES_texture_half_float");
+            let ext = gl.getExtension('OES_texture_float');
 
             gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, (bFloat ? ext.HALF_FLOAT_OES : gl.UNSIGNED_BYTE), image);
+            if (bFloat) {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.FLOAT, image);
+            } else {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            }
 
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -2199,27 +2220,62 @@ var nvis = new function () {
             let self = this;
 
             for (let fileId = 0; fileId < fileNames.length; fileId++) {
+
+                // if (!files[fileId].type.match(/image.*/) && !files[0].name.match(/.exr$/)) {
+                //     continue;
+                // }                
+
                 let texture = gl.createTexture();
                 this.textures.push(texture);
-                this.fileNames.push(fileNames[fileId]);
 
-                const image = new Image();
-                image.src = fileNames[fileId];
+                let fileName = fileNames[fileId];
+                this.fileNames.push(fileName);
 
-                image.onload = function () {
-                    numFilesLoaded++;
-                    self.setupTexture(texture, image);
+                if (fileName.match(/.exr$/)) {
 
-                    if (numFilesLoaded == fileNames.length) {
-                        self.dimensions = { w: image.width, h: image.height };
-                        callback(self.dimensions);
+                    let xhr = new XMLHttpRequest();
+                    xhr.open("GET", fileName);
+                    xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+                    xhr.responseType="arraybuffer";
+                    xhr.onload = function () {
+                        if (this.status == 200 && this.response !== null) {
+                            numFilesLoaded++;
+
+                            let file = new NvisEXRFile(fileName, this.response);
+
+                            self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
+
+                            if (numFilesLoaded == fileNames.length) {
+                                self.dimensions = file.dimensions;
+                                callback(self.dimensions);
+                            }
+                        }
+                    };
+                    xhr.send();
+        
+                } else {
+
+                    const image = new Image();
+                    image.src = fileNames[fileId];
+
+                    image.onload = function () {
+                        numFilesLoaded++;
+                        self.setupTexture(texture, image);
+
+                        if (numFilesLoaded == fileNames.length) {
+                            self.dimensions = { w: image.width, h: image.height };
+                            callback(self.dimensions);
+                        }
                     }
+
                 }
             }
         }
 
 
         drop(files, callback) {
+
+            //  TODO: combine with this.load()
 
             let gl = this.glContext;
             let numFilesLoaded = 0;
@@ -2266,9 +2322,7 @@ var nvis = new function () {
 
                         let file = new NvisEXRFile(files[0].name, reader.result);
 
-                        // let image = new ArrayBuffer(file.width * file.height * 4 * file.numChannels);
-
-                        let image = file.outputBuffer;
+                        let image = new ArrayBuffer(new Float32Array(file.width * file.height * 4 * file.numChannels));
 
                         // for (let y = 0; y < file.dimensions.h; y++) {
                         //     for (let x = 0; x < file.dimensions.w; x++) {
