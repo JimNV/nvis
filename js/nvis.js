@@ -1330,9 +1330,60 @@ var nvis = new function () {
             return value;
         }
 
-        readFloat16() {
-            let value = this.view.getuInt16(this.bytePointer, this.littleEndian);
-            //  TODO: convert to half
+        halfBytes2Float32(bytes) {
+            var sign = ((bytes & 0x8000) ? -1 : 1);
+            var exponent = ((bytes >> 10) & 0x1F) - 15;
+            var significand = bytes & ((1 << 10) - 1);
+        
+            if (exponent == 16) {
+                return sign * ((significand) ? Number.NaN : Number.POSITIVE_INFINITY);
+            }
+        
+            if (exponent == -16) {
+                if (significand == 0) {
+                    return sign * 0.0;
+                }
+                exponent = -16;
+                significand /= (1 << 22);
+            } else {
+                significand = (significand | (1 << 10)) / (1 << 10);
+            }
+        
+            return sign * significand * Math.pow(2, exponent);
+        }
+
+        floatBytes2Float32(bytes) {
+            var sign = (bytes & 0x80000000) ? -1 : 1;
+            var exponent = ((bytes >> 23) & 0xFF) - 127;
+            var significand = (bytes & ~(-1 << 23));
+        
+            if (exponent == 128) {
+                return sign * ((significand) ? Number.NaN : Number.POSITIVE_INFINITY);
+            }
+        
+            if (exponent == -127) {
+                if (significand == 0) {
+                    return sign * 0.0;
+                }
+                exponent = -126;
+                significand /= (1 << 22);
+            } else {
+                significand = (significand | (1 << 23)) / (1 << 23);
+            }
+        
+            return sign * significand * Math.pow(2, exponent);
+        }
+
+        getFloat16(byteIndex) {
+            //  0 01101 0101010101 = 0011 0101 0101 0101
+            let value = this.view.getUint16(byteIndex, false);
+            if (byteIndex < 50)
+                console.log("  byte " + byteIndex + ": 0x" + value.toString(16) + " = " + this.halfBytes2Float32(value));
+            return this.halfBytes2Float32(value);
+        }
+
+        readFloat16(location = this.bytePointer) {
+            let value = this.halfBytes2Float32(this.view.getUint16(location, this.littleEndian));
             this.bytePointer += 2;
             return value;
         }
@@ -1427,7 +1478,8 @@ var nvis = new function () {
                 this.attributes[attrib.name] = attrib;
             }
             b.skip();
-            // console.log(JSON.stringify(this.attributes));
+            
+            console.log(JSON.stringify(this.attributes));
 
             //  offset table
             this.offsetTable = [];
@@ -2016,20 +2068,30 @@ var nvis = new function () {
         }
 
         toFloatArray() {
-            let ab = new ArrayBuffer(1024 * 1024 * 4 * 4);
-            let fa = new Float32Array(ab);
+            let data = new Float32Array(new ArrayBuffer(this.dimensions.w * this.dimensions.h * 4 * 4));  //  w x h x RGBA x float
+            
+            let channels = this.attributes.channels.values;
+
+            let dstChannels = 4;
+            let channelSize = this.dimensions.w * this.dimensions.h * 2;
 
             for (let y = 0; y < this.dimensions.h; y++) {
                 for (let x = 0; x < this.dimensions.w; x++) {
-                    let loc = (y * this.dimensions.w + x) * 4;
-                    fa[loc + 0] = Math.random();  //  R
-                    fa[loc + 1] = Math.random();  //  G
-                    fa[loc + 2] = Math.random();  //  B
-                    fa[loc + 3] = 1.0;  //  A
+                    let dstLoc = (y * this.dimensions.w + x) * dstChannels;
+                    for (let c = 0; c < 3; c++) {
+                        let srcLoc = channelSize * c + (y * this.dimensions.w + x) * 2;
+
+                        let value = this.outputBuffer.getFloat16(srcLoc);
+                        data[dstLoc + c] = value;
+                    }
+                    // data[dstLoc + 0] = x / this.dimensions.w;  //  alpha
+                    // data[dstLoc + 1] = y / this.dimensions.h;  //  alpha
+                    // data[dstLoc + 2] = 1.0;  //  alpha
+                    data[dstLoc + 3] = 1.0;  //  alpha
                 }
             }
 
-            return fa;
+            return data;
         }
     }
     
