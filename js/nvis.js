@@ -1207,7 +1207,7 @@ var nvis = new function () {
 
         constructor(buffer, params = { offset: 0, littleEndian: true }) {
             this.buffer = buffer;  //  i.e., ArrayBuffer
-            this.bitSize = BigInt(buffer.byteLength * 8);
+            this.bitSize = buffer.byteLength * 8;
 
             this.bitPointer = 0;  //  within current byte, not total
             this.bytePointer = 0;
@@ -1221,21 +1221,39 @@ var nvis = new function () {
             return (value & ((1 << (msb + 1)) - 1)) >> lsb;
         }
 
+        copy(buffer, length) {
+            for (let i = 0; i < length; i++) {
+                this.writeUint8(buffer.readUint8());
+            }
+        }
+
+        byteAlign() {
+            if (this.bitPointer > 0) {
+                this.bitPointer = 0;
+                this.bytePointer++;
+            }
+        }
+
         remainingBits() {
             return this.bitSize - (this.bytePointer * 8 + this.bitPointer);
         }
 
         readBits(numBits, peek = false) {
-            let value = BigInt(0);
+            let value = 0;
             let n = numBits;
 
             let bytePointer = this.bytePointer;
             let bitPointer = this.bitPointer;
 
             //  buffer size is in integer bytes
-            if (bytePointer * 8 + (bitPointer + n) > this.bitSize) {
-                return undefined;
+            let remainingBits = this.remainingBits();
+            if (n > remainingBits) {
+                n = remainingBits;
             }
+            // let maxBits = bytePointer * 8 + bitPointer;
+            // if (bytePointer * 8 + (bitPointer + n) > this.bitSize) {
+            //     return undefined;
+            // }
 
             //  leading bits, first byte
             let nextBitPointer = bitPointer + n;
@@ -1289,8 +1307,8 @@ var nvis = new function () {
 
         //  functions below only work on byte boundary
 
-        peekUint8() {
-            let value = this.view.getUint8(this.bytePointer, this.littleEndian);
+        peekUint8(bytePointer = this.bytePointer) {
+            let value = this.view.getUint8(bytePointer, this.littleEndian);
             return value;
         }
 
@@ -1298,6 +1316,11 @@ var nvis = new function () {
             let value = this.view.getUint8(this.bytePointer, this.littleEndian);
             this.bytePointer++;
             return value;
+        }
+
+        writeUint8(value) {
+            this.view.setUint8(this.bytePointer, value);
+            this.bytePointer++;
         }
 
         readUint32() {
@@ -1446,14 +1469,27 @@ var nvis = new function () {
                 }
             }
             if (numOffsets > 1) {
-                this.offsetTable[numOffsets - 1].size = (b.bitSize >> 3n) - this.offsetTable[numOffsets - 1].offset;
+                this.offsetTable[numOffsets - 1].size = (b.bitSize >> 3) - Number(this.offsetTable[numOffsets - 1].offset);
             }
 
             console.log("numOffsets: " + numOffsets);
-            console.log("size: " + b.size);
             console.log("offsetTable:");
             for (let i = 0; i < numOffsets; i++) {
                 console.log("   " + this.offsetTable[i].offset + ", " + this.offsetTable[i].size);
+            }
+
+            //  Huffman
+            this.huffman = {
+                tableSizes: new Array(TINFL_MAX_HUFF_TABLES).fill(0),
+                lengthCodes: new Array(TINFL_MAX_HUFF_SYMBOLS_0 + TINFL_MAX_HUFF_SYMBOLS_1 + 137).fill(0),
+                tables: []
+            }
+            for (let i = 0; i < TINFL_MAX_HUFF_TABLES; i++) {
+                this.huffman.tables.push({
+                    codeSize: new Array(TINFL_MAX_HUFF_SYMBOLS_0).fill(0),
+                    lookUp: new Array(TINFL_FAST_LOOKUP_SIZE).fill(0),
+                    tree: new Array(TINFL_MAX_HUFF_SYMBOLS_0 * 2).fill(0)
+                });
             }
 
             //  pixels
@@ -1474,20 +1510,26 @@ var nvis = new function () {
                 }
             }
             let dataDimensions = this.attributes.dataWindow.values;
-            outputSize *= (dataDimensions.xMax - dataDimensions.xMin) * (dataDimensions.yMax - dataDimensions.yMin);
-            let outputBuffer = new NvisBitBuffer(new ArrayBuffer(outputSize));
+            outputSize *= (dataDimensions.xMax - dataDimensions.xMin + 1) * (dataDimensions.yMax - dataDimensions.yMin + 1);
+            
+            this.outputBuffer = new NvisBitBuffer(new ArrayBuffer(outputSize));
 
             console.log("Total output buffer size: " + outputSize);
 
             for (let sl = 0; sl < numOffsets; sl++) {
                 b.seek(Number(this.offsetTable[sl].offset));
-
+                
                 let scanLine = b.readUint32();
                 let dataSize = b.readUint32();
+
+                console.log("   scanLine: " + scanLine + ", dataSize: " + dataSize);
 
                 let z = {};
 
                 //  https://datatracker.ietf.org/doc/html/rfc1950
+
+                let atBit = (b.bytePointer * 8 + b.bitPointer);
+                console.log("at bit: " + atBit);
 
                 let CMF = b.readUint8();
                 let FLG = b.readUint8();
@@ -1501,9 +1543,8 @@ var nvis = new function () {
                 z.flg.flevel = NvisBitBuffer.bits(FLG, 7, 6);  //  0: fastest, 1: fast, 2: default, 3: maximum/slowest 
                 z.dictId = (z.flg.fdict == 1 ? b.readUint32() : undefined);
 
-                //  https://datatracker.ietf.org/doc/html/rfc1951
-                
-                let inBufferPointer = 0;
+                //  https://datatracker.ietf.org/doc/html/rfc1951                
+
                 let bFinalBlock = false;
                 do {
 
@@ -1512,8 +1553,16 @@ var nvis = new function () {
 
                     if (blockType == 0) {
                         //  no compression
-                        //  TODO: this
-                        console.log("TODO: handle blocks with no compression");
+                        b.byteAlign();
+                        
+                        let len = (b.readBits(8) | (b.readBits(8) << 8));
+                        let nlen = (0xFFFF ^ (b.readBits(8) | (b.readBits(8) << 8)));
+                        if (len != nlen) {
+                            //  error
+                        }
+
+                        this.outputBuffer.copy(b, len);
+                        continue;
                     }
 
                     if (blockType == 3) {
@@ -1521,19 +1570,19 @@ var nvis = new function () {
                         console.log("Reserved block type (3)");
                     }
 
+                    let counter = 0;
+
                     if (blockType == 1 || blockType == 2) {
                         //  compression with Huffman codes
 
-                        const huffman = {
-                            tableSizes: new Array(TINFL_MAX_HUFF_TABLES).fill(0),
-                            tables: []
-                        }
+                        // const huffman = {
+                        //     tableSizes: new Array(TINFL_MAX_HUFF_TABLES).fill(0),
+                        //     tables: []
+                        // }
                         for (let i = 0; i < TINFL_MAX_HUFF_TABLES; i++) {
-                            huffman.tables.push({
-                                codeSize: new Array(TINFL_MAX_HUFF_SYMBOLS_0).fill(0),
-                                lookUp: new Array(TINFL_FAST_LOOKUP_SIZE).fill(0),
-                                tree: new Array(TINFL_MAX_HUFF_SYMBOLS_0 * 2).fill(0)
-                            });
+                            this.huffman.tables[i].codeSize.fill(0);
+                            this.huffman.tables[i].lookUp.fill(0);
+                            this.huffman.tables[i].tree.fill(0);
                         }
 
                         if (blockType == 1) {
@@ -1542,25 +1591,31 @@ var nvis = new function () {
                             console.log("TODO: handle blocks compressed with fixed Huffman codes");
                         } else {
                             //  compression with dynamic Huffman codes
-                            huffman.tableSizes = [
+                            this.huffman.tableSizes = [
                                 b.readBits(5) + s_min_table_sizes[0],
                                 b.readBits(5) + s_min_table_sizes[1],
                                 b.readBits(4) + s_min_table_sizes[2]
                             ];
-                            for (let counter = 0; counter < huffman.tableSizes[2]; counter++) {
-                                huffman.tables[2].codeSize[s_length_dezigzag[counter]] = b.readBits(3);
+                            for (let i = 0; i < this.huffman.tableSizes[2]; i++) {
+                                this.huffman.tables[2].codeSize[s_length_dezigzag[i]] = b.readBits(3);
                             }
-                            huffman.tableSizes[2] = 19;
+                            this.huffman.tableSizes[2] = 19;
                         }
 
                         let nextCode = new Array(17);
-                        let totalSymbols = new Array(16).fill(0);
+                        let totalSymbols = new Array(16);
                         for (let iType = blockType; iType >= 0; iType--)  //  [(2,) 1, 0]
                         {
-                            let curHuffmanTable = huffman.tables[iType];
-                            for (let i = 0; i < huffman.tableSizes[iType]; i++) {
+                            let curHuffmanTable = this.huffman.tables[iType];
+                            
+                            totalSymbols.fill(0);
+                            for (let i = 0; i < this.huffman.tableSizes[iType]; i++) {
                                 totalSymbols[curHuffmanTable.codeSize[i]]++;
                             }
+
+                            // console.log("total bits: " + (b.bytePointer * 8 + b.bitPointer - 6664));
+                            // for (let i = 0; i < 16; i++)
+                            //     console.log("   totalSymbols[" + i + "] = " + totalSymbols[i]);
 
                             let total = 0;
                             let usedSymbols = 0;
@@ -1578,7 +1633,7 @@ var nvis = new function () {
                             }
 
                             let treeNext = -1;
-                            for (let symbolIndex = 0; symbolIndex < huffman.tableSizes[iType]; symbolIndex++) {
+                            for (let symbolIndex = 0; symbolIndex < this.huffman.tableSizes[iType]; symbolIndex++) {
 
                                 let codeSize = curHuffmanTable.codeSize[symbolIndex];
                                 if (codeSize == 0) {
@@ -1610,7 +1665,7 @@ var nvis = new function () {
                                 }
 
                                 reverseCode >>= (TINFL_FAST_LOOKUP_BITS - 1);
-                                for (j = codeSize; j > (TINFL_FAST_LOOKUP_BITS + 1); j--) {
+                                for (let j = codeSize; j > (TINFL_FAST_LOOKUP_BITS + 1); j--) {
                                     treeCurrent -= ((reverseCode >>= 1) & 1);
                                     if (!curHuffmanTable.tree[-treeCurrent - 1]) {
                                         curHuffmanTable.tree[-treeCurrent - 1] = treeNext;
@@ -1624,129 +1679,249 @@ var nvis = new function () {
                                 curHuffmanTable.tree[-treeCurrent - 1] = symbolIndex;
                             }
 
-                        }
+                            if (iType == 2) {
 
-                        if (blockType == 2) {
+                                let distance = 0;
 
-                            let distance = 0;
-                            let numBits = 0;
-                            let lengthCodes = new Array(TINFL_MAX_HUFF_SYMBOLS_0 + TINFL_MAX_HUFF_SYMBOLS_1 + 137).fill(0);
+                                for (counter = 0; counter < (this.huffman.tableSizes[0] + this.huffman.tableSizes[1]);) {
 
-                            let counter = 0;
-                            for (counter = 0; counter < (huffman.tableSizes[0] + huffman.tableSizes[1]); ) {
-                                //mz_uint s;
+                                    distance = this.huffmanDecode(b, 2);
 
-                                //huffmanDecode(16, dist, &r->m_tables[2]);
-                                //  Huffman decode
-                                //    huffmanDecode(state_index, sym, pHuff) {
-
-                                let curHuffmanTable = huffman.tables[2];
-                                let codeLength = 0;
-
-                                let bitBuffer = 0;
-                                if (false && numBits < 15) {
-                                    if ((pIn_buf_end - pIn_buf_cur) < 2) {
-
-                                        // huffmanBitbufferFill(state_index, pHuff) {
-                                        do {
-                                            let temp = curHuffmanTable.lookUp[bitBuffer & (TINFL_FAST_LOOKUP_SIZE - 1)];
-                                            if (temp >= 0) {
-                                                codeLength = temp >> 9;
-                                                if ((codeLength) && (numBits >= codeLength)) {
-                                                    break;
-                                                }
-                                            } else if (numBits > TINFL_FAST_LOOKUP_BITS) {
-                                                codeLength = TINFL_FAST_LOOKUP_BITS;
-                                                do {
-                                                    temp = curHuffmanTable.tree[~temp + ((bitBuffer >> codeLength++) & 1)];
-                                                } while ((temp < 0) && (numBits >= (codeLength + 1)));
-                                                if (temp >= 0) {
-                                                    break;
-                                                }
-                                            }
-                                            let c = b.getUint8();
-                                            bitBuffer |= (c << numBits);
-                                            numBits += 8;
-                                        } while (numBits < 15);
-                                        /////////////
-
-                                    } else {
-                                        // bitBuffer |= (((tinfl_bit_buf_t)pIn_buf_cur[0]) << numBits) | (((tinfl_bit_buf_t)pIn_buf_cur[1]) << (numBits + 8));
-                                        // pIn_buf_cur += 2;
-                                        numBits += 16;
+                                    if (distance < 16) {
+                                        this.huffman.lengthCodes[counter++] = distance;
+                                        continue;
                                     }
-                                }
-                                let lookupIndex = b.readBits(TINFL_FAST_LOOKUP_BITS, true);
-                                let temp = curHuffmanTable.lookUp[lookupIndex];
-                                //let temp = curHuffmanTable.lookUp[bitBuffer & (TINFL_FAST_LOOKUP_SIZE - 1)];
-                                if (temp >= 0) {
-                                    codeLength = temp >> 9;
-                                    temp &= 511;
-                                } else {
-                                    codeLength = TINFL_FAST_LOOKUP_BITS;
-                                    do {
-                                        temp = curHuffmanTable.tree[~temp + ((bitBuffer >> codeLength++) & 1)];
-                                    } while (temp < 0);
-                                }
+                                    if ((distance == 16) && (!counter)) {
+                                        // TINFL_CR_RETURN_FOREVER(17, TINFL_STATUS_FAILED);
+                                        //  Error, TODO: handle
+                                    }
 
-                                distance = temp;
-                                b.skip(0, codeLength);
+                                    let numExtra = [2, 3, 7][distance - 16];
+                                    let s = b.readBits(numExtra);
+                                    s += [3, 3, 11][distance - 16];
 
-                                bitBuffer >>= codeLength;
-                                numBits -= codeLength;
-                                ////////
-
-                                if (distance < 16) {
-                                    lengthCodes[counter++] = distance;
-                                    continue;
+                                    // TINFL_MEMSET(r -> m_len_codes + counter, (distance == 16) ? r -> m_len_codes[counter - 1] : 0, s);
+                                    for (let i = 0; i < s; i++) {
+                                        this.huffman.lengthCodes[counter + i] = (distance == 16 ? this.huffman.lengthCodes[counter - 1] : 0);
+                                    }
+                                    counter += s;
                                 }
-                                if ((distance == 16) && (!counter)) {
-                                    // TINFL_CR_RETURN_FOREVER(17, TINFL_STATUS_FAILED);
+                                if ((this.huffman.tableSizes[0] + this.huffman.tableSizes[1]) != counter) {
+                                    //TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
                                     //  Error, TODO: handle
                                 }
 
-                                //let numExtra = "\02\03\07"[distance - 16];
-                                let numExtra = [2, 3, 7][distance - 16];
-                                
-                                // TINFL_GET_BITS(18, s, num_extra);
-                                let s = b.readBits(numExtra);
-                                
-                                //s += "\03\03\013"[distance - 16];
-                                s += [3, 3, 13][distance - 16];
-                                
-                                // TINFL_MEMSET(r -> m_len_codes + counter, (distance == 16) ? r -> m_len_codes[counter - 1] : 0, s);
-                                for (let i = 0; i < s; i++) {
-                                    lengthCodes[counter + i] = (distance == 16 ? lengthCodes[counter - 1] : 0);
-                                }
-                                counter += s;
-                            }
-                            if ((huffman.tableSizes[0] + huffman.tableSizes[1]) != counter) {
-                                //TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
-                                //  Error, TODO: handle
+                                this.huffman.tables[0].codeSize = this.huffman.lengthCodes.slice(0, this.huffman.tableSizes[0]);
+                                this.huffman.tables[1].codeSize = this.huffman.lengthCodes.slice(this.huffman.tableSizes[0], this.huffman.tableSizes[0] + this.huffman.tableSizes[1]);
                             }
 
-                            huffman.tables[0].codeSize = lengthCodes.slice(0, huffman.tableSizes[0]);
-                            huffman.tables[1].codeSize = lengthCodes.slice(huffman.tableSizes[0], huffman.tableSizes[0] + huffman.tableSizes[1]);
                         }
+
                     }
 
-                    // for (;;) {
-                    //     for (;;) {
+                    for (;;) {
+                        // mz_uint8 *pSrc;
+                        for (;;) {
+                            //if (((pIn_buf_end - pIn_buf_cur) < 4) || ((pOut_buf_end - pOut_buf_cur) < 2)) {
+                            if ((b.remainingBits() < 32 || this.outputBuffer.remainingBits() < 16)) {
+
+                                //  TODO: this path not tested
+                                counter = this.huffmanDecode(b, 0);
+                                if (counter >= 256)
+                                    break;
+                                //while (pOut_buf_cur >= pOut_buf_end) {
+                                if (this.outputBuffer.bytePointer >= this.outputBuffer.buffer.byteLength) {
+                                    //  error: TODO: handle
+                                    console.log("Attempting to write outside output buffer!");
+                                }
+                                //*pOut_buf_cur++ = (mz_uint8)counter;
+                                this.outputBuffer.writeUint8(counter);
+                            } else {
+
+                                let sym2 = this.huffmanDecode(b, 0, true);
+
+                                counter = sym2;
+
+                                if (counter & 256)
+                                    break;
+
+                                sym2 = this.huffmanDecode(b, 0, true);
+
+                                this.outputBuffer.writeUint8(counter & 255);
+                                if (sym2 & 256) {
+                                    counter = sym2;
+                                    break;
+                                }
+                                this.outputBuffer.writeUint8(sym2 & 255);
+                            }
+                        }
                         
-                    //     }
-                    // }
+                        if ((counter &= 511) == 256) {
+                            break;
+                        }
+
+                        let numExtra = s_length_extra[counter - 257];
+                        counter = s_length_base[counter - 257];
+                        if (numExtra) {
+                            let extraBits = b.readBits(numExtra);
+                            counter += extraBits;
+                        }
+
+                        let dist = this.huffmanDecode(b, 1);
+                        numExtra = s_dist_extra[dist];
+                        dist = s_dist_base[dist];
+                        if (numExtra > 0) {
+                            let extraBits = b.readBits(numExtra);
+                            dist += extraBits;
+                        }
+
+                        let dist_from_out_buf_start = this.outputBuffer.bytePointer;
+                        // dist_from_out_buf_start = pOut_buf_cur - pOut_buf_start;
+                        // if ((dist > dist_from_out_buf_start) && (decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) {
+                        //     TINFL_CR_RETURN_FOREVER(37, TINFL_STATUS_FAILED);
+                        // }
+
+                        let byteIndex = (dist_from_out_buf_start - dist);
+//                         pSrc = pOut_buf_start + ((dist_from_out_buf_start - dist) & out_buf_size_mask);
+
+                        if (Math.max(this.outputBuffer.bytePointer, byteIndex) > this.outputBuffer.buffer.byteLength - 1) {
+                            while (counter--) {
+                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(dist_from_out_buf_start - dist));
+                                dist_from_out_buf_start++;
+                            }
+                            continue;
+                        }
+
+                        if (b.remainingBits() == 0) {
+                            console.log("DONE!");
+                        }
+//                         if ((MZ_MAX(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
+//                             while (counter--) {
+//                                 while (pOut_buf_cur >= pOut_buf_end) {
+//                                     TINFL_CR_RETURN(53, TINFL_STATUS_HAS_MORE_OUTPUT);
+//                                 }
+//                                 *pOut_buf_cur++ = pOut_buf_start[(dist_from_out_buf_start++ - dist) & out_buf_size_mask];
+//                             }
+//                             continue;
+//                         }
+
+// #if MINIZ_USE_UNALIGNED_LOADS_AND_STORES
+//                         else if ((counter >= 9) && (counter <= dist)) {
+//                             const mz_uint8 * pSrc_end = pSrc + (counter & ~7);
+//                             do {
+//                                 ((mz_uint32 *)pOut_buf_cur)[0] = ((const mz_uint32 *)pSrc)[0];
+//                                 ((mz_uint32 *)pOut_buf_cur)[1] = ((const mz_uint32 *)pSrc)[1];
+//                                 pOut_buf_cur += 8;
+//                             } while ((pSrc += 8) < pSrc_end);
+//                             if ((counter &= 7) < 3) {
+//                                 if (counter) {
+//                                     pOut_buf_cur[0] = pSrc[0];
+//                                     if (counter > 1)
+//                                         pOut_buf_cur[1] = pSrc[1];
+//                                     pOut_buf_cur += counter;
+//                                 }
+//                                 continue;
+//                             }
+//                         }
+// #endif
+                        do {
+                            this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 0));
+                            this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
+                            this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 2));
+                            byteIndex += 3;
+                            // pOut_buf_cur[0] = pSrc[0];
+                            // pOut_buf_cur[1] = pSrc[1];
+                            // pOut_buf_cur[2] = pSrc[2];
+                            // pOut_buf_cur += 3;
+                            // pSrc += 3;
+                        // } while ((int)(counter -= 3) > 2);
+                        } while ((counter -= 3) > 2);
+
+                        if (counter > 0) {
+                            this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex));
+                            if (counter > 1) {
+                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
+                            }
+                        }
+                        // if ((int)counter > 0) {
+                        //     pOut_buf_cur[0] = pSrc[0];
+                        //     if ((int)counter > 1)
+                        //         pOut_buf_cur[1] = pSrc[1];
+                        //     pOut_buf_cur += counter;
+                        // }
+                     }
 
 
-                    let s = "";
-                    s += scanLine + ", " + dataSize;
-                    s += ", z: " + JSON.stringify(z);
-                    for (let i = 0; i < 10; i++)
-                        s += ", 0x" + b.readUint8().toString(16);
-                    console.log(s);
-                    console.log("bFinalBlock: " + bFinalBlock + ", blockType: " + blockType);
+                    // let s = "";
+                    // s += scanLine + ", " + dataSize;
+                    // s += ", z: " + JSON.stringify(z);
+                    // // for (let i = 0; i < 10; i++)
+                    // //     s += ", 0x" + b.readUint8().toString(16);
+                    // console.log(s);
+                    // console.log("bFinalBlock: " + bFinalBlock + ", blockType: " + blockType);
 
                 } while (!bFinalBlock);
+
+                console.log("outputBuffer @ " + this.outputBuffer.bytePointer);
             }
+        }
+
+        huffmanDecode(bitBuffer, tableId, bTest = false) {
+            let huffmanTable = this.huffman.tables[tableId];
+            let codeLength = 0;
+
+            let remainingBits = bitBuffer.remainingBits();
+
+            if (false && remainingBits < 16) {
+
+                do {
+                    let lookupIndex = bitBuffer.readBits(TINFL_FAST_LOOKUP_BITS, true);
+                    let temp = huffmanTable.lookUp[lookupIndex];
+
+                    if (temp >= 0) {
+                        codeLength = temp >> 9;
+                        if (codeLength > 0 && (numBits >= codeLength)) {
+                            break;
+                        }
+                    } else if (numBits > TINFL_FAST_LOOKUP_BITS) {
+                        codeLength = TINFL_FAST_LOOKUP_BITS;
+                        do {
+                            temp = huffmanTable.tree[~temp + ((lBitBuffer >> codeLength++) & 1)];
+                        } while ((temp < 0) && (numBits >= (codeLength + 1)));
+                        if (temp >= 0) {
+                            break;
+                        }
+                    }
+                    let c = b.getUint8();
+                    lBitBuffer |= (c << numBits);
+                    numBits += 8;
+                } while (numBits < 15);
+            }
+
+            if ((bitBuffer.bytePointer * 8 + bitBuffer.bitPointer) - 6664 == 9196)
+                console.log("Here... " + ((bitBuffer.bytePointer * 8 + bitBuffer.bitPointer) - 6664));
+            let lookupIndex = bitBuffer.readBits(TINFL_FAST_LOOKUP_BITS, true);
+            let temp = huffmanTable.lookUp[lookupIndex];
+            if (temp >= 0) {
+                codeLength = temp >> 9;
+                if (!bTest)
+                    temp &= 511;
+            } else {
+                codeLength = TINFL_FAST_LOOKUP_BITS;
+                lookupIndex = bitBuffer.readBits(15, true);
+                //let lBitBuffer = bitBuffer.readBits(TINFL_FAST_LOOKUP_BITS, true);
+                do {
+                    temp = huffmanTable.tree[~temp + ((lookupIndex >> codeLength++) & 1)];
+                } while (temp < 0);
+            }
+
+            let distance = temp;
+            bitBuffer.skip(0, codeLength);
+
+            //lBitBuffer >>= codeLength;
+            //numBits -= codeLength;
+
+            return distance;
         }
 
         // huffmanBitbufferFill(state_index, pHuff) {
@@ -2047,12 +2222,12 @@ var nvis = new function () {
         }
 
 
-        setupTexture(texture, image) {
+        setupTexture(texture, image, bFloat = false) {
 
             let gl = this.glContext;
 
             gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, (bFloat ? gl.FLOAT : gl.UNSIGNED_BYTE), image);
 
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -2120,7 +2295,7 @@ var nvis = new function () {
             let self = this;
 
             for (let fileId = 0; fileId < files.length; fileId++) {
-                if (!files[fileId].type.match(/image.*/)) {
+                if (!files[fileId].type.match(/image.*/) && !files[0].name.match(/.exr$/)) {
                     continue;
                 }
 
@@ -2153,6 +2328,29 @@ var nvis = new function () {
                     }
 
                     reader.readAsDataURL(file);
+                } else if (files[0].name.match(/.exr$/)) {
+                    let reader = new FileReader();
+
+                    reader.onload = function (event) {
+
+                        let file = new NvisEXRFile(files[0].name, reader.result);
+                        file.outputBuffer;
+                        const image = new Image();
+
+                        image.onload = function () {
+
+                            self.setupTexture(texture, image, true);
+                            numFilesLoaded++;
+
+                            if (numFilesLoaded == files.length) {
+                                self.dimensions = { w: image.width, h: image.height };
+                                callback(self.dimensions);
+                            }
+                        }
+
+                    }
+
+                    reader.readAsArrayBuffer(file);
                 }
             }
         }
@@ -3261,6 +3459,10 @@ var nvis = new function () {
                 return;
             }
 
+            // //  extensions
+            //  not needed in WebGL 2.0
+            // let glFloatExtension = _glContext.getExtension('OES_texture_float');
+
             _windows = new NvisWindows(_glContext, _canvas);
 
             _shaders.push(new NvisShader(_glContext));
@@ -3571,7 +3773,9 @@ var nvis = new function () {
             }
 
             if (files[0].type.match(/image.*/)) {
-                files.sort(function (a, b) { return a.name.localeCompare(b.name); });
+                files.sort(function (a, b) {
+                    return a.name.localeCompare(b.name);
+                });
                 let newStream = new NvisStream(_glContext);
                 newStream.drop(files, _newStreamCallback);
                 _streams.push(newStream);
@@ -3581,11 +3785,22 @@ var nvis = new function () {
             }
 
             if (files[0].name.match(/.exr$/)) {
-                let reader = new FileReader();
-                reader.onload = function() {
-                    let file = new NvisEXRFile(files[0].name, reader.result);
-                }
-                reader.readAsArrayBuffer(files[0]);
+                files.sort(function (a, b) {
+                    return a.name.localeCompare(b.name);
+                });
+                let newStream = new NvisStream(_glContext);
+                newStream.drop(files, _newStreamCallback);
+                _streams.push(newStream);
+                _animation.numFrames = newStream.getNumImages();  //  TODO: check
+                _addWindow(_streams.length - 1);
+                _windows.adjust();
+
+                // let reader = new FileReader();
+                // reader.onload = function() {
+                //     let file = new NvisEXRFile(files[0].name, reader.result);
+
+                // }
+                // reader.readAsArrayBuffer(files[0]);
             }
 
             document.getElementById("fileInput").value = "";  //  force onchange event if same files
