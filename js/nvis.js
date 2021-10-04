@@ -1221,9 +1221,15 @@ var nvis = new function () {
             return (value & ((1 << (msb + 1)) - 1)) >> lsb;
         }
 
-        copy(buffer, length) {
+        consume(buffer, length) {
             for (let i = 0; i < length; i++) {
                 this.writeUint8(buffer.readUint8());
+            }
+        }
+
+        copy(buffer, offset) {
+            for (let i = 0; i < buffer.buffer.byteLength; i++) {
+                this.setUint8(offset + i, buffer.getUint8(i));
             }
         }
 
@@ -1374,11 +1380,21 @@ var nvis = new function () {
             return sign * significand * Math.pow(2, exponent);
         }
 
+        getUint8(byteIndex) {
+            let value = this.view.getUint8(byteIndex);
+            // if (byteIndex < 50)
+            //     console.log("  byte " + byteIndex + ": 0x" + value.toString(16) + " = " + value);
+            return value;
+        }
+
+        setUint8(byteIndex, value) {
+            this.view.setUint8(byteIndex, value);
+        }
+
         getFloat16(byteIndex) {
-            //  0 01101 0101010101 = 0011 0101 0101 0101
-            let value = this.view.getUint16(byteIndex, false);
-            if (byteIndex < 50)
-                console.log("  byte " + byteIndex + ": 0x" + value.toString(16) + " = " + this.halfBytes2Float32(value));
+            let value = this.view.getUint16(byteIndex, true);
+            // if (byteIndex < 50)
+            //     console.log("  byte " + byteIndex + ": 0x" + value.toString(16) + " = " + this.halfBytes2Float32(value));
             return this.halfBytes2Float32(value);
         }
 
@@ -1606,7 +1622,7 @@ var nvis = new function () {
                             console.log("ERROR: Raw block header LEN/NLEN mismatch!");
                         }
 
-                        this.outputBuffer.copy(b, len);
+                        this.outputBuffer.consume(b, len);
                         continue;
                     }
 
@@ -2072,17 +2088,48 @@ var nvis = new function () {
             
             let channels = this.attributes.channels.values;
 
+            let numChannels = 3;
+            let numScanLines = 16;
             let dstChannels = 4;
             let channelSize = this.dimensions.w * this.dimensions.h * 2;
+            let pixelSize = numChannels * 2;
+            let chunkSize = numScanLines * this.dimensions.w * pixelSize;
+            let halfChunkSize = Math.floor((chunkSize + 1) / 2);
+            let numChunks = this.dimensions.h / numScanLines;
+
+            let tmpBuffer = new NvisBitBuffer(new ArrayBuffer(chunkSize));
+
+            //  EXR postprocess
+            for (let chunkId = 0; chunkId < numChunks; chunkId++) {
+                //  predictor
+                let chunkIndex = chunkId * chunkSize;
+                for (let i = chunkIndex + 1; i < chunkIndex + chunkSize; i++) {
+                    let d = this.outputBuffer.getUint8(i - 1) + this.outputBuffer.getUint8(i) - 128;
+                    this.outputBuffer.setUint8(i, d);
+                }
+
+                //  swizzle
+                let srcIndex = chunkIndex;
+                for (let i = 0; i < chunkSize; i += 2) {
+                    let value1 = this.outputBuffer.getUint8(srcIndex);
+                    let value2 = this.outputBuffer.getUint8(srcIndex + halfChunkSize);
+                    tmpBuffer.setUint8(i, value1);
+                    tmpBuffer.setUint8(i + 1, value2);
+                    srcIndex++;
+                }
+                this.outputBuffer.copy(tmpBuffer, chunkIndex);
+            }
+    
 
             for (let y = 0; y < this.dimensions.h; y++) {
                 for (let x = 0; x < this.dimensions.w; x++) {
                     let dstLoc = (y * this.dimensions.w + x) * dstChannels;
                     for (let c = 0; c < 3; c++) {
-                        let srcLoc = channelSize * c + (y * this.dimensions.w + x) * 2;
+                        //let channelType = channels[c].
+                        let srcLoc = y * 6 * this.dimensions.w + c * 2 * this.dimensions.w + x * 2;
 
                         let value = this.outputBuffer.getFloat16(srcLoc);
-                        data[dstLoc + c] = value;
+                        data[dstLoc + (2 - c)] = value;
                     }
                     // data[dstLoc + 0] = x / this.dimensions.w;  //  alpha
                     // data[dstLoc + 1] = y / this.dimensions.h;  //  alpha
