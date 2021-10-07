@@ -26,6 +26,7 @@ var nvis = new function () {
 
     let _state = {
         layout: {
+            border: 50,
             bAutomatic: true,
             dimensions: {
                 w: 1,
@@ -37,10 +38,7 @@ var nvis = new function () {
             },
             getDimensions: function () {
                 return (_state.layout.bAutomatic ? _state.layout.automaticDimensions : _state.layout.dimensions);
-            },
-            w: 1,
-            h: 1,
-            border: 50,
+            }
         },
         zoom: {
             LowFactor: Math.pow(Math.E, Math.log(2) / 8.0),
@@ -55,6 +53,17 @@ var nvis = new function () {
                 x: 0.0,
                 y: 0.0
             },
+        },
+        input: {
+            mouse: {
+                canvasCoords: { x: 0, y: 0 },
+                previousCanvasCoords: { x: 0, y: 0 },
+                clickPosition: { x: 0, y: 0 },
+                down: false
+            },
+            keyboard: {
+                shift: false
+            }
         }
     }
 
@@ -345,8 +354,34 @@ var nvis = new function () {
             this.numVertices++;
         }
 
+
+        addSegmentLine(v0, v1, segments, colors, bInterpolated = false) {
+            let dx = (v1.x - v0.x) / segments;
+            let dy = (v1.y - v0.y) / segments;
+            let v = v0;
+
+            let color = 0;
+            for (let i = 0; i < segments; i ++) {
+                this.addVertex(v, colors[color]);
+                v = { x: v.x + dx, y: v.y + dy };
+                if (i > 0 || i < segments - 1) {
+                    if (bInterpolated) {
+                        color = 1 - color;
+                    }
+                    this.addVertex(v, colors[color]);
+                    if (!bInterpolated) {
+                        color = 1 - color;
+                    }
+                }
+            }
+        }
+
     
         render() {
+            if (this.numVertices == 0) {
+                return;
+            }
+
             let gl = this.glContext;
 
             gl.useProgram(this.shaderProgram);
@@ -439,27 +474,31 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
 
-    class NvisPixelDrawer extends NvisDraw {
+    class NvisPixelDrawer {
 
         constructor(glContext) {
-            super(glContext, "trianglestrip");
+            this.area = new NvisDraw(glContext, "trianglestrip");
+            this.border = new NvisDraw(glContext, "lines");
 
-            this.color = { r: 0.8, g: 0.8, b: 0.0, a: 1.0 };
+            this.areaColor = { r: 0.8, g: 0.8, b: 0.0, a: 0.5 };
+            this.activeAreaColor = { r: 0.8, g: 0.8, b: 0.0, a: 0.1 };
+            this.borderColors = [ { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }, { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } ];
 
             this.offset = { x: 0.0, y: 0.0 };  //  pixels
             this.pixelSize = { w: 0.0, h: 0.0 };
         }
 
-        update(windowId, offset, pixelSize, alpha = 1.0)
+
+        update(windowId, offset, pixelSize, bActiveWindow = false)
         {
             //  only update if there's a change
             if (this.offset.x == offset.x && this.offset.y == offset.y && this.pixelSize.w == pixelSize.w) {
                 return;
             }
 
-            let layoutDims = _state.layout.getDimensions();
-            let dim = { w: 1.0 / layoutDims.w, h: 1.0 / layoutDims.h };
-            let winOffset = { x: (windowId % layoutDims.w) * dim.w, y: Math.floor(windowId / layoutDims.w) * dim.h };
+            //let layoutDims = _state.layout.getDimensions();
+            //let dim = { w: 1.0 / layoutDims.w, h: 1.0 / layoutDims.h };
+            //let winCanvasOffset = { x: (windowId % layoutDims.w) * dim.w, y: Math.floor(windowId / layoutDims.w) * dim.h };
 
             // console.log("NvisPixelDrawer():  offset = " + JSON.stringify(offset) + ", pixelSize = " + JSON.stringify(pixelSize));
             // console.log("NvisPixelDrawer():  dim = " + JSON.stringify(dim) + ", alpha = " + alpha);
@@ -467,15 +506,42 @@ var nvis = new function () {
             this.offset = offset;
             this.pixelSize = pixelSize;
 
-            this.clear();
+            this.area.clear();
 
-            let x = winOffset.x + offset.x;
-            let y = winOffset.y + offset.y;
- 
-            this.addVertex({ x: x, y: y }, this.color);
-            this.addVertex({ x: x, y: y + pixelSize.h }, this.color);
-            this.addVertex({ x: x + pixelSize.w, y: y }, this.color);
-            this.addVertex({ x: x + pixelSize.w, y: y + pixelSize.h }, this.color);
+            let segments = 7;
+            let x = this.offset.x;
+            let y = this.offset.y;
+            let x2 = x + pixelSize.w;
+            let y2 = y + pixelSize.h;
+
+            let v0 = { x: x, y: y };
+            let v1 = { x: x, y: y2 };
+            let v2 = { x: x2, y: y };
+            let v3 = { x: x2, y: y2 };
+
+            let areaColor = (bActiveWindow ? this.activeAreaColor : this.areaColor);
+            this.area.addVertex(v0, areaColor);
+            this.area.addVertex(v1, areaColor);
+            this.area.addVertex(v2, areaColor);
+            this.area.addVertex(v3, areaColor);
+
+            if (bActiveWindow) {
+                this.border.clear();
+
+                this.border.addSegmentLine(v0, v1, segments, this.borderColors);
+                this.border.addSegmentLine(v1, v3, segments, this.borderColors);
+                this.border.addSegmentLine(v3, v2, segments, this.borderColors);
+                this.border.addSegmentLine(v2, v0, segments, this.borderColors);
+            }
+         }
+
+         render(bActiveWindow = false) {
+            if (bActiveWindow) {
+                this.area.render();
+                this.border.render();
+            } else {
+                this.area.render();
+            }
          }
     }
 
@@ -540,6 +606,16 @@ var nvis = new function () {
                     float xx = (vTextureCoord.x * uDimensions.x) / 16.0;
                     float yy = (vTextureCoord.y * uDimensions.y) / 16.0;
                     gl_FragColor = vec4(c.r, c.g, c.b, 1.0);
+
+                    if (true) {
+                        float invGamma = 1.0 / 2.2;
+                        float exposure = 2.0;
+
+                        gl_FragColor.r = exposure * pow(gl_FragColor.r, invGamma);
+                        gl_FragColor.g = exposure * pow(gl_FragColor.g, invGamma);
+                        gl_FragColor.b = exposure * pow(gl_FragColor.b, invGamma);
+                    }
+
                     if (c.a < 1.0)
                     {
                         vec4 gridColor = vec4(0.6, 0.6, 0.6, 1.0);
@@ -1498,24 +1574,32 @@ var nvis = new function () {
             console.log(JSON.stringify(this.attributes));
 
             //  offset table
+            this.scanLinesPerChunk = EXR_NO_COMPRESSION_SCANLINES;
             this.offsetTable = [];
             let dataWindowBox = this.attributes.dataWindow.values;
             let numOffsets = dataWindowBox.yMax - dataWindowBox.yMin + 1;
             let compression = this.attributes["compression"].value;
-            if (compression == EXR_ZIP_COMPRESSION) {
-                numOffsets = Math.floor(numOffsets / EXR_ZIP_COMPRESSION_SCANLINES) + (numOffsets % EXR_ZIP_COMPRESSION_SCANLINES > 0 ? 1 : 0);
+            
+            switch (compression) {
+                case EXR_ZIP_COMPRESSION:
+                    this.scanLinesPerChunk = EXR_ZIP_COMPRESSION_SCANLINES;
+                    break;    
+                case EXR_PIZ_COMPRESSION:
+                    this.scanLinesPerChunk = EXR_PIZ_COMPRESSION_SCANLINES;
+                    break;    
+                case EXR_PXR24_COMPRESSION:
+                    this.scanLinesPerChunk = EXR_PXR24_COMPRESSION_SCANLINES;
+                    break;    
+                case EXR_B44_COMPRESSION:
+                    this.scanLinesPerChunk = EXR_B44_COMPRESSION_SCANLINES;
+                    break;    
+                case EXR_NO_COMPRESSION:
+                default:
+                    break;    
             }
-            if (compression == EXR_PIZ_COMPRESSION) {
-                numOffsets = Math.floor(numOffsets / EXR_PIZ_COMPRESSION_SCANLINES) + (numOffsets % EXR_PIZ_COMPRESSION_SCANLINES > 0 ? 1 : 0);
-            }
-            if (compression == EXR_PXR24_COMPRESSION) {
-                numOffsets = Math.floor(numOffsets / EXR_PXR24_COMPRESSION_SCANLINES) + (numOffsets % EXR_PXR24_COMPRESSION_SCANLINES > 0 ? 1 : 0);
-            }
-            if (compression == EXR_B44_COMPRESSION) {
-                numOffsets = Math.floor(numOffsets / EXR_B44_COMPRESSION_SCANLINES) + (numOffsets % EXR_B44_COMPRESSION_SCANLINES > 0 ? 1 : 0);
-            }
-            if (compression == EXR_B44A_COMPRESSION_SCANLINES) {
-                numOffsets = Math.floor(numOffsets / EXR_B44A_COMPRESSION_SCANLINES) + (numOffsets % EXR_B44A_COMPRESSION_SCANLINES > 0 ? 1 : 0);
+
+            if (compression != EXR_NO_COMPRESSION) {
+                numOffsets = Math.floor(numOffsets / this.scanLinesPerChunk) + (numOffsets % this.scanLinesPerChunk > 0 ? 1 : 0);
             }
             for (let i = 0; i < numOffsets; i++) {
                 let offset = b.readUint64();
@@ -2131,9 +2215,6 @@ var nvis = new function () {
                         let value = this.outputBuffer.getFloat16(srcLoc);
                         data[dstLoc + (2 - c)] = value;
                     }
-                    // data[dstLoc + 0] = x / this.dimensions.w;  //  alpha
-                    // data[dstLoc + 1] = y / this.dimensions.h;  //  alpha
-                    // data[dstLoc + 2] = 1.0;  //  alpha
                     data[dstLoc + 3] = 1.0;  //  alpha
                 }
             }
@@ -2213,12 +2294,18 @@ var nvis = new function () {
             this.outputTexture = undefined;
             this.frameBuffer = undefined;
 
-            if (shaderId != 0) {
-                this.setupOutputTexture({ w: 512, h: 512 });
-            }
+            // if (shaderId != 0) {
+            //     this.setupOutputTexture({ w: 512, h: 512 });
+            // }
 
             this.numTextures = 1;
             this.currentTexture = 0;
+        }
+
+        
+        getPixelValue(pxCoord) {
+
+            return { r: 0.0, g: 0.0, b: 0.0, a: 0.0 };
         }
 
 
@@ -2356,6 +2443,9 @@ var nvis = new function () {
 
                             if (numFilesLoaded == fileNames.length) {
                                 self.dimensions = file.dimensions;
+                                if (self.shaderId != 0) {
+                                    self.setupOutputTexture(self.dimensions);
+                                }
                                 callback(self.dimensions);
                             }
                         }
@@ -2373,6 +2463,9 @@ var nvis = new function () {
 
                         if (numFilesLoaded == fileNames.length) {
                             self.dimensions = { w: image.width, h: image.height };
+                            if (self.shaderId != 0) {
+                                self.setupOutputTexture(self.dimensions);
+                            }
                             callback(self.dimensions);
                         }
                     }
@@ -2417,6 +2510,9 @@ var nvis = new function () {
 
                             if (numFilesLoaded == files.length) {
                                 self.dimensions = { w: image.width, h: image.height };
+                                if (this.shaderId != 0) {
+                                    self.setupOutputTexture(self.dimensions);
+                                }
                                 callback(self.dimensions);
                             }
                         }
@@ -2444,6 +2540,9 @@ var nvis = new function () {
 
                         if (numFilesLoaded == files.length) {
                             self.dimensions = { w: image.width, h: image.height };
+                            if (this.shaderId != 0) {
+                                self.setupOutputTexture(self.dimensions);
+                            }
                             callback(self.dimensions);
                         }
 
@@ -2641,6 +2740,7 @@ var nvis = new function () {
 
             return ui;
         }
+
     }
 
 
@@ -2723,13 +2823,8 @@ var nvis = new function () {
             this.textureCoordinates = new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
         }
 
-
         insideWindow(canvasPxCoords) {
-            let border = _state.layout.border;
-            return !(canvasPxCoords.x < border ||
-                canvasPxCoords.x >= this.canvas.width + border ||
-                canvasPxCoords.y < border ||
-                canvasPxCoords.y >= this.canvas.height + border);
+            return !(canvasPxCoords.x < 0 || canvasPxCoords.x >= this.canvas.width || canvasPxCoords.y < 0 || canvasPxCoords.y >= this.canvas.height);
         }
 
 
@@ -2746,12 +2841,11 @@ var nvis = new function () {
                 return undefined;
             }
 
-            let layout = _state.layout;
 
-            let xx = (canvasPxCoords.x - layout.border) / this.canvas.width;
-            let yy = (canvasPxCoords.y - layout.border) / this.canvas.height;
+            let xx = canvasPxCoords.x / this.canvas.width;
+            let yy = canvasPxCoords.y / this.canvas.height;
 
-            let layoutDims = layout.getDimensions();
+            let layoutDims = _state.layout.getDimensions();
             let w = layoutDims.w;
             let h = layoutDims.h;
 
@@ -2781,12 +2875,11 @@ var nvis = new function () {
                 return undefined;
             }
 
-            let layout = _state.layout;
-            let layoutDims = layout.getDimensions();
+            let layoutDims = _state.layout.getDimensions();
 
             let coords = {
-                x: (canvasPxCoords.x - layout.border) % (this.canvas.width / layoutDims.w),
-                y: (canvasPxCoords.y - layout.border) % (this.canvas.height / layoutDims.h)
+                x: canvasPxCoords.x % (this.canvas.width / layoutDims.w),
+                y: canvasPxCoords.y % (this.canvas.height / layoutDims.h)
             }
 
             if (!bToPixels) {
@@ -2795,27 +2888,6 @@ var nvis = new function () {
                     y: coords.y / this.winPxDimensions.h
                 }
             }
-
-            // console.log("NvisWindows.getWindowOffset(): " + JSON.stringify(offset));
-
-            return coords;
-        }
-
-
-        getCanvasCoordinates(windowId, windowPxCoords)
-        {
-            let layoutDims = _state.layout.getDimensions();
-
-            let position = {
-                x: windowId % layoutDims.w,
-                y: Math.floor(windowId / layoutDims.w)
-            }
-
-            let coords = {
-                x: windowPxCoords.x + (this.canvas.width / layoutDims.w) * position.x,
-                y: windowPxCoords.y + (this.canvas.height / layoutDims.h) * position.y
-            }
-            // console.log("NvisWindows.getWindowOffset(): " + JSON.stringify(offset));
 
             return coords;
         }
@@ -2881,8 +2953,8 @@ var nvis = new function () {
         }
 
 
-        delete(position) {
-            let windowId = this.getWindowId(position);
+        delete(canvasPxCoords) {
+            let windowId = this.getWindowId(canvasPxCoords);
             if (this.windows.length > 1 && windowId !== undefined) {
                 this.windows.splice(windowId, 1);
                 this.adjust();
@@ -2902,8 +2974,6 @@ var nvis = new function () {
             let layout = _state.layout;
             if (!layout.bAutomatic) {
                 layout.dimensions.w = Math.min(layout.dimensions.w + 1, this.windows.length);
-                //layout.dimensions.w = Math.max(Math.min(layout.dimensions.w, this.windows.length), 1);
-                //layout.dimensions.h = Math.ceil(this.windows.length / layout.dimensions.w);
             }
             this.adjust();
         }
@@ -2913,8 +2983,6 @@ var nvis = new function () {
             let layout = _state.layout;
             if (!layout.bAutomatic) {
                 layout.dimensions.w = Math.max(layout.dimensions.w - 1, 1);
-                //layout.dimensions.w = Math.max(Math.min(layout.dimensions.w, this.windows.length), 1);
-                //layout.dimensions.h = Math.ceil(this.windows.length / layout.dimensions.w);
             }
             this.adjust();
         }
@@ -3031,9 +3099,6 @@ var nvis = new function () {
             //  set viewport to match canvas size
             this.glContext.viewport(0, 0, this.canvas.width, this.canvas.height);
 
-            // this.glContext.clearColor(1.0, 0.8, 0.8, 1.0);
-            // this.glContext.clear(this.glContext.COLOR_BUFFER_BIT);
-
             //  lastly, determine window dimensions
             let winDimensions = { w: 1.0 / w, h: 1.0 / h };
 
@@ -3123,6 +3188,63 @@ var nvis = new function () {
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
                 this.windows[windowId].render(windowId, frameId, streams, shaders);
             }
+
+            if (_state.zoom.level >= 8.0) {
+                let canvasCoords = _state.input.mouse.canvasCoords;
+                let activeWindowId = this.getWindowId(canvasCoords);
+
+                let layoutDims = _state.layout.getDimensions();
+                let winDim = { w: this.canvas.width / layoutDims.w, h: this.canvas.height / layoutDims.h };
+                let z = _state.zoom.level;
+                let ww = winDim.w;
+                let wh = winDim.h;
+
+                let pixelSize = {
+                    w: z / (ww * layoutDims.w),
+                    h: z / (wh * layoutDims.h)
+                }
+                
+                let layout = _state.layout.getDimensions();
+                let wc = this.getWindowCoordinates(_state.input.mouse.canvasCoords);
+
+                if (wc === undefined) {
+                    return;
+                }
+
+
+                for (let windowId = 0; windowId < this.windows.length; windowId++) {
+                    let window = this.windows[windowId];
+                    let stream = streams[window.getStreamId()];
+                    let streamDim = stream.getDimensions();
+
+                    if (streamDim === undefined) {
+                        continue;
+                    }
+
+                    let sw = streamDim.w;
+                    let sh = streamDim.h;
+                    let isw = 1.0 / sw;
+                    let ish = 1.0 / sh;
+
+                    let p = window.position;
+
+                    let streamOffset = {
+                        x: (isw - (_state.zoom.streamOffset.x % isw)) * (sw * pixelSize.w),
+                        y: (ish - (_state.zoom.streamOffset.y % ish)) * (sh * pixelSize.h)
+                    };
+                    let offset = { x: p.x + wc.x / layout.w, y: p.y + wc.y / layout.h };
+
+                    offset = {
+                        x: offset.x - (offset.x - streamOffset.x - p.x + pixelSize.w) % pixelSize.w,
+                        y: offset.y - (offset.y - streamOffset.y - p.y + pixelSize.h) % pixelSize.h
+                    };
+
+                    if (activeWindowId !== undefined) {
+                        window.pixelDrawer.update(windowId, offset, pixelSize, windowId == activeWindowId);
+                        window.pixelDrawer.render(windowId == activeWindowId);
+                    }
+                }
+            }
         }
 
     }
@@ -3146,8 +3268,8 @@ var nvis = new function () {
             this.gridDrawer = new NvisGridDrawer(this.glContext);
             this.pixelDrawer = new NvisPixelDrawer(this.glContext);
 
-            // this.position = { x: 0, y: 0 };
-            // this.dimensions = { w: 0, h: 0 };
+            this.position = { x: 0, y: 0 };
+            this.dimensions = { w: 0, h: 0 };
 
             let gl = this.glContext;
 
@@ -3190,6 +3312,9 @@ var nvis = new function () {
 
 
         resize(position, dimensions) {
+            this.position = position;
+            this.dimensions = dimensions;
+
             if (this.streamId === undefined) {
                 return;
             }
@@ -3242,6 +3367,10 @@ var nvis = new function () {
             if (stream === undefined) {
                 return;
             }
+            let streamDim = stream.getDimensions();
+            if (streamDim === undefined) {
+                return;
+            }
 
             let shaderId = stream.getShaderId();
             let shader = shaders[shaderId];
@@ -3276,7 +3405,7 @@ var nvis = new function () {
                     gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
                 }
 
-                gl.viewport(0, 0, 512, 512);
+                gl.viewport(0, 0, streamDim.w, streamDim.h);
 
                 stream.setUniforms(shader);
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -3308,30 +3437,18 @@ var nvis = new function () {
             let uSampler = gl.getUniformLocation(shaderProgram, 'uSampler');
             gl.uniform1i(uSampler, 0);
 
-            let streamDim = stream.getDimensions();
-            //  possibly, the stream has not gotten its dimensions yet
-            if (streamDim !== undefined) {
-                gl.uniform2f(gl.getUniformLocation(shaderProgram, "uDimensions"), streamDim.w, streamDim.h);
-            }
-
-            //gl.clearColor(1.0, 1.0, 0.0, 1.0);
-            // gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.uniform2f(gl.getUniformLocation(shaderProgram, "uDimensions"), streamDim.w, streamDim.h);
 
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
+
+            //  TODO: move elsewhere?
             let layout = _state.layout;
             let layoutDims = layout.getDimensions();
             let winDim = { w: this.canvas.width / layoutDims.w, h: this.canvas.height / layoutDims.h };
-            streamDim = stream.getDimensions();
-
-            if (streamDim === undefined) {
-                //return;
-                streamDim = { w: 512, h: 512 };  //  TODO: fix!!!
-            }
-
 
             let z = _state.zoom.level;
             let sw = streamDim.w;
@@ -3349,14 +3466,12 @@ var nvis = new function () {
                 x: (isw - (_state.zoom.streamOffset.x % isw)) * (sw * pixelSize.w),
                 y: (ish - (_state.zoom.streamOffset.y % ish)) * (sh * pixelSize.h),
             }
+
             if (_state.zoom.level > 10.0) {
-                let alpha = Math.min(1.0, (z - 10.0) / 10.0);
+                let alpha = Math.min(1.0, (z - 16.0) / 16.0);
 
                 this.gridDrawer.update(windowId, offset, pixelSize, alpha);
                 this.gridDrawer.render();
-
-                this.pixelDrawer.update(windowId, offset, pixelSize, alpha);
-                this.pixelDrawer.render();
             }
 
 
@@ -3392,27 +3507,6 @@ var nvis = new function () {
         let _shaders = [];
 
         let _uiHtml = "";
-
-        let _input = {
-            mouse: {
-                canvasCoords: { x: 0, y: 0 },
-                previousCanvasCoords: { x: 0, y: 0 },
-                clickPosition: { x: 0, y: 0 },
-                down: false,
-            },
-            keyboard: {
-                shift: false,
-            }
-        }
-
-        // let _settings = {
-        //     layout: {
-        //         // automatic: true,
-        //         border: 50,
-        //         // w: 1,
-        //         // h: 1,
-        //     },
-        // }
 
         let _animation = {
             active: false,
@@ -3592,7 +3686,7 @@ var nvis = new function () {
 
         var _onWheel = function (event) {
             event.preventDefault();
-            let level = _windows.zoom(-Math.sign(event.deltaY), _input.mouse.canvasCoords, _input.keyboard.shift);
+            let level = _windows.zoom(-Math.sign(event.deltaY), _state.input.mouse.canvasCoords, _state.input.keyboard.shift);
             _popupInfo("zoom = " + level.toFixed(1) + "x");
         }
 
@@ -3679,26 +3773,26 @@ var nvis = new function () {
                     // 	}
                     break;
                 case 16:  //  Shift
-                    _input.keyboard.shift = true;
+                    _state.input.keyboard.shift = true;
                     break;
                 case 37:  //  ArrowLeft
                     _animation.dec();
                     break;
                 case 38:  //  ArrowUp
-                    _windows.incStream(_input.mouse.canvasCoords, _streams);
+                    _windows.incStream(_state.input.mouse.canvasCoords, _streams);
                     break;
                 case 39:  //  ArrowRight
                     _animation.inc();
                     break;
                 case 40:  //  ArrowDown
-                    _windows.decStream(_input.mouse.canvasCoords, _streams);
+                    _windows.decStream(_state.input.mouse.canvasCoords, _streams);
                     break;
                 default:
                     switch (key) {
                         case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
                             let streamId = parseInt(key) - 1;
                             if (streamId < _streams.length) {
-                                _windows.setWindowStreamId(_windows.getWindowId(_input.mouse.canvasCoords), streamId);
+                                _windows.setWindowStreamId(_windows.getWindowId(_state.input.mouse.canvasCoords), streamId);
                             }
                             break;
                         case ' ':
@@ -3713,7 +3807,7 @@ var nvis = new function () {
                             _animation.togglePingPong();
                             break;
                         case 'd':
-                            _windows.delete(_input.mouse.canvasCoords);
+                            _windows.delete(_state.input.mouse.canvasCoords);
                             break;
                         case 'o':
                             document.getElementById("fileInput").click();
@@ -3752,7 +3846,7 @@ var nvis = new function () {
 
             switch (keyCode) {
                 case 16:  //  Shift
-                    _input.keyboard.shift = false;
+                    _state.input.keyboard.shift = false;
                     break;
                 // case 37:  //  ArrowLeft
                 //     break;
@@ -3793,30 +3887,37 @@ var nvis = new function () {
         }
 
         let _onClick = function (event) {
-            let pCoord = _windows.getStreamCoordinates(_input.mouse.canvasCoords, true);
+            let pCoord = _windows.getStreamCoordinates(_state.input.mouse.canvasCoords, true);
 
-            console.log("_canvas.onclick(): " + JSON.stringify(pCoord));
+            let loc = { x: Math.floor(pCoord.x), y: Math.floor(pCoord.y) };
+            let color = _streams[0].getPixelValue(loc);
+
+            console.log("_canvas.onclick(" + JSON.stringify(loc) + "): " + JSON.stringify(color));
         }
 
         let _onMouseDown = function (event) {
-            _input.mouse.down = true;
-            _input.mouse.clickPosition = { x: event.clientX, y: event.clientY };
+            _state.input.mouse.down = true;
+            _state.input.mouse.clickPosition = { x: event.clientX, y: event.clientY };
         }
 
         let _onMouseMove = function (event) {
-            _input.mouse.previousCanvasCoords = _input.mouse.canvasCoords;
-            _input.mouse.canvasCoords = { x: event.clientX, y: event.clientY };
-            if (_input.mouse.down) {
+            _state.input.mouse.previousCanvasCoords = _state.input.mouse.canvasCoords;
+            _state.input.mouse.canvasCoords = {
+                x: event.clientX - _state.layout.border,
+                y: event.clientY - _state.layout.border
+            };
+
+            if (_state.input.mouse.down) {
                 let canvasOffset = {
-                    x: _input.mouse.previousCanvasCoords.x - _input.mouse.canvasCoords.x,
-                    y: _input.mouse.previousCanvasCoords.y - _input.mouse.canvasCoords.y
+                    x: _state.input.mouse.previousCanvasCoords.x - _state.input.mouse.canvasCoords.x,
+                    y: _state.input.mouse.previousCanvasCoords.y - _state.input.mouse.canvasCoords.y
                 }
                 _windows.translate(canvasOffset);
             }
         }
 
         let _onMouseUp = function (event) {
-            _input.mouse.down = false;
+            _state.input.mouse.down = false;
         }
 
         // let _streamUpdateParameter = function (streamId, elementId) {
@@ -4072,9 +4173,15 @@ var nvis = new function () {
                     lcJsonObject[key.toLowerCase()] = jsonObject[key];
                 }
 
+                //  Zoom
+                let zoom = lcJsonObject.zoom;
+                if (zoom !== undefined) {
+                    _state.zoom.level = zoom;
+                }
+
                 //  streams
                 let streams = lcJsonObject.streams;
-                if (lcJsonObject.streams != undefined) {
+                if (lcJsonObject.streams !== undefined) {
                     for (let objectId = 0; objectId < streams.length; objectId++) {
                         let newStream = undefined;
                         let files = streams[objectId].files;

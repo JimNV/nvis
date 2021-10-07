@@ -1,5 +1,7 @@
 {
     "name": "Test configuration",
+    "zoom": 32.0,
+    "position": { "x": 0, "y": 0 },
     "streams": [
         {
             "name": "Sponza",
