@@ -1,3 +1,24 @@
+//  Copyright 2021 NVIDIA Corporation
+//
+//  Redistribution and use in source and binary forms, with or without modification, are permitted provided
+//  that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice,
+//     this list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation and/or
+//     other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors may be
+//     used to endorse or promote products derived from this software without specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+//  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+//  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
+//  OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+//  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+//  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+//  POSSIBILITY OF SUCH DAMAGE.
+
 'use strict';
 
 var nvis = new function () {
@@ -496,13 +517,6 @@ var nvis = new function () {
                 return;
             }
 
-            //let layoutDims = _state.layout.getDimensions();
-            //let dim = { w: 1.0 / layoutDims.w, h: 1.0 / layoutDims.h };
-            //let winCanvasOffset = { x: (windowId % layoutDims.w) * dim.w, y: Math.floor(windowId / layoutDims.w) * dim.h };
-
-            // console.log("NvisPixelDrawer():  offset = " + JSON.stringify(offset) + ", pixelSize = " + JSON.stringify(pixelSize));
-            // console.log("NvisPixelDrawer():  dim = " + JSON.stringify(dim) + ", alpha = " + alpha);
-
             this.offset = offset;
             this.pixelSize = pixelSize;
 
@@ -554,18 +568,17 @@ var nvis = new function () {
 
     class NvisShader {
 
-        constructor(glContext, jsonText = "{}", newStreamCallback) {
+        constructor(glContext, parameters = {}) { // jsonText = "{}", newStreamCallback) {
 
             this.glContext = glContext;
-            this.jsonText = jsonText;
-            this.newStreamCallback = newStreamCallback;
+            this.json = parameters.json;
+            this.callback = parameters.callback;
+            this.fragmentSource = parameters.source;
 
             this.jsonObject = {};
             this.name = undefined;
             this.fileName = undefined;
             this.numInputs = undefined;
-
-            this.source = undefined;
 
             let gl = this.glContext;
             this.vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -575,7 +588,6 @@ var nvis = new function () {
             this.bVertexReady = false;
             this.bFragmentReady = false;
 
-            this.fragmentSource = "";
             this.vertexSource = `precision highp float;
             attribute vec2 aVertexPosition;
             attribute vec2 aTextureCoord;
@@ -586,73 +598,31 @@ var nvis = new function () {
                 vTextureCoord = aTextureCoord;
             }`;
 
-            this.defaultFragmentSource = `precision highp float;
-            varying vec2 vTextureCoord;
-            uniform sampler2D uSampler;
-            uniform vec2 uDimensions;
-
-            float modi(float a, float b) {
-                return floor(a - floor((a + 0.5) / b) * b);
-            }
-
-            void main()
-            {
-                if (vTextureCoord.x < 0.0 || vTextureCoord.x > 1.0 || vTextureCoord.y < 0.0 || vTextureCoord.y > 1.0)
-                    gl_FragColor = vec4(0.1, 0.1, 0.1, 1.0);
-                else
-                {
-                    vec4 c = texture2D(uSampler, vTextureCoord);
-
-                    float xx = (vTextureCoord.x * uDimensions.x) / 16.0;
-                    float yy = (vTextureCoord.y * uDimensions.y) / 16.0;
-                    gl_FragColor = vec4(c.r, c.g, c.b, 1.0);
-
-                    if (true) {
-                        float invGamma = 1.0 / 2.2;
-                        float exposure = 2.0;
-
-                        gl_FragColor.r = exposure * pow(gl_FragColor.r, invGamma);
-                        gl_FragColor.g = exposure * pow(gl_FragColor.g, invGamma);
-                        gl_FragColor.b = exposure * pow(gl_FragColor.b, invGamma);
-                    }
-
-                    if (c.a < 1.0)
-                    {
-                        vec4 gridColor = vec4(0.6, 0.6, 0.6, 1.0);
-                        if (modi(xx, 2.0) == 0.0 ^^ modi(yy, 2.0) == 0.0)
-                            gridColor = vec4(0.5, 0.5, 0.5, 1.0);
-                        
-
-                        gl_FragColor = gridColor + vec4(gl_FragColor.rgb * gl_FragColor.a, 1.0);
-                    }
-                }
-            }`;
-
-            this.jsonObject = JSON.parse(this.jsonText);
-
-            //  convert top-level keys to lowercase
-            let lcJsonObject = {};
-            for (let key of Object.keys(this.jsonObject)) {
-                lcJsonObject[key.toLowerCase()] = this.jsonObject[key];
-            }
-
-            this.name = (lcJsonObject === undefined ? "Stream" : lcJsonObject.name);
-            this.fileName = (lcJsonObject === undefined ? undefined : lcJsonObject.filename);
-            this.numInputs = (lcJsonObject === undefined ? undefined : lcJsonObject.inputs);
-
             this.bVertexReady = this.compile(this.vertexShader, this.vertexSource);
-            if (this.fileName === undefined) {
-                this.bFragmentReady = this.compile(this.fragmentShader, this.defaultFragmentSource);
+
+            if (this.json !== undefined) {
+                this.jsonObject = JSON.parse(this.json);
+
+                //  convert top-level keys to lowercase
+                let config = {};
+                for (let key of Object.keys(this.jsonObject)) {
+                    config[key.toLowerCase()] = this.jsonObject[key];
+                }
+
+                this.name = config.name;
+                this.fileName = config.filename;
+                this.numInputs = config.inputs;
+
+                // this.name = (config === undefined ? "Stream" : config.name);
+                // this.fileName = (config === undefined ? undefined : config.filename);
+                // this.numInputs = (config === undefined ? undefined : config.inputs);
+
+                this.loadFragmentSource(this.fileName);
+            } else {
+                this.bFragmentReady = this.compile(this.fragmentShader, this.fragmentSource);
                 this.attach();
             }
-            else {
-                this.load(this.fileName);
-            }
 
-        }
-
-        getJSONText() {
-            return this.jsonText;
         }
 
         compile(shader, source) {
@@ -680,15 +650,16 @@ var nvis = new function () {
             if (!gl.getProgramParameter(this.shaderProgram, gl.LINK_STATUS)) {
                 alert("Could not initialize shader!");
             }
-            if (this.newStreamCallback !== undefined) {
-                this.newStreamCallback();
+            if (this.callback !== undefined) {
+                this.callback();
             }
         }
 
-        load(fileName) {
+        loadFragmentSource(fileName) {
+            let self = this;
+            
             this.bFragmentReady = false;
 
-            let self = this;
             let xhr = new XMLHttpRequest();
             xhr.open("GET", fileName);
             xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
@@ -718,6 +689,103 @@ var nvis = new function () {
         getNumInputs() {
             return this.numInputs;
         }
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    class NvisShaders {
+        
+        constructor(glContext) {
+
+            this.glContext = glContext;
+
+            this.textureShader = undefined;
+            this.streamShader = undefined;
+            this.shaders = [];
+
+            this.textureFragmentSource = `precision highp float;
+            varying vec2 vTextureCoord;
+            uniform sampler2D uSampler;
+
+            void main()
+            {
+                if (vTextureCoord.x < 0.0 || vTextureCoord.x > 1.0 || vTextureCoord.y < 0.0 || vTextureCoord.y > 1.0) {
+                    gl_FragColor = vec4(0.1, 0.1, 0.1, 1.0);
+                    return;
+                }
+                gl_FragColor = texture2D(uSampler, vTextureCoord);
+            }`;
+
+            this.streamFragmentSource = `precision highp float;
+            varying vec2 vTextureCoord;
+            uniform sampler2D uSampler;
+            uniform vec2 uDimensions;
+
+            float modi(float a, float b) {
+                return floor(a - floor((a + 0.5) / b) * b);
+            }
+
+            void main()
+            {
+                vec4 c = texture2D(uSampler, vTextureCoord);
+
+                float xx = (vTextureCoord.x * uDimensions.x) / 16.0;
+                float yy = (vTextureCoord.y * uDimensions.y) / 16.0;
+                gl_FragColor = vec4(c.r, c.g, c.b, 1.0);
+
+                if (false) {  //  TODO: handle LDR/HDR
+                    float invGamma = 1.0 / 2.2;
+                    float exposure = 2.0;
+
+                    gl_FragColor.r = exposure * pow(gl_FragColor.r, invGamma);
+                    gl_FragColor.g = exposure * pow(gl_FragColor.g, invGamma);
+                    gl_FragColor.b = exposure * pow(gl_FragColor.b, invGamma);
+                }
+
+                if (c.a < 1.0)
+                {
+                    vec4 gridColor = vec4(0.6, 0.6, 0.6, 1.0);
+                    if (modi(xx, 2.0) == 0.0 ^^ modi(yy, 2.0) == 0.0)
+                        gridColor = vec4(0.5, 0.5, 0.5, 1.0);
+                    
+
+                    gl_FragColor = gridColor + vec4(gl_FragColor.rgb * gl_FragColor.a, 1.0);
+                }
+            }`;
+
+            this.textureShader = new NvisShader(glContext, { source: this.textureFragmentSource });
+            this.streamShader = new NvisShader(glContext, { source: this.streamFragmentSource });
+        }
+
+
+        new(json = "{}") {
+            this.shaders.push(new NvisShader(this.glContext, { json: json }));            
+        }
+
+
+        load(jsonFileName, callback) {
+            let self = this;
+
+            let xhr = new XMLHttpRequest();
+            
+            xhr.open("GET", jsonFileName);
+            xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+            xhr.onload = function () {
+                if (this.status == 200 && this.responseText !== null) {
+                    //  set position of shader, filled in later
+                    self.shaders.push(new NvisShader(self.glContext, { json: this.responseText, callback: callback }));
+                }
+            };
+            
+            xhr.send();
+        }
+
     }
 
 
@@ -2276,7 +2344,7 @@ var nvis = new function () {
 
     class NvisStream {
 
-        constructor(glContext, shaderId = 0) {
+        constructor(glContext, shaderId = -1) {
             this.glContext = glContext;
 
             this.dimensions = undefined;
@@ -2285,7 +2353,7 @@ var nvis = new function () {
 
             this.textures = [];
 
-            this.shaderId = shaderId;  //  =0 for file streams
+            this.shaderId = shaderId;  //  = -1 for file streams
             this.inputStreamIds = [];
             this.shaderJSONObject = undefined;
             this.bUIReady = false;
@@ -2293,10 +2361,6 @@ var nvis = new function () {
             //  TODO: to be used for shader streams, plus to read back stream data
             this.outputTexture = undefined;
             this.frameBuffer = undefined;
-
-            // if (shaderId != 0) {
-            //     this.setupOutputTexture({ w: 512, h: 512 });
-            // }
 
             this.numTextures = 1;
             this.currentTexture = 0;
@@ -2315,15 +2379,19 @@ var nvis = new function () {
 
             //  lazily get the UI JSON from the shader
             if (!this.bUIReady) {
-                let shaderJSONText = shader.getJSONText();
-                if (shaderJSONText === undefined) {
+                let json = shader.json;
+                if (json === undefined) {
                     return;
                 }
-                this.shaderJSONObject = JSON.parse(shaderJSONText);
+                this.shaderJSONObject = JSON.parse(json);
                 this.bUIReady = true;
             }
 
             let uiObject = this.shaderJSONObject.UI;
+            if (uiObject === undefined) {
+                return;
+            }
+
             for (let key of Object.keys(uiObject)) {
                 let type = uiObject[key].type;
                 let uniform = gl.getUniformLocation(shader.getProgram(), key);
@@ -2368,8 +2436,6 @@ var nvis = new function () {
 
             let gl = this.glContext;
 
-            let ext = gl.getExtension('OES_texture_float');
-
             gl.bindTexture(gl.TEXTURE_2D, texture);
             if (bFloat) {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.FLOAT, image);
@@ -2386,9 +2452,11 @@ var nvis = new function () {
         }
 
 
-        setupOutputTexture(dimensions) {
+        setDimensions(dimensions) {
 
             let gl = this.glContext;
+
+            this.dimensions = dimensions;
 
             this.outputTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, this.outputTexture);
@@ -2442,11 +2510,8 @@ var nvis = new function () {
                             self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
 
                             if (numFilesLoaded == fileNames.length) {
-                                self.dimensions = file.dimensions;
-                                if (self.shaderId != 0) {
-                                    self.setupOutputTexture(self.dimensions);
-                                }
-                                callback(self.dimensions);
+                                self.setDimensions(file.dimensions);
+                                callback(file.dimensions);
                             }
                         }
                     };
@@ -2462,10 +2527,7 @@ var nvis = new function () {
                         self.setupTexture(texture, image);
 
                         if (numFilesLoaded == fileNames.length) {
-                            self.dimensions = { w: image.width, h: image.height };
-                            if (self.shaderId != 0) {
-                                self.setupOutputTexture(self.dimensions);
-                            }
+                            self.setDimensions({ w: image.width, h: image.height });
                             callback(self.dimensions);
                         }
                     }
@@ -2509,11 +2571,8 @@ var nvis = new function () {
                             numFilesLoaded++;
 
                             if (numFilesLoaded == files.length) {
-                                self.dimensions = { w: image.width, h: image.height };
-                                if (this.shaderId != 0) {
-                                    self.setupOutputTexture(self.dimensions);
-                                }
-                                callback(self.dimensions);
+                                self.setDimensions({ w: image.width, h: image.height });
+                                callback({ w: image.width, h: image.height });
                             }
                         }
 
@@ -2539,11 +2598,8 @@ var nvis = new function () {
                         numFilesLoaded++;
 
                         if (numFilesLoaded == files.length) {
-                            self.dimensions = { w: image.width, h: image.height };
-                            if (this.shaderId != 0) {
-                                self.setupOutputTexture(self.dimensions);
-                            }
-                            callback(self.dimensions);
+                            self.setDimensions({ w: image.width, h: image.height });
+                            callback({ w: image.width, h: image.height });
                         }
 
                     }
@@ -2705,9 +2761,9 @@ var nvis = new function () {
             ui.appendChild(span);
             ui.appendChild(document.createElement("br"));
 
-            if (this.shaderId != 0) {
+            if (this.shaderId != -1) {
 
-                let shader = shaders[this.shaderId];
+                let shader = shaders.shaders[this.shaderId];
 
                 for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
                     let eId = ("input-" + streamId + "-" + inputId);
@@ -2925,12 +2981,14 @@ var nvis = new function () {
             };
 
             if (xx < 0.0 || xx >= sw) {
-                coords.x = undefined;
+//                coords.x = undefined;
+                return undefined;
             } else if (!bToPixels) {
                 coords.x = coords.x / sw;
             }
             if (yy < 0.0 || yy >= sh) {
-                coords.y = undefined;
+//                coords.y = undefined;
+                return undefined;
             } else if (!bToPixels) {
                 coords.y = coords.y / sh;
             }
@@ -3363,77 +3421,98 @@ var nvis = new function () {
         render(windowId, frameId, streams, shaders) {
             let gl = this.glContext;
 
+            //  below, a lot of checks are needed due to asynch file/shader loading
             let stream = streams[this.streamId];
             if (stream === undefined) {
                 return;
             }
             let streamDim = stream.getDimensions();
-            if (streamDim === undefined) {
-                return;
-            }
-
             let shaderId = stream.getShaderId();
-            let shader = shaders[shaderId];
-            if (shader === undefined) {
+            let bStreamDimKnown = false;
+            if (streamDim === undefined) {
+                if (shaderId != -1) {
+                    //  dimensions unknown for a shader stream -> check inputs
+                    let shader = shaders.shaders[shaderId];
+                    if (shader !== undefined && shader.getNumInputs() != 0) {
+                        let inputStream = streams[stream.getInputStreamId(0)];
+                        if (inputStream !== undefined && inputStream.getDimensions() !== undefined) {
+                            streamDim = inputStream.getDimensions();
+                            stream.setDimensions(streamDim);
+                            bStreamDimKnown = true;
+                        }
+                    }
+                }
+                if (!bStreamDimKnown) {
+                    return;
+                }
+                }
+
+            let shader = undefined;
+            if (stream.shaderId == -1) {
+                shader = shaders.streamShader;
+            } else {
+                shader = shaders.shaders[shaderId];
+            }
+            if (shader === undefined || !shader.isReady()) {
                 return;
             }
 
-            //  first, render shader streams to texture
-            if (shaderId != 0) {
+            //  first, render shader streams to textures
+            let shaderProgram = shader.getProgram();
 
-                let shaderProgram = shader.getProgram();
+            gl.useProgram(shaderProgram);
 
-                gl.useProgram(shaderProgram);
+            let aVertexPosition = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.fullVertexPositionBuffer);
+            gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(aVertexPosition);
 
-                let aVertexPosition = gl.getAttribLocation(shaderProgram, "aVertexPosition");
-                gl.bindBuffer(gl.ARRAY_BUFFER, this.fullVertexPositionBuffer);
-                gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
-                gl.enableVertexAttribArray(aVertexPosition);
+            let aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.fullTextureCoordinateBuffer);
+            gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(aTextureCoord);
 
-                let aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
-                gl.bindBuffer(gl.ARRAY_BUFFER, this.fullTextureCoordinateBuffer);
-                gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
-                gl.enableVertexAttribArray(aTextureCoord);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, stream.frameBuffer);
 
-                gl.bindFramebuffer(gl.FRAMEBUFFER, stream.frameBuffer);
-
-                gl.bindTexture(gl.TEXTURE_2D, stream.outputTexture);
+            gl.bindTexture(gl.TEXTURE_2D, stream.outputTexture);
+            if (shaderId == -1) {
+                gl.bindTexture(gl.TEXTURE_2D, stream.getTexture(frameId));
+            } else {
                 for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
                     let activeTexture = this.TextureUnits[inputId];
                     gl.activeTexture(activeTexture);
                     gl.bindTexture(gl.TEXTURE_2D, streams[stream.getInputStreamId(inputId)].getTexture(frameId));
                     gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
                 }
-
-                gl.viewport(0, 0, streamDim.w, streamDim.h);
-
-                stream.setUniforms(shader);
-                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             }
+            gl.viewport(0, 0, streamDim.w, streamDim.h);
+
+            stream.setUniforms(shader);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
 
             //  next, render windows
             gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
-            let shaderProgram = shaders[0].getProgram();
+            //let shaderProgram = shaders[0].getProgram();
+            shaderProgram = shaders.textureShader.getProgram();
             gl.useProgram(shaderProgram);
 
-            let aVertexPosition = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+            aVertexPosition = gl.getAttribLocation(shaderProgram, "aVertexPosition");
             gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
             gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(aVertexPosition);
 
-            // tell webgl how to pull out the texture coordinates from buffer
-            let aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
+            aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
             gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
             gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(aTextureCoord);
 
             gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, (shaderId == 0 ? stream.getTexture(frameId) : stream.outputTexture));
+            gl.bindTexture(gl.TEXTURE_2D, stream.outputTexture);
 
-            // Tell the shader we bound the texture to texture unit 0
             let uSampler = gl.getUniformLocation(shaderProgram, 'uSampler');
             gl.uniform1i(uSampler, 0);
 
@@ -3652,13 +3731,15 @@ var nvis = new function () {
                 return;
             }
 
-            // //  extensions
-            //  not needed in WebGL 2.0
-            // let glFloatExtension = _glContext.getExtension('OES_texture_float');
+            //  extensions
+            //  TODO: not needed in WebGL 2.0?
+            _glContext.getExtension('OES_texture_float');
+
+
 
             _windows = new NvisWindows(_glContext, _canvas);
 
-            _shaders.push(new NvisShader(_glContext));
+            _shaders = new NvisShaders(_glContext);
 
             window.addEventListener("resize", _windows.boundAdjust);
 
@@ -3889,6 +3970,10 @@ var nvis = new function () {
         let _onClick = function (event) {
             let pCoord = _windows.getStreamCoordinates(_state.input.mouse.canvasCoords, true);
 
+            if (pCoord === undefined) {
+                return;
+            }
+            
             let loc = { x: Math.floor(pCoord.x), y: Math.floor(pCoord.y) };
             let color = _streams[0].getPixelValue(loc);
 
@@ -4012,13 +4097,13 @@ var nvis = new function () {
                         let jsonObject = JSON.parse(event.target.result);
 
                         //  convert top-level keys to lowercase
-                        let lcJsonObject = {};
+                        let config = {};
                         for (let key of Object.keys(jsonObject)) {
-                            lcJsonObject[key.toLowerCase()] = jsonObject[key];
+                            config[key.toLowerCase()] = jsonObject[key];
                         }
-                        console.log("JSON filename: " + lcJsonObject.filename);
+                        console.log("JSON filename: " + config.filename);
 
-                        let shader = _addShader(lcJsonObject);
+                        let shader = _addShader(config);
                     }
 
                     reader.readAsText(file);
@@ -4060,12 +4145,14 @@ var nvis = new function () {
             _animation.update();
         }
 
-        let _shaderLoaded = function (shaderId, shader) {
-            _shaders[shaderId] = shader;
+        let _shaderLoaded = function () {
+            //_shaders[shaderId] = shader;
             _windows.adjust();  //  TODO: is this needed?
         }
 
         let _loadShader = function (jsonFileName) {
+            _shaders.load(jsonFileName, function () { _shaderLoaded(); });
+            return;
             let xhr = new XMLHttpRequest();
             xhr.open("GET", jsonFileName);
             xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
@@ -4074,7 +4161,7 @@ var nvis = new function () {
                     //  set position of shader, filled in later
                     let shaderId = _shaders.length;
                     _shaders.push(undefined);
-                    let newShader = new NvisShader(_glContext, this.responseText, function () { _shaderLoaded(shaderId, newShader); });
+                    let newShader = new NvisShader(_glContext, { json: this.responseText, callback: function () { _shaderLoaded(shaderId, newShader); }});
                 }
             };
             xhr.send();
@@ -4168,20 +4255,20 @@ var nvis = new function () {
                 let jsonObject = JSON.parse(this.responseText);
                 console.log("=====  Config JSON loaded (" + fileName + ")");
                 //  convert top-level keys to lowercase
-                let lcJsonObject = {};
+                let config = {};
                 for (let key of Object.keys(jsonObject)) {
-                    lcJsonObject[key.toLowerCase()] = jsonObject[key];
+                    config[key.toLowerCase()] = jsonObject[key];
                 }
 
                 //  Zoom
-                let zoom = lcJsonObject.zoom;
+                let zoom = config.zoom;
                 if (zoom !== undefined) {
                     _state.zoom.level = zoom;
                 }
 
                 //  streams
-                let streams = lcJsonObject.streams;
-                if (lcJsonObject.streams !== undefined) {
+                let streams = config.streams;
+                if (config.streams !== undefined) {
                     for (let objectId = 0; objectId < streams.length; objectId++) {
                         let newStream = undefined;
                         let files = streams[objectId].files;
@@ -4189,7 +4276,7 @@ var nvis = new function () {
                         if (files !== undefined) {
                             newStream = _stream(files);
                         } else if (shaderId !== undefined) {
-                            newStream = _renderer.addShaderStream(shaderId + 1);
+                            newStream = _renderer.addShaderStream(shaderId);
                             let inputStreamIds = streams[objectId].inputs;
                             if (inputStreamIds !== undefined) {
                                 newStream.setInputStreamIds(inputStreamIds);
@@ -4202,7 +4289,7 @@ var nvis = new function () {
                 }
 
                 //  shaders
-                let shaders = lcJsonObject.shaders;
+                let shaders = config.shaders;
                 if (shaders !== undefined) {
                     for (let shaderId = 0; shaderId < shaders.length; shaderId++) {
                         _shader(shaders[shaderId]);
