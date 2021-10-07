@@ -1,4 +1,4 @@
-# NVIDIA nvis
+# nvis
 
 Copyright 2021 NVIDIA Corporation
 
