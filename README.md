@@ -1,5 +1,7 @@
 # nvis
 
+Author: Jim Nilsson
+
 Copyright 2021 NVIDIA Corporation
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
