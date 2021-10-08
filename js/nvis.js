@@ -2373,24 +2373,18 @@ var nvis = new function () {
             let gl = this.glContext;
 
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
-            const format = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT);
-            const type = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE);
-
-            //  check if platform is able to read from float framebuffers
-            if (this.bFloat && type != gl.FLOAT) {
-
-                return;
-            }
+            // const format = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT);
+            // const type = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE);
 
             let numChannels = 4;  //  TODO: handle different formats
             let data = undefined;
+
             if (this.bFloat) {
                 data = new Float32Array(1 * 1 * numChannels);
-                gl.readPixels(pxCoord.x, pxCoord.y, 1, 1, gl.RGBA, gl.FLOAT, data);
             } else {
                 data = new Uint8Array(1 * 1 * numChannels);
-                gl.readPixels(pxCoord.x, pxCoord.y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, data);
             }
+            gl.readPixels(pxCoord.x, pxCoord.y, 1, 1, gl.RGBA, (this.bFloat ? gl.FLOAT : gl.UNSIGNED_BYTE), data);
 
             return { r: data[0], g: data[1], b: data[2], a: data[3] };
         }
@@ -2477,7 +2471,7 @@ var nvis = new function () {
         }
 
 
-        setDimensions(dimensions) {
+        setDimensions(dimensions, bFloat) {
 
             let gl = this.glContext;
 
@@ -2485,7 +2479,7 @@ var nvis = new function () {
 
             this.outputTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, this.outputTexture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, (bFloat ? gl.FLOAT : gl.UNSIGNED_BYTE), null);
 
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -2535,7 +2529,7 @@ var nvis = new function () {
                             self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
 
                             if (numFilesLoaded == fileNames.length) {
-                                self.setDimensions(file.dimensions);
+                                self.setDimensions(file.dimensions, true);
                                 callback(file.dimensions);
                             }
                         }
@@ -2552,7 +2546,7 @@ var nvis = new function () {
                         self.setupTexture(texture, image);
 
                         if (numFilesLoaded == fileNames.length) {
-                            self.setDimensions({ w: image.width, h: image.height });
+                            self.setDimensions({ w: image.width, h: image.height }, false);
                             callback(self.dimensions);
                         }
                     }
@@ -2596,7 +2590,7 @@ var nvis = new function () {
                             numFilesLoaded++;
 
                             if (numFilesLoaded == files.length) {
-                                self.setDimensions({ w: image.width, h: image.height });
+                                self.setDimensions({ w: image.width, h: image.height }, false);
                                 callback({ w: image.width, h: image.height });
                             }
                         }
@@ -2623,7 +2617,7 @@ var nvis = new function () {
                         numFilesLoaded++;
 
                         if (numFilesLoaded == files.length) {
-                            self.setDimensions({ w: image.width, h: image.height });
+                            self.setDimensions({ w: image.width, h: image.height }, true);
                             callback({ w: image.width, h: image.height });
                         }
 
@@ -2665,6 +2659,11 @@ var nvis = new function () {
 
 
         getTexture(index) {
+
+            if (this.shaderId != -1) {
+                return this.outputTexture;
+            }
+
             index = index % this.textures.length;  // TODO: solve elsewhere
             return this.textures[index];
         }
@@ -3462,7 +3461,7 @@ var nvis = new function () {
                         let inputStream = streams[stream.getInputStreamId(0)];
                         if (inputStream !== undefined && inputStream.getDimensions() !== undefined) {
                             streamDim = inputStream.getDimensions();
-                            stream.setDimensions(streamDim);
+                            stream.setDimensions(streamDim, inputStream.bFloat);
                             bStreamDimKnown = true;
                         }
                     }
@@ -3758,8 +3757,6 @@ var nvis = new function () {
             //  extensions
             //  TODO: not needed in WebGL 2.0?
             _glContext.getExtension('OES_texture_float');
-
-
 
             _windows = new NvisWindows(_glContext, _canvas);
 
