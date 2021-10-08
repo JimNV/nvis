@@ -2353,6 +2353,8 @@ var nvis = new function () {
 
             this.textures = [];
 
+            this.bFloat = undefined;
+
             this.shaderId = shaderId;  //  = -1 for file streams
             this.inputStreamIds = [];
             this.shaderJSONObject = undefined;
@@ -2368,8 +2370,29 @@ var nvis = new function () {
 
         
         getPixelValue(pxCoord) {
+            let gl = this.glContext;
 
-            return { r: 0.0, g: 0.0, b: 0.0, a: 0.0 };
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+            const format = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT);
+            const type = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE);
+
+            //  check if platform is able to read from float framebuffers
+            if (this.bFloat && type != gl.FLOAT) {
+
+                return;
+            }
+
+            let numChannels = 4;  //  TODO: handle different formats
+            let data = undefined;
+            if (this.bFloat) {
+                data = new Float32Array(1 * 1 * numChannels);
+                gl.readPixels(pxCoord.x, pxCoord.y, 1, 1, gl.RGBA, gl.FLOAT, data);
+            } else {
+                data = new Uint8Array(1 * 1 * numChannels);
+                gl.readPixels(pxCoord.x, pxCoord.y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, data);
+            }
+
+            return { r: data[0], g: data[1], b: data[2], a: data[3] };
         }
 
 
@@ -2435,6 +2458,8 @@ var nvis = new function () {
         setupTexture(texture, image, bFloat = false, dimensions = { w: 0, h: 0 }) {
 
             let gl = this.glContext;
+
+            this.bFloat = bFloat;
 
             gl.bindTexture(gl.TEXTURE_2D, texture);
             if (bFloat) {
@@ -2981,13 +3006,13 @@ var nvis = new function () {
             };
 
             if (xx < 0.0 || xx >= sw) {
-//                coords.x = undefined;
+                // coords.x = undefined;
                 return undefined;
             } else if (!bToPixels) {
                 coords.x = coords.x / sw;
             }
             if (yy < 0.0 || yy >= sh) {
-//                coords.y = undefined;
+                // coords.y = undefined;
                 return undefined;
             } else if (!bToPixels) {
                 coords.y = coords.y / sh;
@@ -3445,7 +3470,7 @@ var nvis = new function () {
                 if (!bStreamDimKnown) {
                     return;
                 }
-                }
+            }
 
             let shader = undefined;
             if (stream.shaderId == -1) {
@@ -3546,13 +3571,12 @@ var nvis = new function () {
                 y: (ish - (_state.zoom.streamOffset.y % ish)) * (sh * pixelSize.h),
             }
 
-            if (_state.zoom.level > 10.0) {
+            if (z > 10.0) {
                 let alpha = Math.min(1.0, (z - 16.0) / 16.0);
 
                 this.gridDrawer.update(windowId, offset, pixelSize, alpha);
                 this.gridDrawer.render();
             }
-
 
         }
 
@@ -3968,14 +3992,23 @@ var nvis = new function () {
         }
 
         let _onClick = function (event) {
-            let pCoord = _windows.getStreamCoordinates(_state.input.mouse.canvasCoords, true);
+            
+            let cc = _state.input.mouse.canvasCoords;
+            let windowId = _windows.getWindowId(cc);
+
+            if (windowId === undefined) {
+                return;
+            }
+
+            let streamId = _windows.windows[windowId].getStreamId();
+            let pCoord = _windows.getStreamCoordinates(cc, true);
 
             if (pCoord === undefined) {
                 return;
             }
             
             let loc = { x: Math.floor(pCoord.x), y: Math.floor(pCoord.y) };
-            let color = _streams[0].getPixelValue(loc);
+            let color = _streams[streamId].getPixelValue(loc);
 
             console.log("_canvas.onclick(" + JSON.stringify(loc) + "): " + JSON.stringify(color));
         }
