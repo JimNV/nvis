@@ -2386,6 +2386,8 @@ var nvis = new function () {
             }
             gl.readPixels(pxCoord.x, pxCoord.y, 1, 1, gl.RGBA, (this.bFloat ? gl.FLOAT : gl.UNSIGNED_BYTE), data);
 
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
             return { r: data[0], g: data[1], b: data[2], a: data[3] };
         }
 
@@ -4166,8 +4168,9 @@ var nvis = new function () {
         }
 
         let _render = function () {
-            _glContext.clearColor(0.2, 0.2, 0.2, 1.0);
-            _glContext.clear(_glContext.COLOR_BUFFER_BIT);
+            let gl = _glContext;
+            gl.clearColor(0.2, 0.2, 0.2, 1.0);
+            gl.clear(_glContext.COLOR_BUFFER_BIT);
 
             //_renderFrameBuffers();
             _windows.render(_animation.frameId, _streams, _shaders);

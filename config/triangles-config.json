@@ -42,6 +42,15 @@
                 0,
                 1
             ]
+        },
+        {
+            "window": true,
+            "name": "Difference stream test",
+            "shader": 0,
+            "inputs": [
+                1,
+                2
+            ]
         }
     ]
 }
