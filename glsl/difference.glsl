@@ -1,4 +1,4 @@
-
+#version 300 es
 #define DIFF_MODE_RGB           0
 #define DIFF_MODE_LAB_LENGTH    1
 #define DIFF_MODE_LUMINANCE     2
@@ -27,18 +27,19 @@ uniform int uShowColorMap;
 uniform sampler2D uTexture0;
 uniform sampler2D uTexture1;
 
-// Texture varyings
-varying vec2 vTextureCoord;
+// Texture
+in vec2 vTextureCoord;
 
+out vec4 outColor;
 
-mat3 transpose(in mat3 matrix)
-{
-    vec3 i0 = matrix[0];
-    vec3 i1 = matrix[1];
-    vec3 i2 = matrix[2];
+// mat3 transpose(in mat3 matrix)
+// {
+//     vec3 i0 = matrix[0];
+//     vec3 i1 = matrix[1];
+//     vec3 i2 = matrix[2];
 
-    return mat3(vec3(i0.x, i1.x, i2.x), vec3(i0.y, i1.y, i2.y), vec3(i0.z, i1.z, i2.z));
-}
+//     return mat3(vec3(i0.x, i1.x, i2.x), vec3(i0.y, i1.y, i2.y), vec3(i0.z, i1.z, i2.z));
+// }
 
 float RGBtoLuma(vec3 color)
 {
@@ -227,8 +228,8 @@ void main()
 
     vec2 loc2d = vTextureCoord * uDimensions;
 
-    vec3 colorA = texture2D(uTexture0, vTextureCoord).rgb;
-    vec3 colorB = texture2D(uTexture1, vTextureCoord).rgb;
+    vec3 colorA = texture(uTexture0, vTextureCoord).rgb;
+    vec3 colorB = texture(uTexture1, vTextureCoord).rgb;
 
     if (uMode == DIFF_MODE_RGB)
     {
@@ -260,7 +261,7 @@ void main()
     float fade = 0.0;
     if (uShowColorMap != 0)
     {
-        vec2 paletteCorner = vec2(uShowColorMap == 0 || uShowColorMap == 2 ? 0.0 : 1.0, uShowColorMap == 2 || uShowColorMap == 3 ? 0.0 : 1.0);
+        vec2 paletteCorner = vec2((uShowColorMap == 1 || uShowColorMap == 3) ? 0.0 : 1.0, (uShowColorMap == 1 || uShowColorMap == 2) ? 0.0 : 1.0);
 
         float kPaletteEdgeWidth = 2.0;
         float kPaletteLength = float(min(uDimensions.x, uDimensions.y)) * 0.1;
@@ -305,6 +306,6 @@ void main()
     }
     color = lerp(color, vec3(0.5, 0.5, 0.5), fade);
 
-    //gl_FragColor = vec4(color, error);
-    gl_FragColor = vec4(color, 1.0);  //  TODO: allow error metric to be supplied in alpha channel
+    //outColor = vec4(color, error);
+    outColor = vec4(color, 1.0);  //  TODO: allow error metric to be supplied in alpha channel
 }

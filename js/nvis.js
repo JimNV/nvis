@@ -310,10 +310,11 @@ var nvis = new function () {
             // const [minSize, maxSize] = glContext.getParameter(glContext.ALIASED_POINT_SIZE_RANGE);
             // const [minSize, maxSize] = glContext.getParameter(glContext.ALIASED_LINE_WIDTH_RANGE);
 
-            this.vertexSource = `precision highp float;
-            attribute vec2 aVertexPosition;
-            attribute vec4 aVertexColor;
-            varying vec4 vColor;
+            this.vertexSource = `#version 300 es
+            precision highp float;
+            in vec2 aVertexPosition;
+            in vec4 aVertexColor;
+            out vec4 vColor;
             uniform float uPointSize;
             void main()
             {
@@ -321,11 +322,13 @@ var nvis = new function () {
                 gl_PointSize = uPointSize;
                 gl_Position = vec4(aVertexPosition, 0.0, 1.0);
             }`;
-            this.fragmentSource = `precision highp float;
-            varying vec4 vColor;
+            this.fragmentSource = `#version 300 es
+            precision highp float;
+            in vec4 vColor;
+            out vec4 color;
             void main()
             {
-                gl_FragColor = vColor;
+                color = vColor;
             }`;
 
             this.vertexShader = this.glContext.createShader(this.glContext.VERTEX_SHADER);
@@ -588,10 +591,11 @@ var nvis = new function () {
             this.bVertexReady = false;
             this.bFragmentReady = false;
 
-            this.vertexSource = `precision highp float;
-            attribute vec2 aVertexPosition;
-            attribute vec2 aTextureCoord;
-            varying vec2 vTextureCoord;
+            this.vertexSource = `#version 300 es
+            precision highp float;
+            in vec2 aVertexPosition;
+            in vec2 aTextureCoord;
+            out vec2 vTextureCoord;
             void main()
             {
                 gl_Position = vec4(aVertexPosition, 0.0, 1.0);
@@ -709,23 +713,27 @@ var nvis = new function () {
             this.streamShader = undefined;
             this.shaders = [];
 
-            this.textureFragmentSource = `precision highp float;
-            varying vec2 vTextureCoord;
+            this.textureFragmentSource = `#version 300 es
+            precision highp float;
+            in vec2 vTextureCoord;
             uniform sampler2D uSampler;
+            out vec4 color;
 
             void main()
             {
                 if (vTextureCoord.x < 0.0 || vTextureCoord.x > 1.0 || vTextureCoord.y < 0.0 || vTextureCoord.y > 1.0) {
-                    gl_FragColor = vec4(0.1, 0.1, 0.1, 1.0);
+                    color = vec4(0.1, 0.1, 0.1, 1.0);
                     return;
                 }
-                gl_FragColor = texture2D(uSampler, vTextureCoord);
+                color = texture(uSampler, vTextureCoord);
             }`;
 
-            this.streamFragmentSource = `precision highp float;
-            varying vec2 vTextureCoord;
+            this.streamFragmentSource = `#version 300 es
+            precision highp float;
+            in vec2 vTextureCoord;
             uniform sampler2D uSampler;
             uniform vec2 uDimensions;
+            out vec4 color;
 
             float modi(float a, float b) {
                 return floor(a - floor((a + 0.5) / b) * b);
@@ -733,19 +741,19 @@ var nvis = new function () {
 
             void main()
             {
-                vec4 c = texture2D(uSampler, vTextureCoord);
+                vec4 c = texture(uSampler, vTextureCoord);
 
                 float xx = (vTextureCoord.x * uDimensions.x) / 16.0;
                 float yy = (vTextureCoord.y * uDimensions.y) / 16.0;
-                gl_FragColor = vec4(c.r, c.g, c.b, 1.0);
+                color = vec4(c.r, c.g, c.b, 1.0);
 
                 if (false) {  //  TODO: handle LDR/HDR
                     float invGamma = 1.0 / 2.2;
                     float exposure = 2.0;
 
-                    gl_FragColor.r = exposure * pow(gl_FragColor.r, invGamma);
-                    gl_FragColor.g = exposure * pow(gl_FragColor.g, invGamma);
-                    gl_FragColor.b = exposure * pow(gl_FragColor.b, invGamma);
+                    color.r = exposure * pow(color.r, invGamma);
+                    color.g = exposure * pow(color.g, invGamma);
+                    color.b = exposure * pow(color.b, invGamma);
                 }
 
                 if (c.a < 1.0)
@@ -755,7 +763,7 @@ var nvis = new function () {
                         gridColor = vec4(0.5, 0.5, 0.5, 1.0);
                     
 
-                    gl_FragColor = gridColor + vec4(gl_FragColor.rgb * gl_FragColor.a, 1.0);
+                        color = gridColor + vec4(color.rgb * color.a, 1.0);
                 }
             }`;
 
@@ -2458,8 +2466,9 @@ var nvis = new function () {
             this.bFloat = bFloat;
 
             gl.bindTexture(gl.TEXTURE_2D, texture);
+            
             if (bFloat) {
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.FLOAT, image);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, dimensions.w, dimensions.h, 0, gl.RGBA, gl.FLOAT, image);
             } else {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
@@ -2481,7 +2490,12 @@ var nvis = new function () {
 
             this.outputTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, this.outputTexture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, (bFloat ? gl.FLOAT : gl.UNSIGNED_BYTE), null);
+
+            if (bFloat) {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, dimensions.w, dimensions.h, 0, gl.RGBA, gl.FLOAT, null);
+            } else {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            }
 
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -3750,7 +3764,7 @@ var nvis = new function () {
             document.body.appendChild(_fileInput);
             document.body.appendChild(_infoPopup);
 
-            _glContext = _canvas.getContext("webgl");
+            _glContext = _canvas.getContext("webgl2");
             if (_glContext === null) {
                 alert("Unable to initialize WebGL!");
                 return;
@@ -3758,7 +3772,8 @@ var nvis = new function () {
 
             //  extensions
             //  TODO: not needed in WebGL 2.0?
-            _glContext.getExtension('OES_texture_float');
+           // _glContext.getExtension('OES_texture_float');
+           _glContext.getExtension("EXT_color_buffer_float")
 
             _windows = new NvisWindows(_glContext, _canvas);
 
@@ -3979,12 +3994,16 @@ var nvis = new function () {
                 document.getElementById("infoPopup").style.opacity = opacity - 0.02;
                 setTimeout(_fadeInfoPopup, 25);
             }
+            if (opacity == 0.0) {
+                document.getElementById("infoPopup").style.display = "none";
+            }
         }
 
         let _popupInfo = function (text) {
             _infoPopup.innerHTML = text;
             let currentOpacity = document.getElementById("infoPopup").style.opacity;
             document.getElementById("infoPopup").style.opacity = 1.0;
+            document.getElementById("infoPopup").style.display = "block";
             if (currentOpacity == 0.0) {
                 _fadeInfoPopup();
             }
