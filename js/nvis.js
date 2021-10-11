@@ -747,7 +747,7 @@ var nvis = new function () {
                 float yy = (vTextureCoord.y * uDimensions.y) / 16.0;
                 color = vec4(c.r, c.g, c.b, 1.0);
 
-                if (false) {  //  TODO: handle LDR/HDR
+                if (false) {  //  TODO: handle tonemapping
                     float invGamma = 1.0 / 2.2;
                     float exposure = 2.0;
 
@@ -1533,10 +1533,7 @@ var nvis = new function () {
         }
 
         getUint8(byteIndex) {
-            let value = this.view.getUint8(byteIndex);
-            // if (byteIndex < 50)
-            //     console.log("  byte " + byteIndex + ": 0x" + value.toString(16) + " = " + value);
-            return value;
+            return this.view.getUint8(byteIndex);
         }
 
         setUint8(byteIndex, value) {
@@ -1545,9 +1542,11 @@ var nvis = new function () {
 
         getFloat16(byteIndex) {
             let value = this.view.getUint16(byteIndex, true);
-            // if (byteIndex < 50)
-            //     console.log("  byte " + byteIndex + ": 0x" + value.toString(16) + " = " + this.halfBytes2Float32(value));
             return this.halfBytes2Float32(value);
+        }
+
+        putFloat32(byteIndex, value) {
+            this.view.setFloat32(byteIndex, value);
         }
 
         readFloat16(location = this.bytePointer) {
@@ -1560,6 +1559,11 @@ var nvis = new function () {
             let value = this.view.getFloat32(this.bytePointer, this.littleEndian);
             this.bytePointer += 4;
             return value;
+        }
+
+        writeFloat32(value) {
+            this.view.setFloat32(this.bytePointer, value);
+            this.bytePointer += 4;
         }
 
         readString() {
@@ -1733,8 +1737,34 @@ var nvis = new function () {
             outputSize *= (this.dimensions.w * this.dimensions.h);
 
             this.outputBuffer = new NvisBitBuffer(new ArrayBuffer(outputSize));
-
             // console.log("Total output buffer size: " + outputSize);
+
+            const ChannelOffsetMap = { "R": 0, "G": 1, "B": 2, "A": 3 }
+            let channelValues = this.attributes.channels.values;
+            if (compression == EXR_NO_COMPRESSION) {
+
+                for (let sl = 0; sl < numOffsets; sl++) {
+                    b.seek(Number(this.offsetTable[sl].offset));
+                    let outputPosition = this.outputBuffer.bytePointer;
+                    
+                    let scanLine = b.readUint32();
+                    let dataSize = b.readUint32();
+
+                    for (let c = 0; c < channelValues.length; c++) {
+                        this.outputBuffer.bytePointer = outputPosition;
+                        let channel = channelValues[c];
+                        let offset = ChannelOffsetMap[channel.name] * 4;
+                        for (let x = 0; x < this.dimensions.w; x++) {
+                            let value = b.readFloat16();  //  TODO: adapt to channel size
+                            this.outputBuffer.putFloat32(outputPosition + x * 16 + offset, value);
+                        }
+                    }
+                    this.outputBuffer.bytePointer += this.dimensions.w * 16;
+                }
+
+                return;
+            }
+
 
             for (let sl = 0; sl < numOffsets; sl++) {
                 b.seek(Number(this.offsetTable[sl].offset));
@@ -2374,6 +2404,32 @@ var nvis = new function () {
 
             this.numTextures = 1;
             this.currentTexture = 0;
+
+            this.defaultUI = `{
+                "uTonemapper": {
+                    "type": "dropdown",
+                    "value": 0,
+                    "alternatives" : [
+                        "None",
+                        "Gamma Correction",
+                        "Clamp",
+                        "Log",
+                        "Reinhard",
+                        John Hable",
+                        "Uncharted2",
+                        "ACES"
+                    ]
+                },
+                "uWhiteScale": {
+                    "name": "Linear White",
+                    "type": "float",
+                    "value": 11.2,
+                    "min": 0.001,
+                    "max": 100.0,
+                    "step": 0.01,
+                    "condition": "uToneMapper==6"
+                }
+            }`;
         }
 
         
@@ -2466,7 +2522,7 @@ var nvis = new function () {
             this.bFloat = bFloat;
 
             gl.bindTexture(gl.TEXTURE_2D, texture);
-            
+
             if (bFloat) {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, dimensions.w, dimensions.h, 0, gl.RGBA, gl.FLOAT, image);
             } else {
@@ -3248,11 +3304,13 @@ var nvis = new function () {
 
                 let newStreamCoords = this.getStreamCoordinates(canvasPxCoords);
 
-                if (oldStreamCoords.x !== undefined && newStreamCoords.x !== undefined) {
-                    _state.zoom.streamOffset.x += (oldStreamCoords.x - newStreamCoords.x);
-                }
-                if (oldStreamCoords.y !== undefined && newStreamCoords.y !== undefined) {
-                    _state.zoom.streamOffset.y += (oldStreamCoords.y - newStreamCoords.y);
+                if (oldStreamCoords !== undefined && newStreamCoords !== undefined) {
+                    if (oldStreamCoords.x !== undefined && newStreamCoords.x !== undefined) {
+                        _state.zoom.streamOffset.x += (oldStreamCoords.x - newStreamCoords.x);
+                    }
+                    if (oldStreamCoords.y !== undefined && newStreamCoords.y !== undefined) {
+                        _state.zoom.streamOffset.y += (oldStreamCoords.y - newStreamCoords.y);
+                    }
                 }
 
                 this.updateTextureCoordinates();

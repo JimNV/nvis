@@ -1,13 +1,13 @@
 {
     "name": "Test configuration",
-    "zoom": 32.0,
+    "zoom": 1.0,
     "position": { "x": 0, "y": 0 },
     "streams": [
         {
-            "name": "Sponza",
+            "name": "Uncompressed EXR",
             "window": true,
             "files": [
-                "images/sponza.exr"
+                "images/uncompressed.exr"
             ]
         }
     ]
