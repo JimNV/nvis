@@ -385,7 +385,7 @@ var nvis = new function () {
             let v = v0;
 
             let color = 0;
-            for (let i = 0; i < segments; i ++) {
+            for (let i = 0; i < segments; i++) {
                 this.addVertex(v, colors[color]);
                 v = { x: v.x + dx, y: v.y + dy };
                 if (i > 0 || i < segments - 1) {
@@ -400,7 +400,7 @@ var nvis = new function () {
             }
         }
 
-    
+
         render() {
             if (this.numVertices == 0) {
                 return;
@@ -451,8 +451,7 @@ var nvis = new function () {
             this.pixelSize = { w: 0.0, w: 0.0 };
         }
 
-        update(windowId, offset, pixelSize, alpha = 1.0)
-        {
+        update(windowId, offset, pixelSize, alpha = 1.0) {
             //  only update if there's a change
             if (this.offset.x == offset.x && this.offset.y == offset.y && this.pixelSize.w == pixelSize.w) {
                 return;
@@ -506,15 +505,14 @@ var nvis = new function () {
 
             this.areaColor = { r: 0.8, g: 0.8, b: 0.0, a: 0.5 };
             this.activeAreaColor = { r: 0.8, g: 0.8, b: 0.0, a: 0.1 };
-            this.borderColors = [ { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }, { r: 0.0, g: 0.0, b: 0.0, a: 1.0 } ];
+            this.borderColors = [{ r: 1.0, g: 1.0, b: 1.0, a: 1.0 }, { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }];
 
             this.offset = { x: 0.0, y: 0.0 };  //  pixels
             this.pixelSize = { w: 0.0, h: 0.0 };
         }
 
 
-        update(windowId, offset, pixelSize, bActiveWindow = false)
-        {
+        update(windowId, offset, pixelSize, bActiveWindow = false) {
             //  only update if there's a change
             if (this.offset.x == offset.x && this.offset.y == offset.y && this.pixelSize.w == pixelSize.w) {
                 return;
@@ -550,16 +548,16 @@ var nvis = new function () {
                 this.border.addSegmentLine(v3, v2, segments, this.borderColors);
                 this.border.addSegmentLine(v2, v0, segments, this.borderColors);
             }
-         }
+        }
 
-         render(bActiveWindow = false) {
+        render(bActiveWindow = false) {
             if (bActiveWindow) {
                 this.area.render();
                 this.border.render();
             } else {
                 this.area.render();
             }
-         }
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -661,7 +659,7 @@ var nvis = new function () {
 
         loadFragmentSource(fileName) {
             let self = this;
-            
+
             this.bFragmentReady = false;
 
             let xhr = new XMLHttpRequest();
@@ -704,7 +702,7 @@ var nvis = new function () {
 
 
     class NvisShaders {
-        
+
         constructor(glContext) {
 
             this.glContext = glContext;
@@ -773,7 +771,7 @@ var nvis = new function () {
 
 
         new(json = "{}") {
-            this.shaders.push(new NvisShader(this.glContext, { json: json }));            
+            this.shaders.push(new NvisShader(this.glContext, { json: json }));
         }
 
 
@@ -781,7 +779,7 @@ var nvis = new function () {
             let self = this;
 
             let xhr = new XMLHttpRequest();
-            
+
             xhr.open("GET", jsonFileName);
             xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
             xhr.onload = function () {
@@ -790,7 +788,7 @@ var nvis = new function () {
                     self.shaders.push(new NvisShader(self.glContext, { json: this.responseText, callback: callback }));
                 }
             };
-            
+
             xhr.send();
         }
 
@@ -846,492 +844,492 @@ var nvis = new function () {
     const TINFL_FAST_LOOKUP_SIZE = 1 << TINFL_FAST_LOOKUP_BITS;
 
 
-//     // TINFL_HUFF_BITBUF_FILL() is only used rarely, when the number of bytes
-// // remaining in the input buffer falls below 2.
-// // It reads just enough bytes from the input stream that are needed to decode
-// // the next Huffman code (and absolutely no more). It works by trying to fully
-// // decode a
-// // Huffman code by using whatever bits are currently present in the bit buffer.
-// // If this fails, it reads another byte, and tries again until it succeeds or
-// // until the
-// // bit buffer contains >=15 bits (deflate's max. Huffman code size).
-// #define TINFL_HUFF_BITBUF_FILL(state_index, pHuff)                     \
-// do {                                                                 \
-//   temp = (pHuff)->m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]; \
-//   if (temp >= 0) {                                                   \
-//     code_len = temp >> 9;                                            \
-//     if ((code_len) && (num_bits >= code_len)) break;                 \
-//   } else if (num_bits > TINFL_FAST_LOOKUP_BITS) {                    \
-//     code_len = TINFL_FAST_LOOKUP_BITS;                               \
-//     do {                                                             \
-//       temp = (pHuff)->m_tree[~temp + ((bit_buf >> code_len++) & 1)]; \
-//     } while ((temp < 0) && (num_bits >= (code_len + 1)));            \
-//     if (temp >= 0) break;                                            \
-//   }                                                                  \
-//   TINFL_GET_BYTE(state_index, c);                                    \
-//   bit_buf |= (((tinfl_bit_buf_t)c) << num_bits);                     \
-//   num_bits += 8;                                                     \
-// } while (num_bits < 15);
+    //     // TINFL_HUFF_BITBUF_FILL() is only used rarely, when the number of bytes
+    // // remaining in the input buffer falls below 2.
+    // // It reads just enough bytes from the input stream that are needed to decode
+    // // the next Huffman code (and absolutely no more). It works by trying to fully
+    // // decode a
+    // // Huffman code by using whatever bits are currently present in the bit buffer.
+    // // If this fails, it reads another byte, and tries again until it succeeds or
+    // // until the
+    // // bit buffer contains >=15 bits (deflate's max. Huffman code size).
+    // #define TINFL_HUFF_BITBUF_FILL(state_index, pHuff)                     \
+    // do {                                                                 \
+    //   temp = (pHuff)->m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]; \
+    //   if (temp >= 0) {                                                   \
+    //     code_len = temp >> 9;                                            \
+    //     if ((code_len) && (num_bits >= code_len)) break;                 \
+    //   } else if (num_bits > TINFL_FAST_LOOKUP_BITS) {                    \
+    //     code_len = TINFL_FAST_LOOKUP_BITS;                               \
+    //     do {                                                             \
+    //       temp = (pHuff)->m_tree[~temp + ((bit_buf >> code_len++) & 1)]; \
+    //     } while ((temp < 0) && (num_bits >= (code_len + 1)));            \
+    //     if (temp >= 0) break;                                            \
+    //   }                                                                  \
+    //   TINFL_GET_BYTE(state_index, c);                                    \
+    //   bit_buf |= (((tinfl_bit_buf_t)c) << num_bits);                     \
+    //   num_bits += 8;                                                     \
+    // } while (num_bits < 15);
 
-// // TINFL_HUFF_DECODE() decodes the next Huffman coded symbol. It's more complex
-// // than you would initially expect because the zlib API expects the decompressor
-// // to never read
-// // beyond the final byte of the deflate stream. (In other words, when this macro
-// // wants to read another byte from the input, it REALLY needs another byte in
-// // order to fully
-// // decode the next Huffman code.) Handling this properly is particularly
-// // important on raw deflate (non-zlib) streams, which aren't followed by a byte
-// // aligned adler-32.
-// // The slow path is only executed at the very end of the input buffer.
-// #define TINFL_HUFF_DECODE(state_index, sym, pHuff)                             \
-// do {                                                                         \
-//   int temp;                                                                  \
-//   mz_uint code_len, c;                                                       \
-//   if (num_bits < 15) {                                                       \
-//     if ((pIn_buf_end - pIn_buf_cur) < 2) {                                   \
-//       TINFL_HUFF_BITBUF_FILL(state_index, pHuff);                            \
-//     } else {                                                                 \
-//       bit_buf |= (((tinfl_bit_buf_t)pIn_buf_cur[0]) << num_bits) |           \
-//                  (((tinfl_bit_buf_t)pIn_buf_cur[1]) << (num_bits + 8));      \
-//       pIn_buf_cur += 2;                                                      \
-//       num_bits += 16;                                                        \
-//     }                                                                        \
-//   }                                                                          \
-//   if ((temp = (pHuff)->m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= \
-//       0)                                                                     \
-//     code_len = temp >> 9, temp &= 511;                                       \
-//   else {                                                                     \
-//     code_len = TINFL_FAST_LOOKUP_BITS;                                       \
-//     do {                                                                     \
-//       temp = (pHuff)->m_tree[~temp + ((bit_buf >> code_len++) & 1)];         \
-//     } while (temp < 0);                                                      \
-//   }                                                                          \
-//   sym = temp;                                                                \
-//   bit_buf >>= code_len;                                                      \
-//   num_bits -= code_len;                                                      \
-// }                                                                            \
-// MZ_MACRO_END
+    // // TINFL_HUFF_DECODE() decodes the next Huffman coded symbol. It's more complex
+    // // than you would initially expect because the zlib API expects the decompressor
+    // // to never read
+    // // beyond the final byte of the deflate stream. (In other words, when this macro
+    // // wants to read another byte from the input, it REALLY needs another byte in
+    // // order to fully
+    // // decode the next Huffman code.) Handling this properly is particularly
+    // // important on raw deflate (non-zlib) streams, which aren't followed by a byte
+    // // aligned adler-32.
+    // // The slow path is only executed at the very end of the input buffer.
+    // #define TINFL_HUFF_DECODE(state_index, sym, pHuff)                             \
+    // do {                                                                         \
+    //   int temp;                                                                  \
+    //   mz_uint code_len, c;                                                       \
+    //   if (num_bits < 15) {                                                       \
+    //     if ((pIn_buf_end - pIn_buf_cur) < 2) {                                   \
+    //       TINFL_HUFF_BITBUF_FILL(state_index, pHuff);                            \
+    //     } else {                                                                 \
+    //       bit_buf |= (((tinfl_bit_buf_t)pIn_buf_cur[0]) << num_bits) |           \
+    //                  (((tinfl_bit_buf_t)pIn_buf_cur[1]) << (num_bits + 8));      \
+    //       pIn_buf_cur += 2;                                                      \
+    //       num_bits += 16;                                                        \
+    //     }                                                                        \
+    //   }                                                                          \
+    //   if ((temp = (pHuff)->m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= \
+    //       0)                                                                     \
+    //     code_len = temp >> 9, temp &= 511;                                       \
+    //   else {                                                                     \
+    //     code_len = TINFL_FAST_LOOKUP_BITS;                                       \
+    //     do {                                                                     \
+    //       temp = (pHuff)->m_tree[~temp + ((bit_buf >> code_len++) & 1)];         \
+    //     } while (temp < 0);                                                      \
+    //   }                                                                          \
+    //   sym = temp;                                                                \
+    //   bit_buf >>= code_len;                                                      \
+    //   num_bits -= code_len;                                                      \
+    // }                                                                            \
+    // MZ_MACRO_END
 
-//     struct tinfl_decompressor {
-//         mz_uint32 m_state;
-//         mz_uint32 m_num_bits;
-//         mz_uint32 m_zhdr0;
-//         mz_uint32 m_zhdr1;
-//         mz_uint32 m_z_adler32;
-//         mz_uint32 m_final;
-//         mz_uint32 m_type;
-//         mz_uint32 m_check_adler32;
-//         mz_uint32 m_dist;
-//         mz_uint32 m_counter;
-//         mz_uint32 m_num_extra;
-//         mz_uint32 m_table_sizes[TINFL_MAX_HUFF_TABLES];
-//         tinfl_bit_buf_t m_bit_buf;
-//         size_t m_dist_from_out_buf_start;
-//         tinfl_huff_table m_tables[TINFL_MAX_HUFF_TABLES];
-//         mz_uint8 m_raw_header[4];
-//         mz_uint8 m_len_codes[TINFL_MAX_HUFF_SYMBOLS_0 + TINFL_MAX_HUFF_SYMBOLS_1 + 137];
-//       };
+    //     struct tinfl_decompressor {
+    //         mz_uint32 m_state;
+    //         mz_uint32 m_num_bits;
+    //         mz_uint32 m_zhdr0;
+    //         mz_uint32 m_zhdr1;
+    //         mz_uint32 m_z_adler32;
+    //         mz_uint32 m_final;
+    //         mz_uint32 m_type;
+    //         mz_uint32 m_check_adler32;
+    //         mz_uint32 m_dist;
+    //         mz_uint32 m_counter;
+    //         mz_uint32 m_num_extra;
+    //         mz_uint32 m_table_sizes[TINFL_MAX_HUFF_TABLES];
+    //         tinfl_bit_buf_t m_bit_buf;
+    //         size_t m_dist_from_out_buf_start;
+    //         tinfl_huff_table m_tables[TINFL_MAX_HUFF_TABLES];
+    //         mz_uint8 m_raw_header[4];
+    //         mz_uint8 m_len_codes[TINFL_MAX_HUFF_SYMBOLS_0 + TINFL_MAX_HUFF_SYMBOLS_1 + 137];
+    //       };
 
-//     tinfl_status tinfl_decompress(tinfl_decompressor *r,
-//                                 const mz_uint8 *pIn_buf_next,
-//                                 size_t *pIn_buf_size,
-//                                 mz_uint8 *pOut_buf_start,
-//                                 mz_uint8 *pOut_buf_next,
-//                                 size_t *pOut_buf_size,
-//                                 const mz_uint32 decomp_flags) {
+    //     tinfl_status tinfl_decompress(tinfl_decompressor *r,
+    //                                 const mz_uint8 *pIn_buf_next,
+    //                                 size_t *pIn_buf_size,
+    //                                 mz_uint8 *pOut_buf_start,
+    //                                 mz_uint8 *pOut_buf_next,
+    //                                 size_t *pOut_buf_size,
+    //                                 const mz_uint32 decomp_flags) {
 
-//         tinfl_status status = TINFL_STATUS_FAILED;
-//         mz_uint32 num_bits, dist, counter, num_extra;
-//         tinfl_bit_buf_t bit_buf;
+    //         tinfl_status status = TINFL_STATUS_FAILED;
+    //         mz_uint32 num_bits, dist, counter, num_extra;
+    //         tinfl_bit_buf_t bit_buf;
 
-//         const mz_uint8 *pIn_buf_cur = pIn_buf_next;
-//         const mz_uint8 *pIn_buf_end = pIn_buf_next + * pIn_buf_size;
-//         const mz_uint8 *pOut_buf_cur = pOut_buf_next;
-//         const mz_uint8 *pOut_buf_end = pOut_buf_next + * pOut_buf_size;
-        
-//         size_t out_buf_size_mask = (decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF) ? (size_t) - 1 : ((pOut_buf_next - pOut_buf_start) + * pOut_buf_size) - 1;
+    //         const mz_uint8 *pIn_buf_cur = pIn_buf_next;
+    //         const mz_uint8 *pIn_buf_end = pIn_buf_next + * pIn_buf_size;
+    //         const mz_uint8 *pOut_buf_cur = pOut_buf_next;
+    //         const mz_uint8 *pOut_buf_end = pOut_buf_next + * pOut_buf_size;
 
-//         size_t dist_from_out_buf_start;
+    //         size_t out_buf_size_mask = (decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF) ? (size_t) - 1 : ((pOut_buf_next - pOut_buf_start) + * pOut_buf_size) - 1;
 
-//         // Ensure the output buffer's size is a power of 2, unless the output buffer
-//         // is large enough to hold the entire output file (in which case it doesn't
-//         // matter).
-//         if (((out_buf_size_mask + 1) & out_buf_size_mask) || (pOut_buf_next < pOut_buf_start)) {
-//             *pIn_buf_size = 0;
-//             *pOut_buf_size = 0;
-//             return TINFL_STATUS_BAD_PARAM;
-//         }
+    //         size_t dist_from_out_buf_start;
 
-//         num_bits = r->m_num_bits;
-//         bit_buf = r->m_bit_buf;
-//         dist = r->m_dist;
-//         counter = r->m_counter;
-//         num_extra = r->m_num_extra;
-//         dist_from_out_buf_start = r->m_dist_from_out_buf_start;
-//         TINFL_CR_BEGIN
+    //         // Ensure the output buffer's size is a power of 2, unless the output buffer
+    //         // is large enough to hold the entire output file (in which case it doesn't
+    //         // matter).
+    //         if (((out_buf_size_mask + 1) & out_buf_size_mask) || (pOut_buf_next < pOut_buf_start)) {
+    //             *pIn_buf_size = 0;
+    //             *pOut_buf_size = 0;
+    //             return TINFL_STATUS_BAD_PARAM;
+    //         }
 
-//         bit_buf = 0;
-//         num_bits = 0;
-//         dist = 0;
-//         counter = 0;
-//         num_extra = 0;
-//         r->m_zhdr0 = 0;
-//         r->m_zhdr1 = 0;
-//         r->m_z_adler32 = 1;
-//         r->m_check_adler32 = 1;
+    //         num_bits = r->m_num_bits;
+    //         bit_buf = r->m_bit_buf;
+    //         dist = r->m_dist;
+    //         counter = r->m_counter;
+    //         num_extra = r->m_num_extra;
+    //         dist_from_out_buf_start = r->m_dist_from_out_buf_start;
+    //         TINFL_CR_BEGIN
 
-//         if (decomp_flags & TINFL_FLAG_PARSE_ZLIB_HEADER) {
-//             TINFL_GET_BYTE(1, r->m_zhdr0);
-//             TINFL_GET_BYTE(2, r->m_zhdr1);
-//             counter = (((r->m_zhdr0 * 256 + r->m_zhdr1) % 31 != 0) || (r->m_zhdr1 & 32) || ((r->m_zhdr0 & 15) != 8));
-//             if (!(decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) {
-//                 counter |= (((1U << (8U + (r->m_zhdr0 >> 4))) > 32768U) || ((out_buf_size_mask + 1) < (size_t)(1ULL << (8U + (r->m_zhdr0 >> 4)))));
-//             }
-//             if (counter) {
-//                 TINFL_CR_RETURN_FOREVER(36, TINFL_STATUS_FAILED);
-//             }
-//         }
+    //         bit_buf = 0;
+    //         num_bits = 0;
+    //         dist = 0;
+    //         counter = 0;
+    //         num_extra = 0;
+    //         r->m_zhdr0 = 0;
+    //         r->m_zhdr1 = 0;
+    //         r->m_z_adler32 = 1;
+    //         r->m_check_adler32 = 1;
 
-//     do {
-//         TINFL_GET_BITS(3, r->m_final, 3);
-//         r->m_type = r->m_final >> 1;
-//         if (r->m_type == 0) {
-//             TINFL_SKIP_BITS(5, num_bits & 7);
-//             for (counter = 0; counter < 4; ++counter) {
-//                 if (num_bits)
-//                     TINFL_GET_BITS(6, r->m_raw_header[counter], 8);
-//                 else
-//                     TINFL_GET_BYTE(7, r->m_raw_header[counter]);
-//             }
-//             if ((counter = (r->m_raw_header[0] | (r->m_raw_header[1] << 8))) !=
-//                 (mz_uint)(0xFFFF ^
-//                     (r->m_raw_header[2] | (r->m_raw_header[3] << 8)))) {
-//                 TINFL_CR_RETURN_FOREVER(39, TINFL_STATUS_FAILED);
-//             }
-//             while ((counter) && (num_bits)) {
-//                 TINFL_GET_BITS(51, dist, 8);
-//                 while (pOut_buf_cur >= pOut_buf_end) {
-//                     TINFL_CR_RETURN(52, TINFL_STATUS_HAS_MORE_OUTPUT);
-//                 }
-//                 *pOut_buf_cur++ = (mz_uint8)dist;
-//                 counter--;
-//             }
-//             while (counter) {
-//                 size_t n;
-//                 while (pOut_buf_cur >= pOut_buf_end) {
-//                     TINFL_CR_RETURN(9, TINFL_STATUS_HAS_MORE_OUTPUT);
-//                 }
-//                 while (pIn_buf_cur >= pIn_buf_end) {
-//                     if (decomp_flags & TINFL_FLAG_HAS_MORE_INPUT) {
-//                         TINFL_CR_RETURN(38, TINFL_STATUS_NEEDS_MORE_INPUT);
-//                     } else {
-//                         TINFL_CR_RETURN_FOREVER(40, TINFL_STATUS_FAILED);
-//                     }
-//                 }
-//                 n = MZ_MIN(MZ_MIN((size_t)(pOut_buf_end - pOut_buf_cur), (size_t)(pIn_buf_end - pIn_buf_cur)), counter);
-//                 TINFL_MEMCPY(pOut_buf_cur, pIn_buf_cur, n);
-//                 pIn_buf_cur += n;
-//                 pOut_buf_cur += n;
-//                 counter -= (mz_uint)n;
-//             }
-//         } else if (r->m_type == 3) {
-//             TINFL_CR_RETURN_FOREVER(10, TINFL_STATUS_FAILED);
-//         } else {
-//             if (r->m_type == 1) {
-//                 mz_uint8 * p = r->m_tables[0].m_code_size;
-//                 mz_uint i;
-//                 r->m_table_sizes[0] = 288;
-//                 r->m_table_sizes[1] = 32;
-//                 TINFL_MEMSET(r->m_tables[1].m_code_size, 5, 32);
-//                 for (i = 0; i <= 143; ++i) * p++ = 8;
-//                 for (; i <= 255; ++i) * p++ = 9;
-//                 for (; i <= 279; ++i) * p++ = 7;
-//                 for (; i <= 287; ++i) * p++ = 8;
-//             } else {
-//                 for (counter = 0; counter < 3; counter++) {
-//                     TINFL_GET_BITS(11, r->m_table_sizes[counter], "\05\05\04"[counter]);
-//                     r->m_table_sizes[counter] += s_min_table_sizes[counter];
-//                 }
-//                 MZ_CLEAR_OBJ(r->m_tables[2].m_code_size);
-//                 for (counter = 0; counter < r->m_table_sizes[2]; counter++) {
-//                     mz_uint s;
-//                     TINFL_GET_BITS(14, s, 3);
-//                     r->m_tables[2].m_code_size[s_length_dezigzag[counter]] = (mz_uint8)s;
-//                 }
-//                 r->m_table_sizes[2] = 19;
-//             }
-//             for (; (int)r->m_type >= 0; r->m_type--) {
-//                 int tree_next, tree_cur;
-//                 tinfl_huff_table * pTable;
-//                 mz_uint i, j, used_syms, total, sym_index, next_code[17], total_syms[16];
-//                 pTable = & r->m_tables[r->m_type];
-//                 MZ_CLEAR_OBJ(total_syms);
-//                 MZ_CLEAR_OBJ(pTable->m_look_up);
-//                 MZ_CLEAR_OBJ(pTable->m_tree);
-//                 for (i = 0; i < r->m_table_sizes[r->m_type]; ++i)
-//                     total_syms[pTable->m_code_size[i]]++;
-//                 used_syms = 0, total = 0;
-//                 next_code[0] = next_code[1] = 0;
-//                 for (i = 1; i <= 15; ++i) {
-//                     used_syms += total_syms[i];
-//                     next_code[i + 1] = (total = ((total + total_syms[i]) << 1));
-//                 }
-//                 if ((65536 != total) && (used_syms > 1)) {
-//                     TINFL_CR_RETURN_FOREVER(35, TINFL_STATUS_FAILED);
-//                 }
-//                 for (tree_next = -1, sym_index = 0; sym_index < r->m_table_sizes[r->m_type]; ++sym_index) {
-//                     mz_uint rev_code = 0, l, cur_code, code_size = pTable->m_code_size[sym_index];
-//                     if (!code_size)
-//                         continue;
-//                     cur_code = next_code[code_size]++;
-//                     for (l = code_size; l > 0; l--, cur_code >>= 1)
-//                         rev_code = (rev_code << 1) | (cur_code & 1);
-//                     if (code_size <= TINFL_FAST_LOOKUP_BITS) {
-//                         mz_int16 k = (mz_int16)((code_size << 9) | sym_index);
-//                         while (rev_code < TINFL_FAST_LOOKUP_SIZE) {
-//                             pTable->m_look_up[rev_code] = k;
-//                             rev_code += (1 << code_size);
-//                         }
-//                         continue;
-//                     }
-//                     if (0 == (tree_cur = pTable->m_look_up[rev_code & (TINFL_FAST_LOOKUP_SIZE - 1)])) {
-//                         pTable->m_look_up[rev_code & (TINFL_FAST_LOOKUP_SIZE - 1)] = (mz_int16)tree_next;
-//                         tree_cur = tree_next;
-//                         tree_next -= 2;
-//                     }
-//                     rev_code >>= (TINFL_FAST_LOOKUP_BITS - 1);
-//                     for (j = code_size; j > (TINFL_FAST_LOOKUP_BITS + 1); j--) {
-//                         tree_cur -= ((rev_code >>= 1) & 1);
-//                         if (!pTable->m_tree[-tree_cur - 1]) {
-//                             pTable->m_tree[-tree_cur - 1] = (mz_int16)tree_next;
-//                             tree_cur = tree_next;
-//                             tree_next -= 2;
-//                         } else
-//                             tree_cur = pTable->m_tree[-tree_cur - 1];
-//                     }
-//                     tree_cur -= ((rev_code >>= 1) & 1);
-//                     pTable->m_tree[-tree_cur - 1] = (mz_int16)sym_index;
-//                 }
-//                 if (r->m_type == 2) {
-//                     for (counter = 0; counter < (r->m_table_sizes[0] + r->m_table_sizes[1]);) {
-//                         mz_uint s;
-//                         TINFL_HUFF_DECODE(16, dist, &r->m_tables[2]);
-//                         if (dist < 16) {
-//                             r->m_len_codes[counter++] = (mz_uint8)dist;
-//                             continue;
-//                         }
-//                         if ((dist == 16) && (!counter)) {
-//                             TINFL_CR_RETURN_FOREVER(17, TINFL_STATUS_FAILED);
-//                         }
-//                         num_extra = "\02\03\07"[dist - 16];
-//                         TINFL_GET_BITS(18, s, num_extra);
-//                         s += "\03\03\013"[dist - 16];
-//                         TINFL_MEMSET(r->m_len_codes + counter, (dist == 16) ? r->m_len_codes[counter - 1] : 0, s);
-//                         counter += s;
-//                     }
-//                     if ((r->m_table_sizes[0] + r->m_table_sizes[1]) != counter) {
-//                         TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
-//                     }
-//                     TINFL_MEMCPY(r->m_tables[0].m_code_size, r->m_len_codes, r->m_table_sizes[0]);
-//                     TINFL_MEMCPY(r->m_tables[1].m_code_size, r->m_len_codes + r->m_table_sizes[0], r->m_table_sizes[1]);
-//                 }
-//             }
-//             for (;;) {
-//                 mz_uint8 *pSrc;
-//                 for (;;) {
-//                     if (((pIn_buf_end - pIn_buf_cur) < 4) || ((pOut_buf_end - pOut_buf_cur) < 2)) {
-//                         TINFL_HUFF_DECODE(23, counter, & r->m_tables[0]);
-//                         if (counter >= 256)
-//                             break;
-//                         while (pOut_buf_cur >= pOut_buf_end) {
-//                             TINFL_CR_RETURN(24, TINFL_STATUS_HAS_MORE_OUTPUT);
-//                         }
-//                         *pOut_buf_cur++ = (mz_uint8)counter;
-//                     } else {
-//                         int sym2;
-//                         mz_uint code_len;
-// #if TINFL_USE_64BIT_BITBUF
-//                         if (num_bits < 30) {
-//                             bit_buf |= (((tinfl_bit_buf_t)MZ_READ_LE32(pIn_buf_cur)) << num_bits);
-//                             pIn_buf_cur += 4;
-//                             num_bits += 32;
-//                         }
-// #else
-//                         if (num_bits < 15) {
-//                             bit_buf |= (((tinfl_bit_buf_t)MZ_READ_LE16(pIn_buf_cur)) << num_bits);
-//                             pIn_buf_cur += 2;
-//                             num_bits += 16;
-//                         }
-// #endif
-//                         if ((sym2 = r->m_tables[0].m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= 0)
-//                             code_len = sym2 >> 9;
-//                         else {
-//                             code_len = TINFL_FAST_LOOKUP_BITS;
-//                             do {
-//                                 sym2 = r->m_tables[0].m_tree[~sym2 + ((bit_buf >> code_len++) & 1)];
-//                             } while (sym2 < 0);
-//                         }
-//                         counter = sym2;
-//                         bit_buf >>= code_len;
-//                         num_bits -= code_len;
-//                         if (counter & 256)
-//                             break;
+    //         if (decomp_flags & TINFL_FLAG_PARSE_ZLIB_HEADER) {
+    //             TINFL_GET_BYTE(1, r->m_zhdr0);
+    //             TINFL_GET_BYTE(2, r->m_zhdr1);
+    //             counter = (((r->m_zhdr0 * 256 + r->m_zhdr1) % 31 != 0) || (r->m_zhdr1 & 32) || ((r->m_zhdr0 & 15) != 8));
+    //             if (!(decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) {
+    //                 counter |= (((1U << (8U + (r->m_zhdr0 >> 4))) > 32768U) || ((out_buf_size_mask + 1) < (size_t)(1ULL << (8U + (r->m_zhdr0 >> 4)))));
+    //             }
+    //             if (counter) {
+    //                 TINFL_CR_RETURN_FOREVER(36, TINFL_STATUS_FAILED);
+    //             }
+    //         }
 
-// #if!TINFL_USE_64BIT_BITBUF
-//                         if (num_bits < 15) {
-//                             bit_buf |= (((tinfl_bit_buf_t)MZ_READ_LE16(pIn_buf_cur)) << num_bits);
-//                             pIn_buf_cur += 2;
-//                             num_bits += 16;
-//                         }
-// #endif
-//                         if ((sym2 = r->m_tables[0].m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= 0)
-//                             code_len = sym2 >> 9;
-//                         else {
-//                             code_len = TINFL_FAST_LOOKUP_BITS;
-//                             do {
-//                                 sym2 = r->m_tables[0].m_tree[~sym2 + ((bit_buf >> code_len++) & 1)];
-//                             } while (sym2 < 0);
-//                         }
-//                         bit_buf >>= code_len;
-//                         num_bits -= code_len;
+    //     do {
+    //         TINFL_GET_BITS(3, r->m_final, 3);
+    //         r->m_type = r->m_final >> 1;
+    //         if (r->m_type == 0) {
+    //             TINFL_SKIP_BITS(5, num_bits & 7);
+    //             for (counter = 0; counter < 4; ++counter) {
+    //                 if (num_bits)
+    //                     TINFL_GET_BITS(6, r->m_raw_header[counter], 8);
+    //                 else
+    //                     TINFL_GET_BYTE(7, r->m_raw_header[counter]);
+    //             }
+    //             if ((counter = (r->m_raw_header[0] | (r->m_raw_header[1] << 8))) !=
+    //                 (mz_uint)(0xFFFF ^
+    //                     (r->m_raw_header[2] | (r->m_raw_header[3] << 8)))) {
+    //                 TINFL_CR_RETURN_FOREVER(39, TINFL_STATUS_FAILED);
+    //             }
+    //             while ((counter) && (num_bits)) {
+    //                 TINFL_GET_BITS(51, dist, 8);
+    //                 while (pOut_buf_cur >= pOut_buf_end) {
+    //                     TINFL_CR_RETURN(52, TINFL_STATUS_HAS_MORE_OUTPUT);
+    //                 }
+    //                 *pOut_buf_cur++ = (mz_uint8)dist;
+    //                 counter--;
+    //             }
+    //             while (counter) {
+    //                 size_t n;
+    //                 while (pOut_buf_cur >= pOut_buf_end) {
+    //                     TINFL_CR_RETURN(9, TINFL_STATUS_HAS_MORE_OUTPUT);
+    //                 }
+    //                 while (pIn_buf_cur >= pIn_buf_end) {
+    //                     if (decomp_flags & TINFL_FLAG_HAS_MORE_INPUT) {
+    //                         TINFL_CR_RETURN(38, TINFL_STATUS_NEEDS_MORE_INPUT);
+    //                     } else {
+    //                         TINFL_CR_RETURN_FOREVER(40, TINFL_STATUS_FAILED);
+    //                     }
+    //                 }
+    //                 n = MZ_MIN(MZ_MIN((size_t)(pOut_buf_end - pOut_buf_cur), (size_t)(pIn_buf_end - pIn_buf_cur)), counter);
+    //                 TINFL_MEMCPY(pOut_buf_cur, pIn_buf_cur, n);
+    //                 pIn_buf_cur += n;
+    //                 pOut_buf_cur += n;
+    //                 counter -= (mz_uint)n;
+    //             }
+    //         } else if (r->m_type == 3) {
+    //             TINFL_CR_RETURN_FOREVER(10, TINFL_STATUS_FAILED);
+    //         } else {
+    //             if (r->m_type == 1) {
+    //                 mz_uint8 * p = r->m_tables[0].m_code_size;
+    //                 mz_uint i;
+    //                 r->m_table_sizes[0] = 288;
+    //                 r->m_table_sizes[1] = 32;
+    //                 TINFL_MEMSET(r->m_tables[1].m_code_size, 5, 32);
+    //                 for (i = 0; i <= 143; ++i) * p++ = 8;
+    //                 for (; i <= 255; ++i) * p++ = 9;
+    //                 for (; i <= 279; ++i) * p++ = 7;
+    //                 for (; i <= 287; ++i) * p++ = 8;
+    //             } else {
+    //                 for (counter = 0; counter < 3; counter++) {
+    //                     TINFL_GET_BITS(11, r->m_table_sizes[counter], "\05\05\04"[counter]);
+    //                     r->m_table_sizes[counter] += s_min_table_sizes[counter];
+    //                 }
+    //                 MZ_CLEAR_OBJ(r->m_tables[2].m_code_size);
+    //                 for (counter = 0; counter < r->m_table_sizes[2]; counter++) {
+    //                     mz_uint s;
+    //                     TINFL_GET_BITS(14, s, 3);
+    //                     r->m_tables[2].m_code_size[s_length_dezigzag[counter]] = (mz_uint8)s;
+    //                 }
+    //                 r->m_table_sizes[2] = 19;
+    //             }
+    //             for (; (int)r->m_type >= 0; r->m_type--) {
+    //                 int tree_next, tree_cur;
+    //                 tinfl_huff_table * pTable;
+    //                 mz_uint i, j, used_syms, total, sym_index, next_code[17], total_syms[16];
+    //                 pTable = & r->m_tables[r->m_type];
+    //                 MZ_CLEAR_OBJ(total_syms);
+    //                 MZ_CLEAR_OBJ(pTable->m_look_up);
+    //                 MZ_CLEAR_OBJ(pTable->m_tree);
+    //                 for (i = 0; i < r->m_table_sizes[r->m_type]; ++i)
+    //                     total_syms[pTable->m_code_size[i]]++;
+    //                 used_syms = 0, total = 0;
+    //                 next_code[0] = next_code[1] = 0;
+    //                 for (i = 1; i <= 15; ++i) {
+    //                     used_syms += total_syms[i];
+    //                     next_code[i + 1] = (total = ((total + total_syms[i]) << 1));
+    //                 }
+    //                 if ((65536 != total) && (used_syms > 1)) {
+    //                     TINFL_CR_RETURN_FOREVER(35, TINFL_STATUS_FAILED);
+    //                 }
+    //                 for (tree_next = -1, sym_index = 0; sym_index < r->m_table_sizes[r->m_type]; ++sym_index) {
+    //                     mz_uint rev_code = 0, l, cur_code, code_size = pTable->m_code_size[sym_index];
+    //                     if (!code_size)
+    //                         continue;
+    //                     cur_code = next_code[code_size]++;
+    //                     for (l = code_size; l > 0; l--, cur_code >>= 1)
+    //                         rev_code = (rev_code << 1) | (cur_code & 1);
+    //                     if (code_size <= TINFL_FAST_LOOKUP_BITS) {
+    //                         mz_int16 k = (mz_int16)((code_size << 9) | sym_index);
+    //                         while (rev_code < TINFL_FAST_LOOKUP_SIZE) {
+    //                             pTable->m_look_up[rev_code] = k;
+    //                             rev_code += (1 << code_size);
+    //                         }
+    //                         continue;
+    //                     }
+    //                     if (0 == (tree_cur = pTable->m_look_up[rev_code & (TINFL_FAST_LOOKUP_SIZE - 1)])) {
+    //                         pTable->m_look_up[rev_code & (TINFL_FAST_LOOKUP_SIZE - 1)] = (mz_int16)tree_next;
+    //                         tree_cur = tree_next;
+    //                         tree_next -= 2;
+    //                     }
+    //                     rev_code >>= (TINFL_FAST_LOOKUP_BITS - 1);
+    //                     for (j = code_size; j > (TINFL_FAST_LOOKUP_BITS + 1); j--) {
+    //                         tree_cur -= ((rev_code >>= 1) & 1);
+    //                         if (!pTable->m_tree[-tree_cur - 1]) {
+    //                             pTable->m_tree[-tree_cur - 1] = (mz_int16)tree_next;
+    //                             tree_cur = tree_next;
+    //                             tree_next -= 2;
+    //                         } else
+    //                             tree_cur = pTable->m_tree[-tree_cur - 1];
+    //                     }
+    //                     tree_cur -= ((rev_code >>= 1) & 1);
+    //                     pTable->m_tree[-tree_cur - 1] = (mz_int16)sym_index;
+    //                 }
+    //                 if (r->m_type == 2) {
+    //                     for (counter = 0; counter < (r->m_table_sizes[0] + r->m_table_sizes[1]);) {
+    //                         mz_uint s;
+    //                         TINFL_HUFF_DECODE(16, dist, &r->m_tables[2]);
+    //                         if (dist < 16) {
+    //                             r->m_len_codes[counter++] = (mz_uint8)dist;
+    //                             continue;
+    //                         }
+    //                         if ((dist == 16) && (!counter)) {
+    //                             TINFL_CR_RETURN_FOREVER(17, TINFL_STATUS_FAILED);
+    //                         }
+    //                         num_extra = "\02\03\07"[dist - 16];
+    //                         TINFL_GET_BITS(18, s, num_extra);
+    //                         s += "\03\03\013"[dist - 16];
+    //                         TINFL_MEMSET(r->m_len_codes + counter, (dist == 16) ? r->m_len_codes[counter - 1] : 0, s);
+    //                         counter += s;
+    //                     }
+    //                     if ((r->m_table_sizes[0] + r->m_table_sizes[1]) != counter) {
+    //                         TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
+    //                     }
+    //                     TINFL_MEMCPY(r->m_tables[0].m_code_size, r->m_len_codes, r->m_table_sizes[0]);
+    //                     TINFL_MEMCPY(r->m_tables[1].m_code_size, r->m_len_codes + r->m_table_sizes[0], r->m_table_sizes[1]);
+    //                 }
+    //             }
+    //             for (;;) {
+    //                 mz_uint8 *pSrc;
+    //                 for (;;) {
+    //                     if (((pIn_buf_end - pIn_buf_cur) < 4) || ((pOut_buf_end - pOut_buf_cur) < 2)) {
+    //                         TINFL_HUFF_DECODE(23, counter, & r->m_tables[0]);
+    //                         if (counter >= 256)
+    //                             break;
+    //                         while (pOut_buf_cur >= pOut_buf_end) {
+    //                             TINFL_CR_RETURN(24, TINFL_STATUS_HAS_MORE_OUTPUT);
+    //                         }
+    //                         *pOut_buf_cur++ = (mz_uint8)counter;
+    //                     } else {
+    //                         int sym2;
+    //                         mz_uint code_len;
+    // #if TINFL_USE_64BIT_BITBUF
+    //                         if (num_bits < 30) {
+    //                             bit_buf |= (((tinfl_bit_buf_t)MZ_READ_LE32(pIn_buf_cur)) << num_bits);
+    //                             pIn_buf_cur += 4;
+    //                             num_bits += 32;
+    //                         }
+    // #else
+    //                         if (num_bits < 15) {
+    //                             bit_buf |= (((tinfl_bit_buf_t)MZ_READ_LE16(pIn_buf_cur)) << num_bits);
+    //                             pIn_buf_cur += 2;
+    //                             num_bits += 16;
+    //                         }
+    // #endif
+    //                         if ((sym2 = r->m_tables[0].m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= 0)
+    //                             code_len = sym2 >> 9;
+    //                         else {
+    //                             code_len = TINFL_FAST_LOOKUP_BITS;
+    //                             do {
+    //                                 sym2 = r->m_tables[0].m_tree[~sym2 + ((bit_buf >> code_len++) & 1)];
+    //                             } while (sym2 < 0);
+    //                         }
+    //                         counter = sym2;
+    //                         bit_buf >>= code_len;
+    //                         num_bits -= code_len;
+    //                         if (counter & 256)
+    //                             break;
 
-//                         pOut_buf_cur[0] = (mz_uint8)counter;
-//                         if (sym2 & 256) {
-//                             pOut_buf_cur++;
-//                             counter = sym2;
-//                             break;
-//                         }
-//                         pOut_buf_cur[1] = (mz_uint8)sym2;
-//                         pOut_buf_cur += 2;
-//                     }
-//                 }
-//                 if ((counter &= 511) == 256)
-//                     break;
+    // #if!TINFL_USE_64BIT_BITBUF
+    //                         if (num_bits < 15) {
+    //                             bit_buf |= (((tinfl_bit_buf_t)MZ_READ_LE16(pIn_buf_cur)) << num_bits);
+    //                             pIn_buf_cur += 2;
+    //                             num_bits += 16;
+    //                         }
+    // #endif
+    //                         if ((sym2 = r->m_tables[0].m_look_up[bit_buf & (TINFL_FAST_LOOKUP_SIZE - 1)]) >= 0)
+    //                             code_len = sym2 >> 9;
+    //                         else {
+    //                             code_len = TINFL_FAST_LOOKUP_BITS;
+    //                             do {
+    //                                 sym2 = r->m_tables[0].m_tree[~sym2 + ((bit_buf >> code_len++) & 1)];
+    //                             } while (sym2 < 0);
+    //                         }
+    //                         bit_buf >>= code_len;
+    //                         num_bits -= code_len;
 
-//                 num_extra = s_length_extra[counter - 257];
-//                 counter = s_length_base[counter - 257];
-//                 if (num_extra) {
-//                     mz_uint extra_bits;
-//                     TINFL_GET_BITS(25, extra_bits, num_extra);
-//                     counter += extra_bits;
-//                 }
+    //                         pOut_buf_cur[0] = (mz_uint8)counter;
+    //                         if (sym2 & 256) {
+    //                             pOut_buf_cur++;
+    //                             counter = sym2;
+    //                             break;
+    //                         }
+    //                         pOut_buf_cur[1] = (mz_uint8)sym2;
+    //                         pOut_buf_cur += 2;
+    //                     }
+    //                 }
+    //                 if ((counter &= 511) == 256)
+    //                     break;
 
-//                 TINFL_HUFF_DECODE(26, dist, & r->m_tables[1]);
-//                 num_extra = s_dist_extra[dist];
-//                 dist = s_dist_base[dist];
-//                 if (num_extra) {
-//                     mz_uint extra_bits;
-//                     TINFL_GET_BITS(27, extra_bits, num_extra);
-//                     dist += extra_bits;
-//                 }
+    //                 num_extra = s_length_extra[counter - 257];
+    //                 counter = s_length_base[counter - 257];
+    //                 if (num_extra) {
+    //                     mz_uint extra_bits;
+    //                     TINFL_GET_BITS(25, extra_bits, num_extra);
+    //                     counter += extra_bits;
+    //                 }
 
-//                 dist_from_out_buf_start = pOut_buf_cur - pOut_buf_start;
-//                 if ((dist > dist_from_out_buf_start) && (decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) {
-//                     TINFL_CR_RETURN_FOREVER(37, TINFL_STATUS_FAILED);
-//                 }
+    //                 TINFL_HUFF_DECODE(26, dist, & r->m_tables[1]);
+    //                 num_extra = s_dist_extra[dist];
+    //                 dist = s_dist_base[dist];
+    //                 if (num_extra) {
+    //                     mz_uint extra_bits;
+    //                     TINFL_GET_BITS(27, extra_bits, num_extra);
+    //                     dist += extra_bits;
+    //                 }
 
-//                 pSrc = pOut_buf_start + ((dist_from_out_buf_start - dist) & out_buf_size_mask);
+    //                 dist_from_out_buf_start = pOut_buf_cur - pOut_buf_start;
+    //                 if ((dist > dist_from_out_buf_start) && (decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) {
+    //                     TINFL_CR_RETURN_FOREVER(37, TINFL_STATUS_FAILED);
+    //                 }
 
-//                 if ((MZ_MAX(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
-//                     while (counter--) {
-//                         while (pOut_buf_cur >= pOut_buf_end) {
-//                             TINFL_CR_RETURN(53, TINFL_STATUS_HAS_MORE_OUTPUT);
-//                         }
-//                         *pOut_buf_cur++ = pOut_buf_start[(dist_from_out_buf_start++ - dist) & out_buf_size_mask];
-//                     }
-//                     continue;
-//                 }
-// #if MINIZ_USE_UNALIGNED_LOADS_AND_STORES
-//                 else if ((counter >= 9) && (counter <= dist)) {
-//                     const mz_uint8 * pSrc_end = pSrc + (counter & ~7);
-//                     do {
-//                         ((mz_uint32 *)pOut_buf_cur)[0] = ((const mz_uint32 *)pSrc)[0];
-//                         ((mz_uint32 *)pOut_buf_cur)[1] = ((const mz_uint32 *)pSrc)[1];
-//                         pOut_buf_cur += 8;
-//                     } while ((pSrc += 8) < pSrc_end);
-//                     if ((counter &= 7) < 3) {
-//                         if (counter) {
-//                             pOut_buf_cur[0] = pSrc[0];
-//                             if (counter > 1)
-//                                 pOut_buf_cur[1] = pSrc[1];
-//                             pOut_buf_cur += counter;
-//                         }
-//                         continue;
-//                     }
-//                 }
-// #endif
-//                 do {
-//                     pOut_buf_cur[0] = pSrc[0];
-//                     pOut_buf_cur[1] = pSrc[1];
-//                     pOut_buf_cur[2] = pSrc[2];
-//                     pOut_buf_cur += 3;
-//                     pSrc += 3;
-//                 } while ((int)(counter -= 3) > 2);
+    //                 pSrc = pOut_buf_start + ((dist_from_out_buf_start - dist) & out_buf_size_mask);
 
-//                 if ((int)counter > 0) {
-//                     pOut_buf_cur[0] = pSrc[0];
-//                     if ((int)counter > 1) pOut_buf_cur[1] = pSrc[1];
-//                     pOut_buf_cur += counter;
-//                 }
-//             }
-//         }
-//     } while (!(r->m_final & 1));
+    //                 if ((MZ_MAX(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
+    //                     while (counter--) {
+    //                         while (pOut_buf_cur >= pOut_buf_end) {
+    //                             TINFL_CR_RETURN(53, TINFL_STATUS_HAS_MORE_OUTPUT);
+    //                         }
+    //                         *pOut_buf_cur++ = pOut_buf_start[(dist_from_out_buf_start++ - dist) & out_buf_size_mask];
+    //                     }
+    //                     continue;
+    //                 }
+    // #if MINIZ_USE_UNALIGNED_LOADS_AND_STORES
+    //                 else if ((counter >= 9) && (counter <= dist)) {
+    //                     const mz_uint8 * pSrc_end = pSrc + (counter & ~7);
+    //                     do {
+    //                         ((mz_uint32 *)pOut_buf_cur)[0] = ((const mz_uint32 *)pSrc)[0];
+    //                         ((mz_uint32 *)pOut_buf_cur)[1] = ((const mz_uint32 *)pSrc)[1];
+    //                         pOut_buf_cur += 8;
+    //                     } while ((pSrc += 8) < pSrc_end);
+    //                     if ((counter &= 7) < 3) {
+    //                         if (counter) {
+    //                             pOut_buf_cur[0] = pSrc[0];
+    //                             if (counter > 1)
+    //                                 pOut_buf_cur[1] = pSrc[1];
+    //                             pOut_buf_cur += counter;
+    //                         }
+    //                         continue;
+    //                     }
+    //                 }
+    // #endif
+    //                 do {
+    //                     pOut_buf_cur[0] = pSrc[0];
+    //                     pOut_buf_cur[1] = pSrc[1];
+    //                     pOut_buf_cur[2] = pSrc[2];
+    //                     pOut_buf_cur += 3;
+    //                     pSrc += 3;
+    //                 } while ((int)(counter -= 3) > 2);
 
-//     if (decomp_flags & TINFL_FLAG_PARSE_ZLIB_HEADER) {
-//     TINFL_SKIP_BITS(32, num_bits & 7);
-//     for (counter = 0; counter < 4; ++counter) {
-//         mz_uint s;
-//         if (num_bits)
-//             TINFL_GET_BITS(41, s, 8);
-//         else
-//             TINFL_GET_BYTE(42, s);
-//         r->m_z_adler32 = (r->m_z_adler32 << 8) | s;
-//     }
-// }
-// TINFL_CR_RETURN_FOREVER(34, TINFL_STATUS_DONE);
-// TINFL_CR_FINISH
+    //                 if ((int)counter > 0) {
+    //                     pOut_buf_cur[0] = pSrc[0];
+    //                     if ((int)counter > 1) pOut_buf_cur[1] = pSrc[1];
+    //                     pOut_buf_cur += counter;
+    //                 }
+    //             }
+    //         }
+    //     } while (!(r->m_final & 1));
 
-// common_exit:
-// r->m_num_bits = num_bits;
-// r->m_bit_buf = bit_buf;
-// r->m_dist = dist;
-// r->m_counter = counter;
-// r->m_num_extra = num_extra;
-// r->m_dist_from_out_buf_start = dist_from_out_buf_start;
-// * pIn_buf_size = pIn_buf_cur - pIn_buf_next;
-// * pOut_buf_size = pOut_buf_cur - pOut_buf_next;
-// if ((decomp_flags & (TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_COMPUTE_ADLER32)) && (status >= 0)) {
-//     const mz_uint8 *ptr = pOut_buf_next;
-//     size_t buf_len = * pOut_buf_size;
-//     mz_uint32 i;
-//     mz_uint32 s1 = r->m_check_adler32 & 0xffff;
-//     mz_uint32s2 = r->m_check_adler32 >> 16;
-//     size_t block_len = buf_len % 5552;
-//     while (buf_len) {
-//         for (i = 0; i + 7 < block_len; i += 8, ptr += 8) {
-//             s1 += ptr[0], s2 += s1;
-//             s1 += ptr[1], s2 += s1;
-//             s1 += ptr[2], s2 += s1;
-//             s1 += ptr[3], s2 += s1;
-//             s1 += ptr[4], s2 += s1;
-//             s1 += ptr[5], s2 += s1;
-//             s1 += ptr[6], s2 += s1;
-//             s1 += ptr[7], s2 += s1;
-//         }
-//         for (; i < block_len; ++i) s1 += * ptr++, s2 += s1;
-//         s1 %= 65521U, s2 %= 65521U;
-//         buf_len -= block_len;
-//         block_len = 5552;
-//     }
-//     r->m_check_adler32 = (s2 << 16) + s1;
-//     if ((status == TINFL_STATUS_DONE) && (decomp_flags & TINFL_FLAG_PARSE_ZLIB_HEADER) && (r->m_check_adler32 != r->m_z_adler32))
-//         status = TINFL_STATUS_ADLER32_MISMATCH;
-// }
-// return status;
-// }
+    //     if (decomp_flags & TINFL_FLAG_PARSE_ZLIB_HEADER) {
+    //     TINFL_SKIP_BITS(32, num_bits & 7);
+    //     for (counter = 0; counter < 4; ++counter) {
+    //         mz_uint s;
+    //         if (num_bits)
+    //             TINFL_GET_BITS(41, s, 8);
+    //         else
+    //             TINFL_GET_BYTE(42, s);
+    //         r->m_z_adler32 = (r->m_z_adler32 << 8) | s;
+    //     }
+    // }
+    // TINFL_CR_RETURN_FOREVER(34, TINFL_STATUS_DONE);
+    // TINFL_CR_FINISH
+
+    // common_exit:
+    // r->m_num_bits = num_bits;
+    // r->m_bit_buf = bit_buf;
+    // r->m_dist = dist;
+    // r->m_counter = counter;
+    // r->m_num_extra = num_extra;
+    // r->m_dist_from_out_buf_start = dist_from_out_buf_start;
+    // * pIn_buf_size = pIn_buf_cur - pIn_buf_next;
+    // * pOut_buf_size = pOut_buf_cur - pOut_buf_next;
+    // if ((decomp_flags & (TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_COMPUTE_ADLER32)) && (status >= 0)) {
+    //     const mz_uint8 *ptr = pOut_buf_next;
+    //     size_t buf_len = * pOut_buf_size;
+    //     mz_uint32 i;
+    //     mz_uint32 s1 = r->m_check_adler32 & 0xffff;
+    //     mz_uint32s2 = r->m_check_adler32 >> 16;
+    //     size_t block_len = buf_len % 5552;
+    //     while (buf_len) {
+    //         for (i = 0; i + 7 < block_len; i += 8, ptr += 8) {
+    //             s1 += ptr[0], s2 += s1;
+    //             s1 += ptr[1], s2 += s1;
+    //             s1 += ptr[2], s2 += s1;
+    //             s1 += ptr[3], s2 += s1;
+    //             s1 += ptr[4], s2 += s1;
+    //             s1 += ptr[5], s2 += s1;
+    //             s1 += ptr[6], s2 += s1;
+    //             s1 += ptr[7], s2 += s1;
+    //         }
+    //         for (; i < block_len; ++i) s1 += * ptr++, s2 += s1;
+    //         s1 %= 65521U, s2 %= 65521U;
+    //         buf_len -= block_len;
+    //         block_len = 5552;
+    //     }
+    //     r->m_check_adler32 = (s2 << 16) + s1;
+    //     if ((status == TINFL_STATUS_DONE) && (decomp_flags & TINFL_FLAG_PARSE_ZLIB_HEADER) && (r->m_check_adler32 != r->m_z_adler32))
+    //         status = TINFL_STATUS_ADLER32_MISMATCH;
+    // }
+    // return status;
+    // }
 
     class NvisDeflate {
-        
+
         constructor(bufferView, offset, length) {
             this.bufferView = bufferView;
             this.offset = offset;
@@ -1369,18 +1367,14 @@ var nvis = new function () {
             this.view = new DataView(this.buffer, params.offset);
         }
 
-        static bits(value, msb, lsb) {
-            return (value & ((1 << (msb + 1)) - 1)) >> lsb;
-        }
-
         consume(buffer, length) {
             for (let i = 0; i < length; i++) {
                 this.writeUint8(buffer.readUint8());
             }
         }
 
-        copy(buffer, offset) {
-            for (let i = 0; i < buffer.buffer.byteLength; i++) {
+        copy(buffer, offset = 0, length = buffer.buffer.byteLength) {
+            for (let i = 0; i < length; i++) {
                 this.setUint8(offset + i, buffer.getUint8(i));
             }
         }
@@ -1452,51 +1446,21 @@ var nvis = new function () {
             this.bitPointer %= 8;
         }
 
-        //  functions below only work on byte boundary
+        // helpers
 
-        peekUint8(bytePointer = this.bytePointer) {
-            let value = this.view.getUint8(bytePointer, this.littleEndian);
-            return value;
+        static bits(value, msb, lsb) {
+            return (value & ((1 << (msb + 1)) - 1)) >> lsb;
         }
 
-        readUint8() {
-            let value = this.view.getUint8(this.bytePointer, this.littleEndian);
-            this.bytePointer++;
-            return value;
-        }
-
-        writeUint8(value) {
-            this.view.setUint8(this.bytePointer, value);
-            this.bytePointer++;
-        }
-
-        readUint32() {
-            let value = this.view.getUint32(this.bytePointer, this.littleEndian);
-            this.bytePointer += 4;
-            return value;
-        }
-
-        readUint64() {
-            let value = this.view.getBigUint64(this.bytePointer, this.littleEndian);
-            this.bytePointer += 8;
-            return value;
-        }
-
-        readInt32() {
-            let value = this.view.getInt32(this.bytePointer, this.littleEndian);
-            this.bytePointer += 4;
-            return value;
-        }
-
-        halfBytes2Float32(bytes) {
+        static halfBytes2Float32(bytes) {
             var sign = ((bytes & 0x8000) ? -1 : 1);
             var exponent = ((bytes >> 10) & 0x1F) - 15;
             var significand = bytes & ((1 << 10) - 1);
-        
+
             if (exponent == 16) {
                 return sign * ((significand) ? Number.NaN : Number.POSITIVE_INFINITY);
             }
-        
+
             if (exponent == -16) {
                 if (significand == 0) {
                     return sign * 0.0;
@@ -1506,19 +1470,19 @@ var nvis = new function () {
             } else {
                 significand = (significand | (1 << 10)) / (1 << 10);
             }
-        
+
             return sign * significand * Math.pow(2, exponent);
         }
 
-        floatBytes2Float32(bytes) {
+        static floatBytes2Float32(bytes) {
             var sign = (bytes & 0x80000000) ? -1 : 1;
             var exponent = ((bytes >> 23) & 0xFF) - 127;
             var significand = (bytes & ~(-1 << 23));
-        
+
             if (exponent == 128) {
                 return sign * ((significand) ? Number.NaN : Number.POSITIVE_INFINITY);
             }
-        
+
             if (exponent == -127) {
                 if (significand == 0) {
                     return sign * 0.0;
@@ -1528,8 +1492,24 @@ var nvis = new function () {
             } else {
                 significand = (significand | (1 << 23)) / (1 << 23);
             }
-        
+
             return sign * significand * Math.pow(2, exponent);
+        }
+
+        //  functions below only work on byte boundary
+        //  read/write functions respects current byte pointers
+        //  get/set functions need byte buffer offsets
+
+        peekUint8(bytePointer = this.bytePointer) {
+            return this.view.getUint8(bytePointer);
+        }
+
+        readUint8() {
+            return this.view.getUint8(this.bytePointer++);
+        }
+
+        writeUint8(value) {
+            this.view.setUint8(this.bytePointer++, value);
         }
 
         getUint8(byteIndex) {
@@ -1540,20 +1520,53 @@ var nvis = new function () {
             this.view.setUint8(byteIndex, value);
         }
 
-        getFloat16(byteIndex) {
-            let value = this.view.getUint16(byteIndex, true);
-            return this.halfBytes2Float32(value);
+        /////////
+
+        peekUint16(bytePointer = this.bytePointer) {
+            return this.view.getUint16(bytePointer, this.littleEndian);
         }
 
-        putFloat32(byteIndex, value) {
-            this.view.setFloat32(byteIndex, value);
-        }
-
-        readFloat16(location = this.bytePointer) {
-            let value = this.halfBytes2Float32(this.view.getUint16(location, this.littleEndian));
+        readUint16() {
+            let value = this.view.getUint16(this.bytePointer, this.littleEndian);
             this.bytePointer += 2;
             return value;
         }
+
+        writeUint16(value) {
+            this.view.setUint16(this.bytePointer, value, this.littleEndian);
+            this.bytePointer += 2;
+        }
+
+        getUint16(byteIndex) {
+            return this.view.getUint16(byteIndex, this.littleEndian);
+        }
+
+        setUint16(byteIndex, value) {
+            this.view.setUint16(byteIndex, value, this.littleEndian);
+        }
+
+        /////////
+
+        readUint32() {
+            let value = this.view.getUint32(this.bytePointer, this.littleEndian);
+            this.bytePointer += 4;
+            return value;
+        }
+
+        readInt32() {
+            let value = this.view.getInt32(this.bytePointer, this.littleEndian);
+            this.bytePointer += 4;
+            return value;
+        }
+
+        readUint64() {
+            let value = this.view.getBigUint64(this.bytePointer, this.littleEndian);
+            this.bytePointer += 8;
+            return value;
+        }
+
+
+        /////////
 
         readFloat32() {
             let value = this.view.getFloat32(this.bytePointer, this.littleEndian);
@@ -1562,9 +1575,28 @@ var nvis = new function () {
         }
 
         writeFloat32(value) {
-            this.view.setFloat32(this.bytePointer, value);
+            this.view.setFloat32(this.bytePointer, value, this.littleEndian);
             this.bytePointer += 4;
         }
+
+        setFloat32(byteIndex, value) {
+            this.view.setFloat32(byteIndex, value, this.litleEndian);
+        }
+
+        //////////
+
+        readFloat16(location = this.bytePointer) {
+            let value = NvisBitBuffer.halfBytes2Float32(this.view.getUint16(location, this.littleEndian));
+            this.bytePointer += 2;
+            return value;
+        }
+
+        getFloat16(byteIndex) {
+            let value = this.view.getUint16(byteIndex, this.littleEndian);
+            return NvisBitBuffer.halfBytes2Float32(value);
+        }
+
+        //////////
 
         readString() {
             let c = '';
@@ -1591,18 +1623,18 @@ var nvis = new function () {
         }
 
     }
-    
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    
+
     const EXR_UINT = 0;
     const EXR_HALF = 1;
     const EXR_FLOAT = 2;
-    
+
     const EXR_NO_COMPRESSION = 0;
     const EXR_RLE_COMPRESSION = 1;
     const EXR_ZIPS_COMPRESSION = 2;
@@ -1627,11 +1659,9 @@ var nvis = new function () {
             this.fileName = fileName;
             this.buffer = new NvisBitBuffer(buffer);
 
-            // console.log("EXR File...");
-
             let b = this.buffer;
 
-            let magicNumber = b.readInt32();
+            let magicNumber = b.readInt32();  //  should be decimal 20000630
             let versionField = b.readInt32();
             let version = {
                 version: (versionField & 0xf),
@@ -1640,7 +1670,7 @@ var nvis = new function () {
                 nonImage: (((versionField >> (11 - 1)) & 1) == 1),
                 multiPart: (((versionField >> (12 - 1)) & 1) == 1),
             }
-            // console.log("Magic number: " + magicNumber);  //  should be decimal 20000630
+            // console.log("Magic number: " + magicNumber);
             // console.log("Version field: " + JSON.stringify(version));            
 
             //  attributes
@@ -1650,8 +1680,8 @@ var nvis = new function () {
                 this.attributes[attrib.name] = attrib;
             }
             b.skip();
-            
-            console.log(JSON.stringify(this.attributes));
+
+            //console.log(JSON.stringify(this.attributes));
 
             //  offset table
             this.scanLinesPerChunk = EXR_NO_COMPRESSION_SCANLINES;
@@ -1659,23 +1689,23 @@ var nvis = new function () {
             let dataWindowBox = this.attributes.dataWindow.values;
             let numOffsets = dataWindowBox.yMax - dataWindowBox.yMin + 1;
             let compression = this.attributes["compression"].value;
-            
+
             switch (compression) {
                 case EXR_ZIP_COMPRESSION:
                     this.scanLinesPerChunk = EXR_ZIP_COMPRESSION_SCANLINES;
-                    break;    
+                    break;
                 case EXR_PIZ_COMPRESSION:
                     this.scanLinesPerChunk = EXR_PIZ_COMPRESSION_SCANLINES;
-                    break;    
+                    break;
                 case EXR_PXR24_COMPRESSION:
                     this.scanLinesPerChunk = EXR_PXR24_COMPRESSION_SCANLINES;
-                    break;    
+                    break;
                 case EXR_B44_COMPRESSION:
                     this.scanLinesPerChunk = EXR_B44_COMPRESSION_SCANLINES;
-                    break;    
+                    break;
                 case EXR_NO_COMPRESSION:
                 default:
-                    break;    
+                    break;
             }
 
             if (compression != EXR_NO_COMPRESSION) {
@@ -1692,11 +1722,73 @@ var nvis = new function () {
                 this.offsetTable[numOffsets - 1].size = (b.bitSize >> 3) - Number(this.offsetTable[numOffsets - 1].offset);
             }
 
-            // console.log("numOffsets: " + numOffsets);
-            // console.log("offsetTable:");
-            // for (let i = 0; i < numOffsets; i++) {
-            //     console.log("   " + this.offsetTable[i].offset + ", " + this.offsetTable[i].size);
-            // }
+            //  pixels
+            this.pixelSize = 0;
+            this.channelOffsets = [];
+            for (let c = 0; c < this.attributes.channels.values.length; c++) {
+                let channel = this.attributes.channels.values[c];
+
+                this.channelOffsets.push(this.pixelSize);
+
+                switch (channel.pixelType) {
+                    case EXR_UINT:
+                        this.pixelSize += 4;
+                        break;
+                    case EXR_HALF:
+                        this.pixelSize += 2;
+                        break;
+                    case EXR_FLOAT:
+                    default:
+                        this.pixelSize += 4;
+                        break;
+                }
+            }
+
+            this.dimensions = { w: 0, h: 0 };
+            let dataDimensions = this.attributes.dataWindow.values;
+            this.dimensions.w = (dataDimensions.xMax - dataDimensions.xMin + 1);
+            this.dimensions.h = (dataDimensions.yMax - dataDimensions.yMin + 1);
+            let outputSize = this.dimensions.w * this.dimensions.h * this.pixelSize;
+
+            this.outputBuffer = new NvisBitBuffer(new ArrayBuffer(outputSize));
+            // console.log("Total output buffer size: " + outputSize);
+
+            let channelValues = this.attributes.channels.values;
+
+            if (compression == EXR_NO_COMPRESSION) {
+
+                for (let scanLine = 0; scanLine < numOffsets; scanLine++) {
+                    // let scanLineLoc = this.outputBuffer.bytePointer;
+                    b.seek(Number(this.offsetTable[scanLine].offset));
+
+                    //  not really needed, but we have to consume them fom the input stream
+                    let storedScanLine = b.readUint32();
+                    let storedDataSize = b.readUint32();
+
+                    // this.outputBuffer.copy(b, 0, this.dimensions.w * this.pixelSize);
+                    // this.outputBuffer.bytePointer += this.dimensions.w * this.pixelSize;
+                    // continue;
+
+                    for (let channelId = 0; channelId < channelValues.length; channelId++) {
+                        // let channelOffset = this.channelOffsets[channelId];
+                        let channel = channelValues[channelId];
+
+                        //  TODO: fix more efficient copy method
+                        for (let x = 0; x < this.dimensions.w; x++) {
+                            //  here, we don't parse float values
+                            if (channel.pixelType == EXR_UINT || channel.pixelType == EXR_FLOAT) {
+                                // this.outputBuffer.setUint32(scanLineLoc + x * this.pixelSize + channelOffset, b.readUint32());
+                                this.outputBuffer.writeUint16(b.readUint16());
+                            } else if (channel.pixelType == EXR_HALF) {
+                                //this.outputBuffer.setUint16(scanLineLoc + x * this.pixelSize + channelOffset, b.readUint16());
+                                this.outputBuffer.writeUint16(b.readUint16());
+                            }
+                        }
+                    }
+                }
+
+                return;
+            }
 
             //  Huffman
             this.huffman = {
@@ -1712,65 +1804,13 @@ var nvis = new function () {
                 });
             }
 
-            //  pixels
-            let outputSize = 0;
-            for (let c = 0; c < this.attributes.channels.values.length; c++) {
-                let channel = this.attributes.channels.values[c];
-                switch (channel.pixelType) {
-                    case 0:  //  UINT
-                        outputSize += 4;
-                        break;
-                    case 1:  //  HALF
-                        outputSize += 2;
-                        break;
-                    case 2:  //  FLOAT
-                    default:
-                        outputSize += 4;
-                        break;
-                }
-            }
-            let dataDimensions = this.attributes.dataWindow.values;
-            outputSize = 4 * 4;
-            this.dimensions = { w: 0, h: 0 };
-            this.dimensions.w = (dataDimensions.xMax - dataDimensions.xMin + 1);
-            this.dimensions.h = (dataDimensions.yMax - dataDimensions.yMin + 1);
-            outputSize *= (this.dimensions.w * this.dimensions.h);
-
-            this.outputBuffer = new NvisBitBuffer(new ArrayBuffer(outputSize));
-            // console.log("Total output buffer size: " + outputSize);
-
-            const ChannelOffsetMap = { "R": 0, "G": 1, "B": 2, "A": 3 }
-            let channelValues = this.attributes.channels.values;
-            if (compression == EXR_NO_COMPRESSION) {
-
-                for (let sl = 0; sl < numOffsets; sl++) {
-                    b.seek(Number(this.offsetTable[sl].offset));
-                    let outputPosition = this.outputBuffer.bytePointer;
-                    
-                    let scanLine = b.readUint32();
-                    let dataSize = b.readUint32();
-
-                    for (let c = 0; c < channelValues.length; c++) {
-                        this.outputBuffer.bytePointer = outputPosition;
-                        let channel = channelValues[c];
-                        let offset = ChannelOffsetMap[channel.name] * 4;
-                        for (let x = 0; x < this.dimensions.w; x++) {
-                            let value = b.readFloat16();  //  TODO: adapt to channel size
-                            this.outputBuffer.putFloat32(outputPosition + x * 16 + offset, value);
-                        }
-                    }
-                    this.outputBuffer.bytePointer += this.dimensions.w * 16;
-                }
-
-                return;
-            }
-
-
+            //  compressed data handled below
             for (let sl = 0; sl < numOffsets; sl++) {
                 b.seek(Number(this.offsetTable[sl].offset));
-                
-                let scanLine = b.readUint32();
-                let dataSize = b.readUint32();
+
+                //  not really needed, but we have to consume them fom the input stream
+                let storedScanLine = b.readUint32();
+                let storedDataSize = b.readUint32();
 
                 //console.log("   scanLine: " + scanLine + ", dataSize: " + dataSize);
 
@@ -1804,7 +1844,7 @@ var nvis = new function () {
                     if (blockType == 0) {
                         //  no compression
                         b.byteAlign();
-                        
+
                         let len = (b.readBits(8) | (b.readBits(8) << 8));
                         let nlen = (0xFFFF ^ (b.readBits(8) | (b.readBits(8) << 8)));
                         if (len != nlen) {
@@ -1854,7 +1894,7 @@ var nvis = new function () {
                         for (let iType = blockType; iType >= 0; iType--)  //  [(2,) 1, 0]
                         {
                             let curHuffmanTable = this.huffman.tables[iType];
-                            
+
                             totalSymbols.fill(0);
                             for (let i = 0; i < this.huffman.tableSizes[iType]; i++) {
                                 totalSymbols[curHuffmanTable.codeSize[i]]++;
@@ -1962,8 +2002,8 @@ var nvis = new function () {
 
                     }
 
-                    for (;;) {
-                        for (;;) {
+                    for (; ;) {
+                        for (; ;) {
                             if ((b.remainingBits() < 32 || this.outputBuffer.remainingBits() < 16)) {
                                 //  TODO: this path not tested
                                 counter = this.huffmanDecode(b, 0);
@@ -1993,7 +2033,7 @@ var nvis = new function () {
                                 this.outputBuffer.writeUint8(sym2 & 255);
                             }
                         }
-                        
+
                         if ((counter &= 511) == 256) {
                             break;
                         }
@@ -2020,7 +2060,7 @@ var nvis = new function () {
                         // }
 
                         let byteIndex = (dist_from_out_buf_start - dist);
-//                         pSrc = pOut_buf_start + ((dist_from_out_buf_start - dist) & out_buf_size_mask);
+                        //                         pSrc = pOut_buf_start + ((dist_from_out_buf_start - dist) & out_buf_size_mask);
 
                         if (Math.max(this.outputBuffer.bytePointer, byteIndex) > this.outputBuffer.buffer.byteLength - 1) {
                             while (counter--) {
@@ -2033,35 +2073,35 @@ var nvis = new function () {
                         if (b.remainingBits() == 0) {
                             console.log("DONE!");
                         }
-//                         if ((MZ_MAX(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
-//                             while (counter--) {
-//                                 while (pOut_buf_cur >= pOut_buf_end) {
-//                                     TINFL_CR_RETURN(53, TINFL_STATUS_HAS_MORE_OUTPUT);
-//                                 }
-//                                 *pOut_buf_cur++ = pOut_buf_start[(dist_from_out_buf_start++ - dist) & out_buf_size_mask];
-//                             }
-//                             continue;
-//                         }
+                        //                         if ((MZ_MAX(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
+                        //                             while (counter--) {
+                        //                                 while (pOut_buf_cur >= pOut_buf_end) {
+                        //                                     TINFL_CR_RETURN(53, TINFL_STATUS_HAS_MORE_OUTPUT);
+                        //                                 }
+                        //                                 *pOut_buf_cur++ = pOut_buf_start[(dist_from_out_buf_start++ - dist) & out_buf_size_mask];
+                        //                             }
+                        //                             continue;
+                        //                         }
 
-// #if MINIZ_USE_UNALIGNED_LOADS_AND_STORES
-//                         else if ((counter >= 9) && (counter <= dist)) {
-//                             const mz_uint8 * pSrc_end = pSrc + (counter & ~7);
-//                             do {
-//                                 ((mz_uint32 *)pOut_buf_cur)[0] = ((const mz_uint32 *)pSrc)[0];
-//                                 ((mz_uint32 *)pOut_buf_cur)[1] = ((const mz_uint32 *)pSrc)[1];
-//                                 pOut_buf_cur += 8;
-//                             } while ((pSrc += 8) < pSrc_end);
-//                             if ((counter &= 7) < 3) {
-//                                 if (counter) {
-//                                     pOut_buf_cur[0] = pSrc[0];
-//                                     if (counter > 1)
-//                                         pOut_buf_cur[1] = pSrc[1];
-//                                     pOut_buf_cur += counter;
-//                                 }
-//                                 continue;
-//                             }
-//                         }
-// #endif
+                        // #if MINIZ_USE_UNALIGNED_LOADS_AND_STORES
+                        //                         else if ((counter >= 9) && (counter <= dist)) {
+                        //                             const mz_uint8 * pSrc_end = pSrc + (counter & ~7);
+                        //                             do {
+                        //                                 ((mz_uint32 *)pOut_buf_cur)[0] = ((const mz_uint32 *)pSrc)[0];
+                        //                                 ((mz_uint32 *)pOut_buf_cur)[1] = ((const mz_uint32 *)pSrc)[1];
+                        //                                 pOut_buf_cur += 8;
+                        //                             } while ((pSrc += 8) < pSrc_end);
+                        //                             if ((counter &= 7) < 3) {
+                        //                                 if (counter) {
+                        //                                     pOut_buf_cur[0] = pSrc[0];
+                        //                                     if (counter > 1)
+                        //                                         pOut_buf_cur[1] = pSrc[1];
+                        //                                     pOut_buf_cur += counter;
+                        //                                 }
+                        //                                 continue;
+                        //                             }
+                        //                         }
+                        // #endif
                         do {
                             this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 0));
                             this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
@@ -2072,7 +2112,7 @@ var nvis = new function () {
                             // pOut_buf_cur[2] = pSrc[2];
                             // pOut_buf_cur += 3;
                             // pSrc += 3;
-                        // } while ((int)(counter -= 3) > 2);
+                            // } while ((int)(counter -= 3) > 2);
                         } while ((counter -= 3) > 2);
 
                         if (counter > 0) {
@@ -2087,7 +2127,7 @@ var nvis = new function () {
                         //         pOut_buf_cur[1] = pSrc[1];
                         //     pOut_buf_cur += counter;
                         // }
-                     }
+                    }
 
 
                     // let s = "";
@@ -2101,6 +2141,35 @@ var nvis = new function () {
                 } while (!bFinalBlock);
 
             }
+
+            //  EXR postprocess for ZIP and RLE
+            let numChunks = this.dimensions.h / this.scanLinesPerChunk;
+            let chunkSize = this.scanLinesPerChunk * this.dimensions.w * this.pixelSize;
+            let halfChunkSize = Math.floor((chunkSize + 1) / 2);
+            let tmpBuffer = new NvisBitBuffer(new ArrayBuffer(chunkSize));
+
+            for (let chunkId = 0; chunkId < numChunks; chunkId++) {
+
+                //  predictor
+                let chunkIndex = chunkId * chunkSize;
+                for (let i = chunkIndex + 1; i < chunkIndex + chunkSize; i++) {
+                    let d = this.outputBuffer.getUint8(i - 1) + this.outputBuffer.getUint8(i) - 128;
+                    this.outputBuffer.setUint8(i, d);
+                }
+
+                //  swizzle
+                let srcIndex = chunkIndex;
+                for (let i = 0; i < chunkSize; i += 2) {
+                    let value1 = this.outputBuffer.getUint8(srcIndex);
+                    let value2 = this.outputBuffer.getUint8(srcIndex + halfChunkSize);
+                    tmpBuffer.setUint8(i, value1);
+                    tmpBuffer.setUint8(i + 1, value2);
+                    srcIndex++;
+                }
+
+                this.outputBuffer.copy(tmpBuffer, chunkIndex);
+            }
+
         }
 
         huffmanDecode(bitBuffer, tableId, bTest = false) {
@@ -2165,7 +2234,7 @@ var nvis = new function () {
             attrib.name = b.readString();
             attrib.type = b.readString();
             attrib.size = b.readInt32();
-            
+
             //  https://openexr.readthedocs.io/en/latest/OpenEXRFileLayout.html
 
             if (attrib.type == "box2i") {
@@ -2269,73 +2338,45 @@ var nvis = new function () {
             }
             if (attrib.type == "v3f") {
             }
-            
+
             return attrib;
         }
 
         toFloatArray() {
             let data = new Float32Array(new ArrayBuffer(this.dimensions.w * this.dimensions.h * 4 * 4));  //  w x h x RGBA x float
-            
+
+            const ChannelMap = { "R": 0, "G": 1, "B": 2, "A": 3 };
             let channels = this.attributes.channels.values;
 
-            let numChannels = 3;
-            let numScanLines = 16;
-            let dstChannels = 4;
-            let channelSize = this.dimensions.w * this.dimensions.h * 2;
-            let pixelSize = numChannels * 2;
-            let chunkSize = numScanLines * this.dimensions.w * pixelSize;
-            let halfChunkSize = Math.floor((chunkSize + 1) / 2);
-            let numChunks = this.dimensions.h / numScanLines;
-
-            let tmpBuffer = new NvisBitBuffer(new ArrayBuffer(chunkSize));
-
-            //  EXR postprocess
-            for (let chunkId = 0; chunkId < numChunks; chunkId++) {
-                //  predictor
-                let chunkIndex = chunkId * chunkSize;
-                for (let i = chunkIndex + 1; i < chunkIndex + chunkSize; i++) {
-                    let d = this.outputBuffer.getUint8(i - 1) + this.outputBuffer.getUint8(i) - 128;
-                    this.outputBuffer.setUint8(i, d);
-                }
-
-                //  swizzle
-                let srcIndex = chunkIndex;
-                for (let i = 0; i < chunkSize; i += 2) {
-                    let value1 = this.outputBuffer.getUint8(srcIndex);
-                    let value2 = this.outputBuffer.getUint8(srcIndex + halfChunkSize);
-                    tmpBuffer.setUint8(i, value1);
-                    tmpBuffer.setUint8(i + 1, value2);
-                    srcIndex++;
-                }
-                this.outputBuffer.copy(tmpBuffer, chunkIndex);
-            }
-    
-
+            const dstChannels = 4;
             for (let y = 0; y < this.dimensions.h; y++) {
                 for (let x = 0; x < this.dimensions.w; x++) {
                     let dstLoc = (y * this.dimensions.w + x) * dstChannels;
-                    for (let c = 0; c < 3; c++) {
-                        //let channelType = channels[c].
-                        let srcLoc = y * 6 * this.dimensions.w + c * 2 * this.dimensions.w + x * 2;
+                    for (let channelId = 0; channelId < channels.length; channelId++) {
+                        let channel = channels[channelId];
+                        let channelOffset = this.channelOffsets[channelId];
+                        let channelSize = (channel.pixelType == EXR_HALF ? 2 : 4);
+                        let srcLoc = (y * this.pixelSize + channelOffset) * this.dimensions.w + x * channelSize;
 
-                        let value = this.outputBuffer.getFloat16(srcLoc);
-                        data[dstLoc + (2 - c)] = value;
+                        let value = 0;
+                        value = this.outputBuffer.getFloat16(srcLoc);
+                        data[dstLoc + ChannelMap[channel.name]] = value;
                     }
-                    data[dstLoc + 3] = 1.0;  //  alpha
+                    data[dstLoc + ChannelMap["A"]] = 1.0;  //  alpha
                 }
             }
 
             return data;
         }
     }
-    
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    
+
     function NvisFileName(fileName) {
         let _fileName = fileName;
         let _directory = "";
@@ -2432,7 +2473,7 @@ var nvis = new function () {
             }`;
         }
 
-        
+
         getPixelValue(pxCoord) {
             let gl = this.glContext;
 
@@ -2591,7 +2632,7 @@ var nvis = new function () {
                     let xhr = new XMLHttpRequest();
                     xhr.open("GET", fileName);
                     xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
-                    xhr.responseType="arraybuffer";
+                    xhr.responseType = "arraybuffer";
                     xhr.onload = function () {
                         if (this.status == 200 && this.response !== null) {
                             numFilesLoaded++;
@@ -2599,6 +2640,7 @@ var nvis = new function () {
                             let file = new NvisEXRFile(fileName, this.response);
 
                             self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
+                            //self.setupTexture(texture, new Float32Array(file.outputBuffer.buffer, 0, file.bitSize / (8 * 4)), true, file.dimensions);
 
                             if (numFilesLoaded == fileNames.length) {
                                 self.setDimensions(file.dimensions, true);
@@ -2607,7 +2649,7 @@ var nvis = new function () {
                         }
                     };
                     xhr.send();
-        
+
                 } else {
 
                     const image = new Image();
@@ -2681,7 +2723,7 @@ var nvis = new function () {
 
                         // for (let y = 0; y < file.dimensions.h; y++) {
                         //     for (let x = 0; x < file.dimensions.w; x++) {
-                                
+
                         //     }
                         // }
 
@@ -3204,7 +3246,7 @@ var nvis = new function () {
                 this.textureCoordinates[i + 1] += _state.zoom.streamOffset.y;
             }
 
-            this.debugZoom("updateTextureCoordinates()");
+            // this.debugZoom("updateTextureCoordinates()");
 
             //  update windows with new coordinates
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
@@ -3359,7 +3401,7 @@ var nvis = new function () {
                     w: z / (ww * layoutDims.w),
                     h: z / (wh * layoutDims.h)
                 }
-                
+
                 let layout = _state.layout.getDimensions();
                 let wc = this.getWindowCoordinates(_state.input.mouse.canvasCoords);
 
@@ -3830,8 +3872,8 @@ var nvis = new function () {
 
             //  extensions
             //  TODO: not needed in WebGL 2.0?
-           // _glContext.getExtension('OES_texture_float');
-           _glContext.getExtension("EXT_color_buffer_float")
+            // _glContext.getExtension('OES_texture_float');
+            _glContext.getExtension("EXT_color_buffer_float")
 
             _windows = new NvisWindows(_glContext, _canvas);
 
@@ -4068,7 +4110,7 @@ var nvis = new function () {
         }
 
         let _onClick = function (event) {
-            
+
             let cc = _state.input.mouse.canvasCoords;
             let windowId = _windows.getWindowId(cc);
 
@@ -4082,7 +4124,7 @@ var nvis = new function () {
             if (pCoord === undefined) {
                 return;
             }
-            
+
             let loc = { x: Math.floor(pCoord.x), y: Math.floor(pCoord.y) };
             let color = _streams[streamId].getPixelValue(loc);
 
@@ -4271,14 +4313,14 @@ var nvis = new function () {
                     //  set position of shader, filled in later
                     let shaderId = _shaders.length;
                     _shaders.push(undefined);
-                    let newShader = new NvisShader(_glContext, { json: this.responseText, callback: function () { _shaderLoaded(shaderId, newShader); }});
+                    let newShader = new NvisShader(_glContext, { json: this.responseText, callback: function () { _shaderLoaded(shaderId, newShader); } });
                 }
             };
             xhr.send();
         }
 
         let _newStreamCallback = function (streamPxDimensions) {
-            console.log("_newStreamCallback(" + streamPxDimensions.w + ", " + streamPxDimensions.h + ")");
+            // console.log("_newStreamCallback(" + streamPxDimensions.w + ", " + streamPxDimensions.h + ")");
             _windows.setStreamPxDimensions(streamPxDimensions);
             _windows.adjust();
         }
@@ -4300,7 +4342,7 @@ var nvis = new function () {
 
         let _addShaderStream = function (shaderId) {
             let newStream = new NvisStream(_glContext, shaderId);
-            
+
             _streams.push(newStream);
             _windows.adjust();
 
