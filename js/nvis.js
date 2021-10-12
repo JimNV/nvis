@@ -130,7 +130,7 @@ var nvis = new function () {
                 elementValue.innerHTML = element.value;
             }
 
-            console.log(key + ": " + _object[key].value);
+            // console.log(key + ": " + _object[key].value);
         }
 
         let _setUniforms = function (glContext, shaderProgram) {
@@ -469,10 +469,10 @@ var nvis = new function () {
 
             this.clear();
 
-            let value = 0.6;
-            this.color.r = value;
-            this.color.g = value;
-            this.color.b = value;
+            // let value = 0.6;
+            this.color.r = alpha;
+            this.color.g = alpha;
+            this.color.b = alpha;
             this.color.a = alpha;
 
             let x = winOffset.x + offset.x;
@@ -731,6 +731,9 @@ var nvis = new function () {
             in vec2 vTextureCoord;
             uniform sampler2D uSampler;
             uniform vec2 uDimensions;
+            uniform int uTonemapper;
+            uniform float uGamma;
+            uniform float uExposure;
             out vec4 color;
 
             float modi(float a, float b) {
@@ -754,14 +757,15 @@ var nvis = new function () {
                     color.b = exposure * pow(color.b, invGamma);
                 }
 
+                //  gray checkerboard for background
                 if (c.a < 1.0)
                 {
                     vec4 gridColor = vec4(0.6, 0.6, 0.6, 1.0);
-                    if (modi(xx, 2.0) == 0.0 ^^ modi(yy, 2.0) == 0.0)
+                    if (modi(xx, 2.0) == 0.0 ^^ modi(yy, 2.0) == 0.0) {
                         gridColor = vec4(0.5, 0.5, 0.5, 1.0);
-                    
+                    }                    
 
-                        color = gridColor + vec4(color.rgb * color.a, 1.0);
+                    color = gridColor + vec4(color.rgb * color.a, 1.0);
                 }
             }`;
 
@@ -2461,6 +2465,24 @@ var nvis = new function () {
                         "ACES"
                     ]
                 },
+                "uGamma" : {
+                    "type": "float",
+                    "type": "float",
+                    "value": 2.2,
+                    "min": 1.0,
+                    "max": 5.0,
+                    "step": 0.01,
+                    "condition": "uToneMapper==1"
+                },
+                "uExposure" : {
+                    "type": "float",
+                    "type": "float",
+                    "value": 1.0,
+                    "min": 0.0,
+                    "max": 100.0,
+                    "step": 0.1,
+                    "condition": "uToneMapper==1"
+                },
                 "uWhiteScale": {
                     "name": "Linear White",
                     "type": "float",
@@ -2552,7 +2574,7 @@ var nvis = new function () {
                 elementValue.innerHTML = element.value;
             }
 
-            console.log(key + ": " + object.value);
+            // console.log(key + ": " + object.value);
         }
 
 
@@ -2640,7 +2662,6 @@ var nvis = new function () {
                             let file = new NvisEXRFile(fileName, this.response);
 
                             self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
-                            //self.setupTexture(texture, new Float32Array(file.outputBuffer.buffer, 0, file.bitSize / (8 * 4)), true, file.dimensions);
 
                             if (numFilesLoaded == fileNames.length) {
                                 self.setDimensions(file.dimensions, true);
@@ -2712,6 +2733,7 @@ var nvis = new function () {
                     }
 
                     reader.readAsDataURL(file);
+
                 } else if (files[0].name.match(/.exr$/)) {
                     let reader = new FileReader();
 
@@ -2719,20 +2741,12 @@ var nvis = new function () {
 
                         let file = new NvisEXRFile(files[0].name, reader.result);
 
-                        let image = new ArrayBuffer(new Float32Array(file.width * file.height * 4 * file.numChannels));
-
-                        // for (let y = 0; y < file.dimensions.h; y++) {
-                        //     for (let x = 0; x < file.dimensions.w; x++) {
-
-                        //     }
-                        // }
-
-                        self.setupTexture(texture, image, true);
+                        self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
                         numFilesLoaded++;
 
                         if (numFilesLoaded == files.length) {
-                            self.setDimensions({ w: image.width, h: image.height }, true);
-                            callback({ w: image.width, h: image.height });
+                            self.setDimensions(file.dimensions, true);
+                            callback(file.dimensions);
                         }
 
                     }
@@ -2807,15 +2821,59 @@ var nvis = new function () {
             table.style.marginLeft = "50px";
 
             for (let key of Object.keys(object)) {
+
+            }
+
+            for (let key of Object.keys(object)) {
+
+                let bConditionMet = true;
+                let bAllConditionsMet = true;
+
+                let bConditionNegated = false;
+                let conditionVariable = "";
+                let conditionValue = "";
+
+                let conditionString = object[key].condition;
+                if (conditionString !== undefined) {
+                    conditionString = conditionString.replace(/\s+/g, '');
+                    let conditionStrings = conditionString.split("&");
+                    for (let i = 0; i < conditionStrings.length; i++) {
+                        let condition = conditionStrings[i];
+
+                        let equalPosition = condition.lastIndexOf("=");
+                        if (equalPosition != -1) {
+                            //  numeric conditional
+                            bConditionNegated = (condition[equalPosition - 1] == "!");
+                            conditionVariable = condition.substring(0, equalPosition - 1);
+                            conditionValue = condition.substring(equalPosition + 1);
+                            let conditionValues = conditionValue.split(",");
+                            bConditionMet = conditionValues.includes(object[conditionVariable].value.toString())
+                            bConditionMet = (bConditionNegated ? !bConditionMet : bConditionMet);
+                        } else {
+                            //  boolean conditional
+                            bConditionNegated = (condition[0] == '!');
+                            conditionVariable = condition.substring(bConditionNegated ? 1 : 0);
+                            bConditionMet = (!bConditionNegated && object[conditionVariable].value) || (bConditionNegated && !object[conditionVariable].value);
+                        }
+                    }
+
+                    bAllConditionsMet &= bConditionMet;
+                }
+
+
                 let label = document.createElement("label");
                 label.setAttribute("for", key);
                 label.innerHTML = object[key].name;
 
                 let elementId = (key + "-" + streamId);  //  need uniqueness
+                let rowId = elementId + "-row";
 
-                let callbackString = "nvis.streamUpdateParameter(" + streamId + ", \"" + elementId + "\")";
+                let callbackString = "document.getElementById(\"" + rowId + "\").style.display=(" + bAllConditionsMet + " ? \"\" : \"none\")";
+                callbackString += "; nvis.streamUpdateParameter(" + streamId + ", \"" + elementId + "\")";
 
                 let row = document.createElement("tr");
+                row.setAttribute("id", rowId);
+                row.style.display = (bAllConditionsMet ? "" : "none");
 
                 let el = undefined;
                 let type = object[key].type;
@@ -3265,7 +3323,8 @@ var nvis = new function () {
             //  first, determine layout width/height
             if (layout.bAutomatic) {
                 let canvasAspect = this.canvas.height / this.canvas.width;
-                layout.automaticDimensions.w = Math.round(Math.sqrt(Math.pow(2, Math.ceil(Math.log2(this.windows.length / canvasAspect)))));
+                //let streamAspect = this.windows[0].streams.dimensions.h / this.windows[0].stream.dimensions.w;
+                layout.automaticDimensions.w = Math.round(Math.sqrt(Math.pow(2, Math.ceil(Math.log2(this.windows.length) / canvasAspect))));
                 layout.automaticDimensions.w = Math.max(Math.min(layout.automaticDimensions.w, this.windows.length), 1);
                 layout.automaticDimensions.h = Math.ceil(this.windows.length / layout.automaticDimensions.w);
             } else {
@@ -3772,11 +3831,75 @@ var nvis = new function () {
             }
         };
 
+        function addStylesheetRules(rules) {
+            let styleElement = document.createElement('style');
+            document.head.appendChild(styleElement);
+            styleElement.sheet.insertRule(rules, styleElement.sheet.cssRules.length);
+        }
+
+        function addStyles() {
+
+            let cssBody = `body {
+                width: 100%;
+                height: 100%;
+                margin: 0px;
+                padding: 0px;
+            }`;
+
+            let cssHelpPopup = `.helpPopup {
+                font: 20px Arial;
+                color: black;
+                background-color: #f0f0f0;
+                border: 3px solid #808080;
+                border-radius: 15px;
+                position: absolute;
+                display: none;
+                margin: 0px;
+                padding: 20px;
+                left: 20px;
+                top: 20px;
+            }`;
+
+            let cssUiPopup = `.uiPopup {
+                font: 20px Arial;
+                color: black;
+                background-color: #f0f0f0;
+                border: 3px solid #808080;
+                border-radius: 15px;
+                position: absolute;
+                display: none;
+                margin: 0px;
+                padding: 20px;
+                left: 20px;
+                top: 20px;
+            }`;
+
+            let cssInfoPopup = `.infoPopup {
+                width: 100%;
+                text-align: right;
+                font: 42px Arial;
+                color: white;
+                opacity: 0.0;
+                position: absolute;
+                left: -50px;
+                top: 5px;
+                text-shadow: 5px 5px 10px black;
+            }`;
+
+            addStylesheetRules(cssBody);
+            addStylesheetRules(cssHelpPopup);
+            addStylesheetRules(cssUiPopup);
+            addStylesheetRules(cssInfoPopup);
+        }
+
         let _init = function () {
-            document.body.style.width = "100%";
-            document.body.style.height = "100%";
-            document.body.style.margin = "0px";
-            document.body.style.padding = "0px";
+
+            addStyles();
+
+            // document.body.style.width = "100%";
+            // document.body.style.height = "100%";
+            // document.body.style.margin = "0px";
+            // document.body.style.padding = "0px";
 
             _canvas = document.createElement("canvas");
             _canvas.style.margin = "0px";
@@ -3785,19 +3908,7 @@ var nvis = new function () {
             document.body.appendChild(_canvas);
 
             _helpPopup = document.createElement("div");
-            _helpPopup.style.font = "20px Arial";
-            _helpPopup.style.color = "black";
-            _helpPopup.style.backgroundColor = "#f0f0f0";
-            _helpPopup.style.margin = "0px";
-            _helpPopup.style.padding = "20px";
-            _helpPopup.style.border = "3px solid #808080";
-            _helpPopup.style.borderRadius = "15px";
-            _helpPopup.style.position = "absolute";
-            _helpPopup.style.display = "none";
-            _helpPopup.style.left = "20px";
-            _helpPopup.style.top = "20px";
-            // _helpPopup.style.width = "300px";
-            // _helpPopup.style.height = "300px";
+            _helpPopup.className = "helpPopup";
 
             _helpPopup.innerHTML = "<b>Nvis Online</b><br/>";
             _helpPopup.innerHTML += "<br/>";
@@ -3815,29 +3926,11 @@ var nvis = new function () {
 
             _infoPopup = document.createElement("div");
             _infoPopup.id = "infoPopup";
-            _infoPopup.style.width = "100%";
-            _infoPopup.style.textAlign = "right";
-            _infoPopup.style.font = "42px Arial";
-            _infoPopup.style.color = "white";
-            _infoPopup.style.opacity = 0.0;
-            _infoPopup.style.position = "absolute";
-            _infoPopup.style.left = "-50px";
-            _infoPopup.style.top = "5px";
-            _infoPopup.style.textShadow = "5px 5px 10px black";
+            _infoPopup.className = "infoPopup";
 
             _uiPopup = document.createElement("div");
             _uiPopup.id = "uiPopup";
-            _uiPopup.style.font = "20px Arial";
-            _uiPopup.style.color = "black";
-            _uiPopup.style.backgroundColor = "#f0f0f0";
-            _uiPopup.style.margin = "0px";
-            _uiPopup.style.padding = "20px";
-            _uiPopup.style.border = "3px solid #808080";
-            _uiPopup.style.borderRadius = "15px";
-            _uiPopup.style.position = "absolute";
-            _uiPopup.style.display = "none";
-            _uiPopup.style.left = "20px";
-            _uiPopup.style.top = "20px";
+            _uiPopup.className = "uiPopup";
 
             _fileInput = document.createElement("input");
             _fileInput.id = "fileInput";
@@ -3871,12 +3964,9 @@ var nvis = new function () {
             }
 
             //  extensions
-            //  TODO: not needed in WebGL 2.0?
-            // _glContext.getExtension('OES_texture_float');
             _glContext.getExtension("EXT_color_buffer_float")
 
             _windows = new NvisWindows(_glContext, _canvas);
-
             _shaders = new NvisShaders(_glContext);
 
             window.addEventListener("resize", _windows.boundAdjust);
@@ -3888,15 +3978,13 @@ var nvis = new function () {
             _canvas.addEventListener("mouseleave", _onMouseUp);
             _canvas.addEventListener("wheel", _onWheel);
 
-            //  TODO: change to addEventListener
-            document.body.onpaste = _onFileDrop;
-            document.body.ondrop = _onFileDrop;
-            document.body.ondragenter = _onFileDragEnter;
-            document.body.ondragover = _onFileDragOver;
-            document.body.ondragleave = _onFileDragLeave;
-
-            document.body.onkeydown = _onKeyDown;
-            document.body.onkeyup = _onKeyUp;
+            document.body.addEventListener("paste", _onFileDrop);
+            document.body.addEventListener("drop", _onFileDrop);
+            document.body.addEventListener("dragenter", _onFileDragEnter);
+            document.body.addEventListener("dragover", _onFileDragOver);
+            document.body.addEventListener("dragleave", _onFileDragLeave);
+            document.body.addEventListener("keydown", _onKeyDown);
+            document.body.addEventListener("keyup", _onKeyUp);
         };
 
         let _getContext = function () {
@@ -3978,18 +4066,13 @@ var nvis = new function () {
             switch (keyCode) {
                 case 9:  //  Tab
                     event.preventDefault();
-                    if (_uiPopup.style.display == "none") {
+                    if (_uiPopup.style.display == "") {
                         _uiPopup.style.display = "block";
                         _updateUiPopup();
                     }
                     else {
-                        _uiPopup.style.display = "none";
+                        _uiPopup.style.display = "";
                     }
-                    //				_uiPopup.style.display = (_uiPopup.style.display == "none" ? "block" : "none");
-                    // 	for (let i = 0; i < _windows.length; i++)
-                    // 	{
-                    // 		_windows[i].showInfo();
-                    // 	}
                     break;
                 case 16:  //  Shift
                     _state.input.keyboard.shift = true;
@@ -4280,18 +4363,11 @@ var nvis = new function () {
             event.preventDefault();
         }
 
-        let _renderFrameBuffers = function () {
-            //  TODO: enable hierarchical rendering
-
-
-        }
-
         let _render = function () {
             let gl = _glContext;
             gl.clearColor(0.2, 0.2, 0.2, 1.0);
             gl.clear(_glContext.COLOR_BUFFER_BIT);
 
-            //_renderFrameBuffers();
             _windows.render(_animation.frameId, _streams, _shaders);
 
             _animation.update();
@@ -4304,19 +4380,6 @@ var nvis = new function () {
 
         let _loadShader = function (jsonFileName) {
             _shaders.load(jsonFileName, function () { _shaderLoaded(); });
-            return;
-            let xhr = new XMLHttpRequest();
-            xhr.open("GET", jsonFileName);
-            xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
-            xhr.onload = function () {
-                if (this.status == 200 && this.responseText !== null) {
-                    //  set position of shader, filled in later
-                    let shaderId = _shaders.length;
-                    _shaders.push(undefined);
-                    let newShader = new NvisShader(_glContext, { json: this.responseText, callback: function () { _shaderLoaded(shaderId, newShader); } });
-                }
-            };
-            xhr.send();
         }
 
         let _newStreamCallback = function (streamPxDimensions) {
@@ -4381,6 +4444,7 @@ var nvis = new function () {
             loadStream: _loadStream,
             loadShader: _loadShader,
             render: _render,
+            updateUiPopup: _updateUiPopup,
             // streamUpdateParameter: _streamUpdateParameter,
             // streamUpdateInput: _streamUpdateInput,
             setWindowStreamId: _setWindowStreamId,
@@ -4456,6 +4520,7 @@ var nvis = new function () {
     let _streamUpdateParameter = function (streamId, elementId) {
         console.log("update: " + streamId + ", " + elementId);
         _streams[streamId].uiUpdate(elementId);
+        _renderer.updateUiPopup();
     }
 
     let _streamUpdateInput = function (streamId, inputId) {
@@ -4467,15 +4532,10 @@ var nvis = new function () {
 
     let _setWindowStreamId = function (windowId) {
         _renderer.setWindowStreamId(windowId);
-        // let elementId = ("windowStream-" + windowId);
-        // let newStreamId = document.getElementById(elementId).selectedIndex;
-        // _windows.getWindow(windowId).setStream(_streams[newStreamId]);
     }
 
     let _toggleAutomaticLayout = function () {
         console.log(document.getElementById("bAutomaticLayout").checked);
-        //_windows.adjust();
-        //    _windows.toggleAutomaticLayout();
     }
 
 
