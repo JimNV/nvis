@@ -2814,15 +2814,18 @@ var nvis = new function () {
         }
 
 
+        createCallbackString(streamId, elementId, rowId, bAllConditionsMet, bUpdateUI = true) {
+            let callbackString = "document.getElementById(\"" + rowId + "\").style.display=\"" + (bAllConditionsMet ? "" : "none") + "\"";
+            callbackString += "; nvis.streamUpdateParameter(" + streamId + ", \"" + elementId + "\", " + bUpdateUI + ")";
+            //console.log(callbackString);
+            return callbackString;
+        }
+
         buildShaderUI(object, streamId) {
             let dom = document.createDocumentFragment();
 
             let table = document.createElement("table");
             table.style.marginLeft = "50px";
-
-            for (let key of Object.keys(object)) {
-
-            }
 
             for (let key of Object.keys(object)) {
 
@@ -2857,7 +2860,7 @@ var nvis = new function () {
                         }
                     }
 
-                    bAllConditionsMet &= bConditionMet;
+                    bAllConditionsMet &&= bConditionMet;
                 }
 
 
@@ -2867,9 +2870,6 @@ var nvis = new function () {
 
                 let elementId = (key + "-" + streamId);  //  need uniqueness
                 let rowId = elementId + "-row";
-
-                let callbackString = "document.getElementById(\"" + rowId + "\").style.display=(" + bAllConditionsMet + " ? \"\" : \"none\")";
-                callbackString += "; nvis.streamUpdateParameter(" + streamId + ", \"" + elementId + "\")";
 
                 let row = document.createElement("tr");
                 row.setAttribute("id", rowId);
@@ -2885,11 +2885,10 @@ var nvis = new function () {
                         el.setAttribute("type", "checkbox");
                         if (object[key].value) {
                             el.setAttribute("checked", true);
-                        }
-                        else {
+                        } else {
                             el.removeAttribute("checked");
                         }
-                        el.setAttribute("onclick", callbackString);
+                        el.setAttribute("onclick", this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet));
                     }
                     else if (type == "float") {
                         el.setAttribute("type", "range");
@@ -2897,7 +2896,7 @@ var nvis = new function () {
                         el.setAttribute("max", (object[key].max ? object[key].max : 1.0));
                         el.setAttribute("value", (object[key].value ? object[key].value : 0.0));
                         el.setAttribute("step", (object[key].step ? object[key].step : 0.1));
-                        el.setAttribute("oninput", callbackString);
+                        el.setAttribute("oninput", this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet, false));
                         let oEl = document.createElement("span");
                         oEl.id = (elementId + "-Value");
                         oEl.innerHTML = (oEl.innerHTML == "" ? object[key].value : oEl.innerHTML);
@@ -2908,7 +2907,7 @@ var nvis = new function () {
                 else if (type == "dropdown") {
                     el = document.createElement("select");
                     el.setAttribute("id", elementId);
-                    el.setAttribute("onchange", callbackString);
+                    el.setAttribute("onchange", this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet));
                     for (let optionId = 0; optionId < object[key].alternatives.length; optionId++) {
                         let oEl = document.createElement("option");
                         if (object[key].value == optionId) {
@@ -2926,8 +2925,7 @@ var nvis = new function () {
                         cell.innerHTML = el.outerHTML + label.outerHTML;
 
                         row.appendChild(cell);
-                    }
-                    else {
+                    } else {
                         let elCell = document.createElement("td");
                         elCell.innerHTML = el.outerHTML;
                         let labelCell = document.createElement("td");
@@ -4517,10 +4515,13 @@ var nvis = new function () {
         xhr.send();
     }
 
-    let _streamUpdateParameter = function (streamId, elementId) {
+    let _streamUpdateParameter = function (streamId, elementId, bUpdateUI) {
         console.log("update: " + streamId + ", " + elementId);
         _streams[streamId].uiUpdate(elementId);
-        _renderer.updateUiPopup();
+        if (bUpdateUI) {
+            console.log("Updating UI");
+            _renderer.updateUiPopup();
+        }
     }
 
     let _streamUpdateInput = function (streamId, inputId) {
