@@ -88,11 +88,86 @@ var nvis = new function () {
         }
     }
 
+    function addStylesheetRules(rules) {
+        let styleElement = document.createElement('style');
+        document.head.appendChild(styleElement);
+        styleElement.sheet.insertRule(rules, styleElement.sheet.cssRules.length);
+    }
+
+    function addStyles() {
+
+        addStylesheetRules(`body {
+            width: 100%;
+            height: 100%;
+            margin: 0px;
+            padding: 0px;
+            font: 20px Arial;
+        }`);
+
+        addStylesheetRules(`canvas {
+            margin: 0px;
+            padding: 0px;
+            display: block;
+        }`);
+
+        addStylesheetRules(`input[type=file] {
+            display: none;
+        }`);
+
+        addStylesheetRules(`.helpPopup {
+            color: black;
+            background-color: #f0f0f0;
+            border: 3px solid #808080;
+            border-radius: 15px;
+            position: absolute;
+            display: none;
+            margin: 0px;
+            padding: 20px;
+            left: 20px;
+            top: 20px;
+        }`);
+
+        addStylesheetRules(`.uiPopup {
+            color: black;
+            background-color: #f0f0f0;
+            border: 3px solid #808080;
+            border-radius: 15px;
+            position: absolute;
+            display: none;
+            margin: 0px;
+            padding: 20px;
+            left: 20px;
+            top: 20px;
+        }`);
+
+        addStylesheetRules(`.infoPopup {
+            width: 100%;
+            text-align: right;
+            font: 42px Arial;
+            color: white;
+            opacity: 0.0;
+            position: absolute;
+            left: -50px;
+            top: 5px;
+            text-shadow: 5px 5px 10px black;
+        }`);
+
+        addStylesheetRules(`.uiTable {
+            margin-left: 50px;
+        }`);
+        addStylesheetRules(`select {
+            font: 20px Arial;
+        }`);
+    }
+
+
     let _init = function () {
+        addStyles();
         _renderer = new NvisRenderer();
         _renderer.start();
     }
 
+    window.onload = _init;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -2825,7 +2900,7 @@ var nvis = new function () {
             let dom = document.createDocumentFragment();
 
             let table = document.createElement("table");
-            table.style.marginLeft = "50px";
+            table.className = "uiTable";
 
             for (let key of Object.keys(object)) {
 
@@ -3071,6 +3146,8 @@ var nvis = new function () {
             this.boundAdjust = this.adjust.bind(this);
 
             this.textureCoordinates = new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
+
+            this.adjust();
         }
 
         insideWindow(canvasPxCoords) {
@@ -3312,13 +3389,28 @@ var nvis = new function () {
 
 
         adjust() {
-            if (this.windows.length == 0) {
-                return;
-            }
 
             let layout = _state.layout;
 
-            //  first, determine layout width/height
+            //  determine canvas dimensions and border
+            this.canvas.style.borderWidth = layout.border + "px";
+            this.canvas.style.borderStyle = "solid";
+            this.canvas.style.borderColor = "black";
+            let pageWidth = (window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth);
+            let pageHeight = (window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight);
+            let width = pageWidth - 2 * layout.border;
+            let height = pageHeight - 2 * layout.border;
+
+            //  special case with no windows
+            if (this.windows.length == 0) {
+                this.canvas.width = width;
+                this.canvas.height = height;
+                return;
+            } else {
+                
+            }
+
+            //  determine layout width/height
             if (layout.bAutomatic) {
                 let canvasAspect = this.canvas.height / this.canvas.width;
                 //let streamAspect = this.windows[0].streams.dimensions.h / this.windows[0].stream.dimensions.w;
@@ -3330,29 +3422,21 @@ var nvis = new function () {
                 layout.dimensions.h = Math.ceil(this.windows.length / layout.dimensions.w);
             }
 
-
             let layoutDims = layout.getDimensions();
             let w = layoutDims.w;
             let h = layoutDims.h;
 
-            //  next, determine canvas dimensions and border
-            this.canvas.style.border = layout.border + "px solid black";
-            let pageWidth = (window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth);
-            let pageHeight = (window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight);
-            let width = pageWidth - 2 * layout.border;
-            let height = pageHeight - 2 * layout.border;
             let dw = (width % w);
             let dh = (height % h);
-
             this.canvas.width = (width - dw);
             this.canvas.height = (height - dh);
-            this.canvas.style.borderRight = (layout.border + dw) + "px solid black";
-            this.canvas.style.borderBottom = (layout.border + dh) + "px solid black";
+            this.canvas.style.borderRightWidth = (layout.border + dw) + "px";
+            this.canvas.style.borderBottomWidth = (layout.border + dh) + "px";
 
             //  set viewport to match canvas size
             this.glContext.viewport(0, 0, this.canvas.width, this.canvas.height);
 
-            //  lastly, determine window dimensions
+            //  determine window dimensions
             let winDimensions = { w: 1.0 / w, h: 1.0 / h };
 
             //  use actual canvas border values
@@ -3829,80 +3913,9 @@ var nvis = new function () {
             }
         };
 
-        function addStylesheetRules(rules) {
-            let styleElement = document.createElement('style');
-            document.head.appendChild(styleElement);
-            styleElement.sheet.insertRule(rules, styleElement.sheet.cssRules.length);
-        }
-
-        function addStyles() {
-
-            let cssBody = `body {
-                width: 100%;
-                height: 100%;
-                margin: 0px;
-                padding: 0px;
-            }`;
-
-            let cssHelpPopup = `.helpPopup {
-                font: 20px Arial;
-                color: black;
-                background-color: #f0f0f0;
-                border: 3px solid #808080;
-                border-radius: 15px;
-                position: absolute;
-                display: none;
-                margin: 0px;
-                padding: 20px;
-                left: 20px;
-                top: 20px;
-            }`;
-
-            let cssUiPopup = `.uiPopup {
-                font: 20px Arial;
-                color: black;
-                background-color: #f0f0f0;
-                border: 3px solid #808080;
-                border-radius: 15px;
-                position: absolute;
-                display: none;
-                margin: 0px;
-                padding: 20px;
-                left: 20px;
-                top: 20px;
-            }`;
-
-            let cssInfoPopup = `.infoPopup {
-                width: 100%;
-                text-align: right;
-                font: 42px Arial;
-                color: white;
-                opacity: 0.0;
-                position: absolute;
-                left: -50px;
-                top: 5px;
-                text-shadow: 5px 5px 10px black;
-            }`;
-
-            addStylesheetRules(cssBody);
-            addStylesheetRules(cssHelpPopup);
-            addStylesheetRules(cssUiPopup);
-            addStylesheetRules(cssInfoPopup);
-        }
-
         let _init = function () {
 
-            addStyles();
-
-            // document.body.style.width = "100%";
-            // document.body.style.height = "100%";
-            // document.body.style.margin = "0px";
-            // document.body.style.padding = "0px";
-
             _canvas = document.createElement("canvas");
-            _canvas.style.margin = "0px";
-            _canvas.style.padding = "0px";
-            _canvas.style.display = "block";
             document.body.appendChild(_canvas);
 
             _helpPopup = document.createElement("div");
@@ -3934,8 +3947,7 @@ var nvis = new function () {
             _fileInput.id = "fileInput";
             _fileInput.setAttribute("type", "file");
             _fileInput.setAttribute("multiple", true);
-            _fileInput.setAttribute("accept", ".png")
-            _fileInput.style.display = "none";
+            _fileInput.setAttribute("accept", "image/*|.exr")
             _fileInput.onchange = _onFileDrop;
             // _fileInput.style.position = "absolute";
             // _fileInput.style.left = "0px";
@@ -3983,6 +3995,7 @@ var nvis = new function () {
             document.body.addEventListener("dragleave", _onFileDragLeave);
             document.body.addEventListener("keydown", _onKeyDown);
             document.body.addEventListener("keyup", _onKeyUp);
+
         };
 
         let _getContext = function () {
@@ -4303,7 +4316,7 @@ var nvis = new function () {
 
             document.getElementById("fileInput").value = "";  //  force onchange event if same files
 
-            _canvas.style.border = _state.layout.border + "px solid black";
+            _canvas.style.borderColor = "black";
 
             return;
             for (let i = 0; i < files.length; i++) {
@@ -4348,7 +4361,7 @@ var nvis = new function () {
         }
 
         let _onFileDragEnter = function (event) {
-            _canvas.style.border = _state.layout.border + "px solid green";
+            _canvas.style.borderColor = "green";
             event.preventDefault();
         }
 
@@ -4357,7 +4370,7 @@ var nvis = new function () {
         }
 
         let _onFileDragLeave = function (event) {
-            _canvas.style.border = _state.layout.border + "px solid black";
+            _canvas.style.borderColor = "black";
             event.preventDefault();
         }
 
