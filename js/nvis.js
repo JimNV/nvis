@@ -1,23 +1,30 @@
 //  Copyright 2021 NVIDIA Corporation
 //
-//  Redistribution and use in source and binary forms, with or without modification, are permitted provided
-//  that the following conditions are met:
+//  Redistribution and use in source and binary forms, with or without
+//  modification, are permitted provided that the following conditions are met:
 //
 //  1. Redistributions of source code must retain the above copyright notice,
 //     this list of conditions and the following disclaimer.
 //  2. Redistributions in binary form must reproduce the above copyright notice,
-//     this list of conditions and the following disclaimer in the documentation and/or
-//     other materials provided with the distribution.
-//  3. Neither the name of the copyright holder nor the names of its contributors may be
-//     used to endorse or promote products derived from this software without specific prior written permission.
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software
+//     without specific prior written permission.
 //
-//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
-//  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-//  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
-//  OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-//  OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-//  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+//  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+//  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+//  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+//  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+//  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+//  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+//  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+//  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+//  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 //  POSSIBILITY OF SUCH DAMAGE.
+
+//--------|---------|---------|---------|---------|---------|---------|---------|
 
 'use strict';
 
@@ -644,7 +651,7 @@ var nvis = new function () {
 
     class NvisShader {
 
-        constructor(glContext, parameters = {}) { // jsonText = "{}", newStreamCallback) {
+        constructor(glContext, parameters = {}) {
 
             this.glContext = glContext;
             this.json = parameters.json;
@@ -838,7 +845,7 @@ var nvis = new function () {
                     vec4 gridColor = vec4(0.6, 0.6, 0.6, 1.0);
                     if (modi(xx, 2.0) == 0.0 ^^ modi(yy, 2.0) == 0.0) {
                         gridColor = vec4(0.5, 0.5, 0.5, 1.0);
-                    }                    
+                    }
 
                     color = gridColor + vec4(color.rgb * color.a, 1.0);
                 }
@@ -1750,7 +1757,7 @@ var nvis = new function () {
                 multiPart: (((versionField >> (12 - 1)) & 1) == 1),
             }
             // console.log("Magic number: " + magicNumber);
-            // console.log("Version field: " + JSON.stringify(version));            
+            // console.log("Version field: " + JSON.stringify(version));
 
             //  attributes
             this.attributes = {};
@@ -1908,11 +1915,11 @@ var nvis = new function () {
                 z.cmf.info = NvisBitBuffer.bits(CMF, 7, 4);  //   base-2 logarithm of the LZ77 window size, minus eight (CINFO=7 indicates a 32K window size)
                 z.flg = {};
                 z.flg.fcheck = NvisBitBuffer.bits(FLG, 4, 0);  //  to make (CMF * 256 + FLG % 31) == 0
-                z.flg.fdict = NvisBitBuffer.bits(FLG, 5, 5);  //  
-                z.flg.flevel = NvisBitBuffer.bits(FLG, 7, 6);  //  0: fastest, 1: fast, 2: default, 3: maximum/slowest 
+                z.flg.fdict = NvisBitBuffer.bits(FLG, 5, 5);  //
+                z.flg.flevel = NvisBitBuffer.bits(FLG, 7, 6);  //  0: fastest, 1: fast, 2: default, 3: maximum/slowest
                 z.dictId = (z.flg.fdict == 1 ? b.readUint32() : undefined);
 
-                //  https://datatracker.ietf.org/doc/html/rfc1951                
+                //  https://datatracker.ietf.org/doc/html/rfc1951
 
                 let bFinalBlock = false;
                 do {
@@ -2706,7 +2713,7 @@ var nvis = new function () {
         }
 
 
-        load(fileNames, callback) {
+        load(fileNames, windows) {
 
             let gl = this.glContext;
             let numFilesLoaded = 0;
@@ -2716,7 +2723,7 @@ var nvis = new function () {
 
                 // if (!files[fileId].type.match(/image.*/) && !files[0].name.match(/.exr$/)) {
                 //     continue;
-                // }                
+                // }
 
                 let texture = gl.createTexture();
                 this.textures.push(texture);
@@ -2740,7 +2747,9 @@ var nvis = new function () {
 
                             if (numFilesLoaded == fileNames.length) {
                                 self.setDimensions(file.dimensions, true);
-                                callback(file.dimensions);
+                                //callback(file.dimensions);
+                                windows.setStreamPxDimensions(file.dimensions);
+                                windows.adjust();
                             }
                         }
                     };
@@ -2756,8 +2765,11 @@ var nvis = new function () {
                         self.setupTexture(texture, image);
 
                         if (numFilesLoaded == fileNames.length) {
-                            self.setDimensions({ w: image.width, h: image.height }, false);
-                            callback(self.dimensions);
+                            let dimensions = { w: image.width, h: image.height };
+                            self.setDimensions(dimensions, false);
+                            //callback(self.dimensions);
+                            windows.setStreamPxDimensions(dimensions);
+                            windows.adjust();
                         }
                     }
 
@@ -3407,7 +3419,7 @@ var nvis = new function () {
                 this.canvas.height = height;
                 return;
             } else {
-                
+
             }
 
             //  determine layout width/height
@@ -3853,190 +3865,180 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
 
-    function NvisRenderer() {
-        let _glContext = undefined;
+    class NvisRenderer {
 
-        let _canvas = undefined;
-        let _helpPopup = undefined;
-        let _uiPopup = undefined;
-        let _infoPopup = undefined;
-        let _fileInput = undefined;
+        constructor() {
+            this.glContext = undefined;
 
-        let _windows = undefined;
-        let _shaders = [];
+            this.canvas = undefined;
+            this.helpPopup = undefined;
+            this.uiPopup = undefined;
+            this.infoPopup = undefined;
+            this.fileInput = undefined;
 
-        let _uiHtml = "";
+            this.streams = [];
+            this.windows = undefined;
+            this.shaders = undefined;
 
-        let _animation = {
-            active: false,
-            fps: 24,
-            pingPong: true,
-            direction: 1,
-            frameId: 0,
-            numFrames: 1,  //  TODO: fix this!
-            minFrameId: 0,
-            maxFrameId: 0,
+            this.uiHtml = "";
 
-            toggleActive: function () {
-                this.active = !this.active;
-            },
+            this.animation = {
+                active: false,
+                fps: 5,
+                pingPong: true,
+                direction: 1,
+                frameId: 0,
+                numFrames: 1,  //  TODO: fix this!
+                minFrameId: 0,
+                maxFrameId: 0,
+                time: undefined,
 
-            togglePingPong: function () {
-                this.pingPong = !this.pingPong;
-            },
+                toggleActive: function () {
+                    this.active = !this.active;
+                },
 
-            inc: function () {
-                this.frameId = (this.frameId + 1) % this.numFrames;
-                console.log("frameId: " + this.frameId);
-            },
+                togglePingPong: function () {
+                    this.pingPong = !this.pingPong;
+                },
 
-            dec: function () {
-                this.frameId = (this.frameId + this.numFrames - 1) % this.numFrames;
-                console.log("frameId: " + this.frameId);
-            },
+                inc: function () {
+                    this.frameId = (this.frameId + 1) % this.numFrames;
+                    console.log("frameId: " + this.frameId);
+                },
 
-            update: function () {
-                if (this.active) {
-                    this.frameId += this.direction;
-                    this.frameId = Math.max(this.frameId, 0);
-                    this.frameId = Math.min(this.frameId, this.numFrames - 1);
+                dec: function () {
+                    this.frameId = (this.frameId + this.numFrames - 1) % this.numFrames;
+                    console.log("frameId: " + this.frameId);
+                },
 
-                    if (this.pingPong) {
-                        if (this.frameId == 0 || this.frameId == this.numFrames - 1) {
-                            this.direction = -this.direction;
+                update: function () {
+                    if (this.active) {
+                        this.frameId += this.direction;
+                        this.frameId = Math.max(this.frameId, 0);
+                        this.frameId = Math.min(this.frameId, this.numFrames - 1);
+
+                        if (this.pingPong) {
+                            if (this.frameId == 0 || this.frameId == this.numFrames - 1) {
+                                this.direction = -this.direction;
+                            }
+                        }
+                        else {
+                            this.frameId %= this.numFrames;
                         }
                     }
-                    else {
-                        this.frameId %= this.numFrames;
-                    }
                 }
-            }
-        };
+            };
 
-        let _init = function () {
+            this.canvas = document.createElement("canvas");
+            document.body.appendChild(this.canvas);
 
-            _canvas = document.createElement("canvas");
-            document.body.appendChild(_canvas);
+            this.helpPopup = document.createElement("div");
+            this.helpPopup.className = "helpPopup";
 
-            _helpPopup = document.createElement("div");
-            _helpPopup.className = "helpPopup";
+            this.helpPopup.innerHTML = "<b>Nvis Online</b><br/>";
+            this.helpPopup.innerHTML += "<br/>";
+            this.helpPopup.innerHTML += "Drag-and-drop files to this window...<br/>";
+            this.helpPopup.innerHTML += "<br/>";
+            this.helpPopup.innerHTML += "h - display this text<br/>";
+            this.helpPopup.innerHTML += "d - delete window under cursor<br/>";
+            this.helpPopup.innerHTML += "w - add window<br/>";
+            this.helpPopup.innerHTML += "+ - increase number of window columns<br/>";
+            this.helpPopup.innerHTML += "- - decrease number of window columns<br/>";
+            this.helpPopup.innerHTML += "Up/Down - change stream for window under cursor<br/>";
+            this.helpPopup.innerHTML += "<br/>";
+            this.helpPopup.innerHTML += "<br/>";
+            this.helpPopup.innerHTML += "<br/>";
 
-            _helpPopup.innerHTML = "<b>Nvis Online</b><br/>";
-            _helpPopup.innerHTML += "<br/>";
-            _helpPopup.innerHTML += "Drag-and-drop files to this window...<br/>";
-            _helpPopup.innerHTML += "<br/>";
-            _helpPopup.innerHTML += "h - display this text<br/>";
-            _helpPopup.innerHTML += "d - delete window under cursor<br/>";
-            _helpPopup.innerHTML += "w - add window<br/>";
-            _helpPopup.innerHTML += "+ - increase number of window columns<br/>";
-            _helpPopup.innerHTML += "- - decrease number of window columns<br/>";
-            _helpPopup.innerHTML += "Up/Down - change stream for window under cursor<br/>";
-            _helpPopup.innerHTML += "<br/>";
-            _helpPopup.innerHTML += "<br/>";
-            _helpPopup.innerHTML += "<br/>";
+            this.infoPopup = document.createElement("div");
+            this.infoPopup.id = "infoPopup";
+            this.infoPopup.className = "infoPopup";
 
-            _infoPopup = document.createElement("div");
-            _infoPopup.id = "infoPopup";
-            _infoPopup.className = "infoPopup";
+            this.uiPopup = document.createElement("div");
+            this.uiPopup.id = "uiPopup";
+            this.uiPopup.className = "uiPopup";
 
-            _uiPopup = document.createElement("div");
-            _uiPopup.id = "uiPopup";
-            _uiPopup.className = "uiPopup";
+            this.fileInput = document.createElement("input");
+            this.fileInput.id = "fileInput";
+            this.fileInput.setAttribute("type", "file");
+            this.fileInput.setAttribute("multiple", true);
+            this.fileInput.setAttribute("accept", "image/*|.exr")
+            this.fileInput.onchange = this.onFileDrop;
 
-            _fileInput = document.createElement("input");
-            _fileInput.id = "fileInput";
-            _fileInput.setAttribute("type", "file");
-            _fileInput.setAttribute("multiple", true);
-            _fileInput.setAttribute("accept", "image/*|.exr")
-            _fileInput.onchange = _onFileDrop;
-            // _fileInput.style.position = "absolute";
-            // _fileInput.style.left = "0px";
-            // _fileInput.style.top = "0px";
-            // _fileInput.style.width = "100%";
-            // _fileInput.style.height = "100%";
-            // _fileInput.style.backgroundColor = "#20802080";
+            document.body.appendChild(this.uiPopup);
+            document.body.appendChild(this.helpPopup);
+            document.body.appendChild(this.fileInput);
+            document.body.appendChild(this.infoPopup);
 
-            // _fileInput.ondrop = _onFileDrop;
-            // _fileInput.ondragenter = _onFileDragEnter;
-            // _fileInput.ondragover = _onFileDragOver;
-            // _fileInput.ondragleave = _onFileDragLeave;
-            // _fileInput.onclick = undefined;
-
-            document.body.appendChild(_uiPopup);
-            document.body.appendChild(_helpPopup);
-            document.body.appendChild(_fileInput);
-            document.body.appendChild(_infoPopup);
-
-            _glContext = _canvas.getContext("webgl2");
-            if (_glContext === null) {
+            this.glContext = this.canvas.getContext("webgl2");
+            if (this.glContext === null) {
                 alert("Unable to initialize WebGL!");
                 return;
             }
 
             //  extensions
-            _glContext.getExtension("EXT_color_buffer_float")
+            this.glContext.getExtension("EXT_color_buffer_float")
 
-            _windows = new NvisWindows(_glContext, _canvas);
-            _shaders = new NvisShaders(_glContext);
+            this.windows = new NvisWindows(this.glContext, this.canvas);
+            this.shaders = new NvisShaders(this.glContext);
 
-            window.addEventListener("resize", _windows.boundAdjust);
+            window.addEventListener("resize", this.windows.boundAdjust);
 
-            _canvas.addEventListener("click", _onClick);
-            _canvas.addEventListener("mousedown", _onMouseDown);
-            _canvas.addEventListener("mousemove", _onMouseMove);
-            _canvas.addEventListener("mouseup", _onMouseUp);
-            _canvas.addEventListener("mouseleave", _onMouseUp);
-            _canvas.addEventListener("wheel", _onWheel);
+            this.canvas.addEventListener("click", (event) => this.onClick(event));
+            this.canvas.addEventListener("mousedown", (event) => this.onMouseDown(event));
+            this.canvas.addEventListener("mousemove", (event) => this.onMouseMove(event));
+            this.canvas.addEventListener("mouseup", (event) => this.onMouseUp(event));
+            this.canvas.addEventListener("mouseleave", (event) => this.onMouseUp(event));
+            this.canvas.addEventListener("wheel", (event) => this.onWheel(event));
 
-            document.body.addEventListener("paste", _onFileDrop);
-            document.body.addEventListener("drop", _onFileDrop);
-            document.body.addEventListener("dragenter", _onFileDragEnter);
-            document.body.addEventListener("dragover", _onFileDragOver);
-            document.body.addEventListener("dragleave", _onFileDragLeave);
-            document.body.addEventListener("keydown", _onKeyDown);
-            document.body.addEventListener("keyup", _onKeyUp);
+            document.body.addEventListener("paste", (event) => this.onFileDrop(event));
+            document.body.addEventListener("drop", (event) => this.onFileDrop(event));
+            document.body.addEventListener("dragenter", (event) => this.onFileDragEnter(event));
+            document.body.addEventListener("dragover", (event) => this.onFileDragOver(event));
+            document.body.addEventListener("dragleave", (event) => this.onFileDragLeave(event));
+            document.body.addEventListener("keydown", (event) => this.onKeyDown(event));
+            document.body.addEventListener("keyup", (event) => this.onKeyUp(event));
 
         };
 
-        let _getContext = function () {
-            return _glContext;
+        getContext = function () {
+            return this.glContext;
         }
 
-        var _onWheel = function (event) {
+        onWheel(event) {
             event.preventDefault();
-            let level = _windows.zoom(-Math.sign(event.deltaY), _state.input.mouse.canvasCoords, _state.input.keyboard.shift);
-            _popupInfo("zoom = " + level.toFixed(1) + "x");
+            let level = this.windows.zoom(-Math.sign(event.deltaY), _state.input.mouse.canvasCoords, _state.input.keyboard.shift);
+            this.popupInfo("zoom = " + level.toFixed(1) + "x");
         }
 
-        let _updateUiPopup = function () {
+        updateUiPopup() {
             //  clear all children
-            _uiPopup.textContent = '';
+            this.uiPopup.textContent = '';
 
-            _uiPopup.innerHTML = "<b>NVIS Online<br/><br/>";
+            this.uiPopup.innerHTML = "<b>NVIS Online<br/><br/>";
 
-            _uiPopup.innerHTML += "Streams<br/>";
-            for (let streamId = 0; streamId < _streams.length; streamId++) {
-                let ui = _streams[streamId].getUI(streamId, _streams, _shaders);
-                _uiPopup.appendChild(ui);
+            this.uiPopup.innerHTML += "Streams<br/>";
+            for (let streamId = 0; streamId < this.streams.length; streamId++) {
+                let ui = this.streams[streamId].getUI(streamId, this.streams, this.shaders);
+                this.uiPopup.appendChild(ui);
             }
-            for (let shaderId = 0; shaderId < _shaders.length; shaderId++) {
+            for (let shaderId = 0; shaderId < this.shaders.length; shaderId++) {
                 let ui = document.createElement("p");
-                ui.innerHTML = "Shader: " + _shaders[shaderId].name;
-                _uiPopup.appendChild(ui);
+                ui.innerHTML = "Shader: " + this.shaders[shaderId].name;
+                this.uiPopup.appendChild(ui);
             }
-            _uiPopup.innerHTML += "<br/>";
-            _uiPopup.innerHTML += "<br/>";
+            this.uiPopup.innerHTML += "<br/>";
+            this.uiPopup.innerHTML += "<br/>";
 
-            _uiPopup.innerHTML += "Windows<br/>";
-            for (let windowId = 0; windowId < _windows.getNumWindows(); windowId++) {
+            this.uiPopup.innerHTML += "Windows<br/>";
+            for (let windowId = 0; windowId < this.windows.getNumWindows(); windowId++) {
                 //let w = _windows.getWindow(i);
                 let label = "- window " + (windowId + 1) + ": ";
                 // _uiPopup.innerHTML += selector;
-                _uiPopup.innerHTML += "<label for=\"windowStream\">" + label + "</label>";
+                this.uiPopup.innerHTML += "<label for=\"windowStream\">" + label + "</label>";
                 let options = "";
-                let windowStreamId = _windows.getWindow(windowId).getStreamId();
-                for (let streamId = 0; streamId < _streams.length; streamId++) {
-                    let fileName = _streams[streamId].getFileName();
+                let windowStreamId = this.windows.getWindow(windowId).getStreamId();
+                for (let streamId = 0; streamId < this.streams.length; streamId++) {
+                    let fileName = this.streams[streamId].getFileName();
                     options += "<option";
                     if (streamId == windowStreamId) {
                         options += " selected";
@@ -4046,25 +4048,25 @@ var nvis = new function () {
                 let select = ("<select id=\"windowStream-" + windowId + "\"");
                 select += (" onchange=\"nvis.setWindowStreamId(" + windowId + ")\"");
                 select += (" id=\"windowStream\">" + options + "</select>");
-                _uiPopup.innerHTML += select;
-                _uiPopup.innerHTML += "<br/>";
+                this.uiPopup.innerHTML += select;
+                this.uiPopup.innerHTML += "<br/>";
             }
-            _uiPopup.innerHTML += "<hr>";
-            _uiPopup.innerHTML += "<br/>";
-            _uiPopup.innerHTML += "<input id=\"bAutomaticLayout\" " + (_state.layout.bAutomatic ? "checked " : "") + "type=\"checkbox\" onclick=\"nvis.toggleAutomaticLayout()\"> Automatic window layout";
-            _uiPopup.innerHTML += "<br/>";
+            this.uiPopup.innerHTML += "<hr>";
+            this.uiPopup.innerHTML += "<br/>";
+            this.uiPopup.innerHTML += "<input id=\"bAutomaticLayout\" " + (_state.layout.bAutomatic ? "checked " : "") + "type=\"checkbox\" onclick=\"nvis.toggleAutomaticLayout()\"> Automatic window layout";
+            this.uiPopup.innerHTML += "<br/>";
 
             //  center popup
-            let w = window.getComputedStyle(_uiPopup).getPropertyValue("width");
-            let h = window.getComputedStyle(_uiPopup).getPropertyValue("height");
-            let x = Math.trunc((_canvas.width - w.substring(0, w.indexOf('px'))) / 2);
-            let y = Math.trunc((_canvas.height - h.substring(0, h.indexOf('px'))) / 2);
-            _uiPopup.style.left = (x + "px");
-            _uiPopup.style.top = (y + "px");
+            let w = window.getComputedStyle(this.uiPopup).getPropertyValue("width");
+            let h = window.getComputedStyle(this.uiPopup).getPropertyValue("height");
+            let x = Math.trunc((this.canvas.width - w.substring(0, w.indexOf('px'))) / 2);
+            let y = Math.trunc((this.canvas.height - h.substring(0, h.indexOf('px'))) / 2);
 
+            this.uiPopup.style.left = (x + "px");
+            this.uiPopup.style.top = (y + "px");
         }
 
-        let _onKeyDown = function (event) {
+        onKeyDown(event) {
             event = event || window.event;
             let keyCode = event.keyCode || event.which;
             let key = event.key;
@@ -4077,64 +4079,63 @@ var nvis = new function () {
             switch (keyCode) {
                 case 9:  //  Tab
                     event.preventDefault();
-                    if (_uiPopup.style.display == "") {
-                        _uiPopup.style.display = "block";
-                        _updateUiPopup();
-                    }
-                    else {
-                        _uiPopup.style.display = "";
+                    if (this.uiPopup.style.display == "") {
+                        this.uiPopup.style.display = "block";
+                        this.updateUiPopup();
+                    } else {
+                        this.uiPopup.style.display = "";
                     }
                     break;
                 case 16:  //  Shift
                     _state.input.keyboard.shift = true;
                     break;
                 case 37:  //  ArrowLeft
-                    _animation.dec();
+                    this.animation.dec();
                     break;
                 case 38:  //  ArrowUp
-                    _windows.incStream(_state.input.mouse.canvasCoords, _streams);
+                    this.windows.incStream(_state.input.mouse.canvasCoords, this.streams);
                     break;
                 case 39:  //  ArrowRight
-                    _animation.inc();
+                    this.animation.inc();
                     break;
                 case 40:  //  ArrowDown
-                    _windows.decStream(_state.input.mouse.canvasCoords, _streams);
+                    this.windows.decStream(_state.input.mouse.canvasCoords, this.streams);
                     break;
                 default:
                     switch (key) {
                         case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
                             let streamId = parseInt(key) - 1;
-                            if (streamId < _streams.length) {
-                                _windows.setWindowStreamId(_windows.getWindowId(_state.input.mouse.canvasCoords), streamId);
+                            if (streamId < this.streams.length) {
+                                this.windows.setWindowStreamId(this.windows.getWindowId(_state.input.mouse.canvasCoords), streamId);
                             }
                             break;
                         case ' ':
-                            _animation.toggleActive();
+                            this.animation.toggleActive();
                             break;
                         case 'a':
                             _state.layout.bAutomatic = !_state.layout.bAutomatic;
-                            _popupInfo("Automatic window placement: " + (_state.layout.bAutomatic ? "on" : "off"));
-                            _windows.adjust();
+                            this.popupInfo("Automatic window placement: " + (_state.layout.bAutomatic ? "on" : "off"));
+                            this.windows.adjust();
                             break;
                         case 'p':
-                            _animation.togglePingPong();
+                            this.animation.togglePingPong();
                             break;
                         case 'd':
-                            _windows.delete(_state.input.mouse.canvasCoords);
+                            this.windows.delete(_state.input.mouse.canvasCoords);
                             break;
                         case 'o':
                             document.getElementById("fileInput").click();
                             break;
                         case 'D':
-                            if (_streams.length > 1) {
-                                _renderer.loadShader("glsl/difference.json");
+                            if (this.streams.length > 1) {
+                                this.renderer.loadShader("glsl/difference.json");
                             }
                             break;
                         case 'w':
-                            _windows.add();
+                            this.windows.add();
                             break;
                         case 'h':
-                            _helpPopup.style.display = "block";
+                            this.helpPopup.style.display = "block";
                             break;
                         case '+':
                             _state.layout.bAutomatic = false;
@@ -4142,7 +4143,7 @@ var nvis = new function () {
                             break;
                         case '-':
                             _state.layout.bAutomatic = false;
-                            _windows.dec();
+                            this.windows.dec();
                             break;
                         default:
                             console.log("KEYDOWN   key: '" + key + "', keyCode: " + keyCode);
@@ -4152,7 +4153,7 @@ var nvis = new function () {
             }
         }
 
-        let _onKeyUp = function (event) {
+        onKeyUp(event) {
             event = event || window.event;
             let keyCode = event.keyCode || event.which;
             let key = event.key;
@@ -4172,7 +4173,7 @@ var nvis = new function () {
                 default:
                     switch (key) {
                         case 'h':
-                            _helpPopup.style.display = "none";
+                            this.helpPopup.style.display = "none";
                             break;
                         default:
                             // console.log("KEYUP   key: '" + key + "', keyCode: " + keyCode);
@@ -4182,55 +4183,55 @@ var nvis = new function () {
             }
         }
 
-        let _fadeInfoPopup = function () {
+        fadeInfoPopup() {
             let opacity = parseFloat(document.getElementById("infoPopup").style.opacity);
             if (opacity > 0.0) {
                 document.getElementById("infoPopup").style.opacity = opacity - 0.02;
-                setTimeout(_fadeInfoPopup, 25);
+                setTimeout(() => this.fadeInfoPopup(), 25);
             }
             if (opacity == 0.0) {
                 document.getElementById("infoPopup").style.display = "none";
             }
         }
 
-        let _popupInfo = function (text) {
-            _infoPopup.innerHTML = text;
+        popupInfo(text) {
+            this.infoPopup.innerHTML = text;
             let currentOpacity = document.getElementById("infoPopup").style.opacity;
             document.getElementById("infoPopup").style.opacity = 1.0;
             document.getElementById("infoPopup").style.display = "block";
             if (currentOpacity == 0.0) {
-                _fadeInfoPopup();
+                this.fadeInfoPopup();
             }
         }
 
-        let _onClick = function (event) {
+        onClick(event) {
 
             let cc = _state.input.mouse.canvasCoords;
-            let windowId = _windows.getWindowId(cc);
+            let windowId = this.windows.getWindowId(cc);
 
             if (windowId === undefined) {
                 return;
             }
 
-            let streamId = _windows.windows[windowId].getStreamId();
-            let pCoord = _windows.getStreamCoordinates(cc, true);
+            let streamId = this.windows.windows[windowId].getStreamId();
+            let pCoord = this.windows.getStreamCoordinates(cc, true);
 
             if (pCoord === undefined) {
                 return;
             }
 
             let loc = { x: Math.floor(pCoord.x), y: Math.floor(pCoord.y) };
-            let color = _streams[streamId].getPixelValue(loc);
+            let color = this.streams[streamId].getPixelValue(loc);
 
-            console.log("_canvas.onclick(" + JSON.stringify(loc) + "): " + JSON.stringify(color));
+            console.log("canvas.onClick(" + JSON.stringify(loc) + "): " + JSON.stringify(color));
         }
 
-        let _onMouseDown = function (event) {
+        onMouseDown(event) {
             _state.input.mouse.down = true;
             _state.input.mouse.clickPosition = { x: event.clientX, y: event.clientY };
         }
 
-        let _onMouseMove = function (event) {
+        onMouseMove(event) {
             _state.input.mouse.previousCanvasCoords = _state.input.mouse.canvasCoords;
             _state.input.mouse.canvasCoords = {
                 x: event.clientX - _state.layout.border,
@@ -4242,11 +4243,11 @@ var nvis = new function () {
                     x: _state.input.mouse.previousCanvasCoords.x - _state.input.mouse.canvasCoords.x,
                     y: _state.input.mouse.previousCanvasCoords.y - _state.input.mouse.canvasCoords.y
                 }
-                _windows.translate(canvasOffset);
+                this.windows.translate(canvasOffset);
             }
         }
 
-        let _onMouseUp = function (event) {
+        onMouseUp(event) {
             _state.input.mouse.down = false;
         }
 
@@ -4262,13 +4263,13 @@ var nvis = new function () {
         //     _streams[streamId].setInputStream(inputId, inputStreamId);
         // }
 
-        let _setWindowStreamId = function (windowId) {
+        setWindowStreamId(windowId) {
             let elementId = ("windowStream-" + windowId);
             let newStreamId = document.getElementById(elementId).selectedIndex;
-            _windows.getWindow(windowId).setStreamId(newStreamId);
+            this.windows.getWindow(windowId).setStreamId(newStreamId);
         }
 
-        let _onFileDrop = function (event) {
+        onFileDrop(event) {
             event.stopPropagation();
             event.preventDefault();
 
@@ -4306,17 +4307,17 @@ var nvis = new function () {
                 files.sort(function (a, b) {
                     return a.name.localeCompare(b.name);
                 });
-                let newStream = new NvisStream(_glContext);
-                newStream.drop(files, _newStreamCallback);
-                _streams.push(newStream);
-                _animation.numFrames = newStream.getNumImages();  //  TODO: check
-                _addWindow(_streams.length - 1);
-                _windows.adjust();
+                let newStream = new NvisStream(this.glContext);
+                newStream.drop(files, this.newStreamCallback);
+                this.streams.push(newStream);
+                this.animation.numFrames = newStream.getNumImages();  //  TODO: check
+                this.addWindow(this.streams.length - 1);
+                this.windows.adjust();
             }
 
             document.getElementById("fileInput").value = "";  //  force onchange event if same files
 
-            _canvas.style.borderColor = "black";
+            this.canvas.style.borderColor = "black";
 
             return;
             for (let i = 0; i < files.length; i++) {
@@ -4360,108 +4361,104 @@ var nvis = new function () {
 
         }
 
-        let _onFileDragEnter = function (event) {
-            _canvas.style.borderColor = "green";
+        onFileDragEnter(event) {
+            this.canvas.style.borderColor = "green";
             event.preventDefault();
         }
 
-        let _onFileDragOver = function (event) {
+        onFileDragOver(event) {
             event.preventDefault();
         }
 
-        let _onFileDragLeave = function (event) {
-            _canvas.style.borderColor = "black";
+        onFileDragLeave(event) {
+            this.canvas.style.borderColor = "black";
             event.preventDefault();
         }
 
-        let _render = function () {
-            let gl = _glContext;
+        render() {
+            let gl = this.glContext;
             gl.clearColor(0.2, 0.2, 0.2, 1.0);
-            gl.clear(_glContext.COLOR_BUFFER_BIT);
+            gl.clear(this.glContext.COLOR_BUFFER_BIT);
 
-            _windows.render(_animation.frameId, _streams, _shaders);
-
-            _animation.update();
+            this.windows.render(this.animation.frameId, this.streams, this.shaders);
         }
 
-        let _shaderLoaded = function () {
+        shaderLoaded() {
             //_shaders[shaderId] = shader;
-            _windows.adjust();  //  TODO: is this needed?
+            this.windows.adjust();  //  TODO: is this needed?
         }
 
-        let _loadShader = function (jsonFileName) {
-            _shaders.load(jsonFileName, function () { _shaderLoaded(); });
+        loadShader(jsonFileName) {
+            // this.shaders.load(jsonFileName, function () { this.shaderLoaded(); });
+            this.shaders.load(jsonFileName, () => this.shaderLoaded());
         }
 
-        let _newStreamCallback = function (streamPxDimensions) {
-            // console.log("_newStreamCallback(" + streamPxDimensions.w + ", " + streamPxDimensions.h + ")");
-            _windows.setStreamPxDimensions(streamPxDimensions);
-            _windows.adjust();
+        newStreamCallback(streamPxDimensions) {
+            // console.log("newStreamCallback(" + streamPxDimensions.w + ", " + streamPxDimensions.h + ")");
+            this.windows.setStreamPxDimensions(streamPxDimensions);
+            this.windows.adjust();
         }
 
-        let _loadStream = function (fileNames) {
-            //let newStream = new NvisStream(_glContext, fileNames, _newStreamCallback);
-            let newStream = new NvisStream(_glContext);
+        loadStream(fileNames) {
+            //let newStream = new NvisStream(this.glContext, fileNames, this.newStreamCallback);
+            let newStream = new NvisStream(this.glContext);
 
-            newStream.load(fileNames, _newStreamCallback);
+            //newStream.load(fileNames, (dim) => this.newStreamCallback(dim));
+            newStream.load(fileNames, this.windows);
 
             //  TODO: fix this
-            _animation.numFrames = newStream.getNumImages();
+            this.animation.numFrames = newStream.getNumImages();
 
-            _streams.push(newStream);
-            _windows.adjust();
-
-            return newStream;
-        }
-
-        let _addShaderStream = function (shaderId) {
-            let newStream = new NvisStream(_glContext, shaderId);
-
-            _streams.push(newStream);
-            _windows.adjust();
+            this.streams.push(newStream);
+            this.windows.adjust();
 
             return newStream;
         }
 
-        let _addWindow = function (streamId) {
-            _windows.add(streamId);
+        addShaderStream(shaderId) {
+            let newStream = new NvisStream(this.glContext, shaderId);
+
+            this.streams.push(newStream);
+            this.windows.adjust();
+
+            return newStream;
         }
 
-        let _getNumStreams = function () {
-            return _streams.length;
+        addWindow(streamId) {
+            this.windows.add(streamId);
         }
 
-        let _start = function () {
-            _animate();
+        getNumStreams = function () {
+            return this.streams.length;
         }
 
-        let _animate = function () {
+        start() {
+            requestAnimationFrame(() => this.animate());
+        }
+
+        animate(timeStamp) {
             // TODO: fix this...
-            let fps = 60;
+
+            let fps = this.animation.fps;
+
+            if (this.animation.time === undefined) {
+                this.animation.time = timeStamp;
+            }
+
+            const elapsed = timeStamp - this.animation.time;
+
+            if (elapsed >= 1000.0 / fps) {
+                this.animation.update();
+                this.animation.time = timeStamp;
+            }
 
             setTimeout(() => {
-                requestAnimationFrame(_animate);
-            }, 1000 / fps);
-            //requestAnimationFrame(animate);
-            _render();
+                requestAnimationFrame((t) => this.animate(t));
+            }, 1);
+
+            this.render();
         }
 
-        _init();
-
-        return {
-            getContext: _getContext,
-            addShaderStream: _addShaderStream,
-            addWindow: _addWindow,
-            loadStream: _loadStream,
-            loadShader: _loadShader,
-            render: _render,
-            updateUiPopup: _updateUiPopup,
-            // streamUpdateParameter: _streamUpdateParameter,
-            // streamUpdateInput: _streamUpdateInput,
-            setWindowStreamId: _setWindowStreamId,
-            getNumStreams: _getNumStreams,
-            start: _start,
-        }
     }
 
     //  API
@@ -4510,7 +4507,7 @@ var nvis = new function () {
                             }
                         }
                         if (newStream !== undefined && streams[objectId].window) {
-                            _renderer.addWindow(_streams.length - 1);
+                            _renderer.addWindow(_renderer.streams.length - 1);
                         }
                     }
                 }
@@ -4530,7 +4527,7 @@ var nvis = new function () {
 
     let _streamUpdateParameter = function (streamId, elementId, bUpdateUI) {
         console.log("update: " + streamId + ", " + elementId);
-        _streams[streamId].uiUpdate(elementId);
+        _renderer.streams[streamId].uiUpdate(elementId);
         if (bUpdateUI) {
             console.log("Updating UI");
             _renderer.updateUiPopup();
@@ -4541,7 +4538,7 @@ var nvis = new function () {
         console.log("update: " + streamId + ", " + inputId);
         let elementId = ("input-" + streamId + "-" + inputId);
         let inputStreamId = document.getElementById(elementId).selectedIndex;
-        _streams[streamId].setInputStreamId(inputId, inputStreamId);
+        _renderer.streams[streamId].setInputStreamId(inputId, inputStreamId);
     }
 
     let _setWindowStreamId = function (windowId) {
