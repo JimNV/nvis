@@ -1,0 +1,36 @@
+{
+    "name": "JERI Glass configuration",
+    "layout": {
+        "width": 3
+    },
+    "shaders": [
+        "glsl/difference.json"
+    ],
+    "windows": [
+        "Lena",
+        "Texture/Plane"
+    ],
+    "streams": [
+        {
+            "name": "Input",
+            "window": true,
+            "files": [
+                "images/jeri-glass-input.exr"
+            ]
+        },
+        {
+            "name": "Denoised",
+            "window": false,
+            "files": [
+                "images/jeri-glass-denoised.exr"
+            ]
+        },
+        {
+            "name": "Reference",
+            "window": false,
+            "files": [
+                "images/jeri-glass-reference.exr"
+            ]
+        }
+    ]
+}

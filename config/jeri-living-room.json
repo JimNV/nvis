@@ -1,0 +1,32 @@
+{
+    "name": "JERI Living Room configuration",
+    "layout": {
+        "width": 3
+    },
+    "shaders": [
+        "glsl/difference.json"
+    ],
+    "streams": [
+        {
+            "name": "Input",
+            "window": true,
+            "files": [
+                "images/jeri-living-room-input.exr"
+            ]
+        },
+        {
+            "name": "Denoised",
+            "window": false,
+            "files": [
+                "images/jeri-living-room-denoised.exr"
+            ]
+        },
+        {
+            "name": "Reference",
+            "window": false,
+            "files": [
+                "images/jeri-living-room-reference.exr"
+            ]
+        }
+    ]
+}
