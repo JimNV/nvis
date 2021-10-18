@@ -53,6 +53,13 @@ var nvis = new function () {
     ];
 
     let _state = {
+        ui: {
+            tabId: "tabSettings",
+            position: { x: 50, y: 50 },
+            clickPosition: undefined,
+            mouseDown: false,
+            previousPosition: { x: 50, y: 50 }
+        },
         layout: {
             border: 50,
             bAutomatic: true,
@@ -109,6 +116,13 @@ var nvis = new function () {
             margin: 0px;
             padding: 0px;
             font: 20px Arial;
+            overflow: hidden;
+            user-select: none;
+        }`);
+
+        addStylesheetRules(`div.title {
+            font-weight: bold;
+            padding-bottom: 10px;
         }`);
 
         addStylesheetRules(`canvas {
@@ -135,6 +149,7 @@ var nvis = new function () {
         }`);
 
         addStylesheetRules(`.uiPopup {
+            user-select: false;
             color: black;
             background-color: #f0f0f0;
             border: 3px solid #808080;
@@ -145,6 +160,23 @@ var nvis = new function () {
             padding: 20px;
             left: 20px;
             top: 20px;
+        }`);
+        addStylesheetRules(`.uiPopup div.titleBar {
+            display: flex;
+            margin-bottom: 15px;
+        }`);
+        addStylesheetRules(`.uiPopup span.title {
+            margin-right: 15px;
+        }`);
+        addStylesheetRules(`.uiPopup div.titleBarBar {
+            flex-grow: 1;
+            background: repeating-linear-gradient(
+                135deg,
+                #b0b0b0,
+                #b0b0b0 10px,
+                #a0a0a0 10px,
+                #a0a0a0 20px
+            );
         }`);
 
         addStylesheetRules(`.infoPopup {
@@ -165,6 +197,45 @@ var nvis = new function () {
         addStylesheetRules(`select {
             font: 20px Arial;
         }`);
+
+        //  UI tabs
+        addStylesheetRules(`div.tabs {
+            overflow: hidden;
+            border: 0px solid #c0c0c0;
+            background-color: #f0f0f0;
+        }`);
+        addStylesheetRules(`div.tabs button {
+            background-color: inherit;
+            float: left;
+            border: 1px solid #e0e0e0;
+            border-radius: 15px 15px 0px 0px;
+            outline: none;
+            cursor: pointer;
+            padding: 6px 18px;
+            transition: 0.3s;
+            font-size: 17px;
+        }`);
+        addStylesheetRules(`div.tabs button:hover {
+            background-color: #d0d0d0;
+        }`);
+        addStylesheetRules(`div.tabs button {
+            border-bottom: 1px solid #808080;
+            border-radius: 15px 15px 0px 0px;
+        }`);
+        addStylesheetRules(`div.tabs button.active {
+            border-bottom: 1px solid #f0f0f0;
+            border-top: 1px solid #808080;
+            border-left: 1px solid #808080;
+            border-right: 1px solid #808080;
+            border-radius: 15px 15px 0px 0px;
+        }`);
+        addStylesheetRules(`div.tabContent {
+            display: none;
+            padding: 6px 12px;
+            border: 1px solid #808080;
+            border-top: none;
+        }`);
+        
     }
 
 
@@ -307,15 +378,14 @@ var nvis = new function () {
                         cell.innerHTML = el.outerHTML + label.outerHTML;
 
                         row.appendChild(cell);
-                    }
-                    else {
+                    } else {
                         let elCell = document.createElement("td");
                         elCell.innerHTML = el.outerHTML;
                         let labelCell = document.createElement("td");
                         labelCell.innerHTML = label.outerHTML;
 
-                        row.appendChild(labelCell);
                         row.appendChild(elCell);
+                        row.appendChild(labelCell);
                     }
 
                     table.appendChild(row);
@@ -1645,12 +1715,21 @@ var nvis = new function () {
             return value;
         }
 
+        getUint32(byteIndex) {
+            return this.view.getUint32(byteIndex, this.littleEndian);
+        }
+
+        setUint32(byteIndex, value) {
+            this.view.setUint32(byteIndex, value, this.littleEndian);
+        }
+
+        /////////
+
         readUint64() {
             let value = this.view.getBigUint64(this.bytePointer, this.littleEndian);
             this.bytePointer += 8;
             return value;
         }
-
 
         /////////
 
@@ -1663,6 +1742,10 @@ var nvis = new function () {
         writeFloat32(value) {
             this.view.setFloat32(this.bytePointer, value, this.littleEndian);
             this.bytePointer += 4;
+        }
+
+        getFloat32(byteIndex) {
+            return this.view.getFloat32(byteIndex, this.littleEndian);
         }
 
         setFloat32(byteIndex, value) {
@@ -1745,6 +1828,7 @@ var nvis = new function () {
             this.fileName = fileName;
             this.buffer = new NvisBitBuffer(buffer);
 
+            this.bSuccess = true;
             let b = this.buffer;
 
             let magicNumber = b.readInt32();  //  should be decimal 20000630
@@ -1756,8 +1840,8 @@ var nvis = new function () {
                 nonImage: (((versionField >> (11 - 1)) & 1) == 1),
                 multiPart: (((versionField >> (12 - 1)) & 1) == 1),
             }
-            // console.log("Magic number: " + magicNumber);
-            // console.log("Version field: " + JSON.stringify(version));
+            console.log("Magic number: " + magicNumber);
+            console.log("Version field: " + JSON.stringify(version));
 
             //  attributes
             this.attributes = {};
@@ -1767,7 +1851,7 @@ var nvis = new function () {
             }
             b.skip();
 
-            //console.log(JSON.stringify(this.attributes));
+            console.log(JSON.stringify(this.attributes));
 
             //  offset table
             this.scanLinesPerChunk = EXR_NO_COMPRESSION_SCANLINES;
@@ -1775,6 +1859,13 @@ var nvis = new function () {
             let dataWindowBox = this.attributes.dataWindow.values;
             let numOffsets = dataWindowBox.yMax - dataWindowBox.yMin + 1;
             let compression = this.attributes["compression"].value;
+
+            //  TODO: implement missing compresion methods
+            if (compression != EXR_NO_COMPRESSION && compression != EXR_ZIP_COMPRESSION) {
+                alert("EXR compression method not implemented!");
+                this.bSuccess = false;
+                return;
+            }
 
             switch (compression) {
                 case EXR_ZIP_COMPRESSION:
@@ -1876,386 +1967,399 @@ var nvis = new function () {
                 return;
             }
 
-            //  Huffman
-            this.huffman = {
-                tableSizes: new Array(TINFL_MAX_HUFF_TABLES).fill(0),
-                lengthCodes: new Array(TINFL_MAX_HUFF_SYMBOLS_0 + TINFL_MAX_HUFF_SYMBOLS_1 + 137).fill(0),
-                tables: []
-            }
-            for (let i = 0; i < TINFL_MAX_HUFF_TABLES; i++) {
-                this.huffman.tables.push({
-                    codeSize: new Array(TINFL_MAX_HUFF_SYMBOLS_0).fill(0),
-                    lookUp: new Array(TINFL_FAST_LOOKUP_SIZE).fill(0),
-                    tree: new Array(TINFL_MAX_HUFF_SYMBOLS_0 * 2).fill(0)
-                });
-            }
+            if (compression == EXR_ZIP_COMPRESSION) {
+                //  Huffman
+                this.huffman = {
+                    tableSizes: new Array(TINFL_MAX_HUFF_TABLES).fill(0),
+                    lengthCodes: new Array(TINFL_MAX_HUFF_SYMBOLS_0 + TINFL_MAX_HUFF_SYMBOLS_1 + 137).fill(0),
+                    tables: []
+                }
+                for (let i = 0; i < TINFL_MAX_HUFF_TABLES; i++) {
+                    this.huffman.tables.push({
+                        codeSize: new Array(TINFL_MAX_HUFF_SYMBOLS_0).fill(0),
+                        lookUp: new Array(TINFL_FAST_LOOKUP_SIZE).fill(0),
+                        tree: new Array(TINFL_MAX_HUFF_SYMBOLS_0 * 2).fill(0)
+                    });
+                }
 
-            //  compressed data handled below
-            for (let sl = 0; sl < numOffsets; sl++) {
-                b.seek(Number(this.offsetTable[sl].offset));
+                //  compressed data handled below
+                for (let sl = 0; sl < numOffsets; sl++) {
+                    b.seek(Number(this.offsetTable[sl].offset));
 
-                //  not really needed, but we have to consume them fom the input stream
-                let storedScanLine = b.readUint32();
-                let storedDataSize = b.readUint32();
+                    //  not really needed, but we have to consume them fom the input stream
+                    let storedScanLine = b.readUint32();
+                    let storedDataSize = b.readUint32();
 
-                //console.log("   scanLine: " + scanLine + ", dataSize: " + dataSize);
+                    //console.log("   scanLine: " + scanLine + ", dataSize: " + dataSize);
 
-                let z = {};
+                    let z = {};
 
-                //  https://datatracker.ietf.org/doc/html/rfc1950
+                    //  https://datatracker.ietf.org/doc/html/rfc1950
 
-                // let atBit = (b.bytePointer * 8 + b.bitPointer);
-                // console.log("at bit: " + atBit);
+                    // let atBit = (b.bytePointer * 8 + b.bitPointer);
+                    // console.log("at bit: " + atBit);
 
-                let CMF = b.readUint8();
-                let FLG = b.readUint8();
-                // console.log("CMF: " + CMF + ", FLG: " + FLG + ", next: 0x" + b.peekUint8().toString(16));
-                z.cmf = {};
-                z.cmf.cm = NvisBitBuffer.bits(CMF, 3, 0);  //  compression method, should be = 8
-                z.cmf.info = NvisBitBuffer.bits(CMF, 7, 4);  //   base-2 logarithm of the LZ77 window size, minus eight (CINFO=7 indicates a 32K window size)
-                z.flg = {};
-                z.flg.fcheck = NvisBitBuffer.bits(FLG, 4, 0);  //  to make (CMF * 256 + FLG % 31) == 0
-                z.flg.fdict = NvisBitBuffer.bits(FLG, 5, 5);  //
-                z.flg.flevel = NvisBitBuffer.bits(FLG, 7, 6);  //  0: fastest, 1: fast, 2: default, 3: maximum/slowest
-                z.dictId = (z.flg.fdict == 1 ? b.readUint32() : undefined);
+                    let CMF = b.readUint8();
+                    let FLG = b.readUint8();
+                    //console.log("CMF: " + CMF + ", FLG: " + FLG + ", next: 0x" + b.peekUint8().toString(16));
+                    z.cmf = {};
+                    z.cmf.cm = NvisBitBuffer.bits(CMF, 3, 0);  //  compression method, should be = 8
+                    z.cmf.info = NvisBitBuffer.bits(CMF, 7, 4);  //   base-2 logarithm of the LZ77 window size, minus eight (CINFO=7 indicates a 32K window size)
+                    z.flg = {};
+                    z.flg.fcheck = NvisBitBuffer.bits(FLG, 4, 0);  //  to make (CMF * 256 + FLG % 31) == 0
+                    z.flg.fdict = NvisBitBuffer.bits(FLG, 5, 5);  //
+                    z.flg.flevel = NvisBitBuffer.bits(FLG, 7, 6);  //  0: fastest, 1: fast, 2: default, 3: maximum/slowest
+                    z.dictId = (z.flg.fdict == 1 ? b.readUint32() : undefined);
 
-                //  https://datatracker.ietf.org/doc/html/rfc1951
+                    console.log(JSON.stringify(z));
 
-                let bFinalBlock = false;
-                do {
+                    //  https://datatracker.ietf.org/doc/html/rfc1951
 
-                    bFinalBlock = (b.readBits(1) == 1);
-                    let blockType = b.readBits(2);
+                    let bFinalBlock = false;
+                    do {
 
-                    if (blockType == 0) {
-                        //  no compression
-                        b.byteAlign();
+                        bFinalBlock = (b.readBits(1) == 1);
+                        let blockType = b.readBits(2);
 
-                        let len = (b.readBits(8) | (b.readBits(8) << 8));
-                        let nlen = (0xFFFF ^ (b.readBits(8) | (b.readBits(8) << 8)));
-                        if (len != nlen) {
-                            //  error
-                            console.log("ERROR: Raw block header LEN/NLEN mismatch!");
-                        }
+                        if (blockType == 0) {
+                            //  no compression
+                            b.byteAlign();
 
-                        this.outputBuffer.consume(b, len);
-                        continue;
-                    }
-
-                    if (blockType == 3) {
-                        //  reserved (error)
-                        console.log("ERROR: Reserved block type (3)");
-                    }
-
-                    let counter = 0;
-
-                    if (blockType == 1 || blockType == 2) {
-                        //  compression with Huffman codes
-
-                        for (let i = 0; i < TINFL_MAX_HUFF_TABLES; i++) {
-                            this.huffman.tables[i].codeSize.fill(0);
-                            this.huffman.tables[i].lookUp.fill(0);
-                            this.huffman.tables[i].tree.fill(0);
-                        }
-
-                        if (blockType == 1) {
-                            //  compression with fixed Huffman codes
-                            //  TODO: this
-                            console.log("TODO: handle blocks compressed with fixed Huffman codes");
-                        } else {
-                            //  compression with dynamic Huffman codes
-                            this.huffman.tableSizes = [
-                                b.readBits(5) + s_min_table_sizes[0],
-                                b.readBits(5) + s_min_table_sizes[1],
-                                b.readBits(4) + s_min_table_sizes[2]
-                            ];
-                            for (let i = 0; i < this.huffman.tableSizes[2]; i++) {
-                                this.huffman.tables[2].codeSize[s_length_dezigzag[i]] = b.readBits(3);
-                            }
-                            this.huffman.tableSizes[2] = 19;
-                        }
-
-                        let nextCode = new Array(17);
-                        let totalSymbols = new Array(16);
-                        for (let iType = blockType; iType >= 0; iType--)  //  [(2,) 1, 0]
-                        {
-                            let curHuffmanTable = this.huffman.tables[iType];
-
-                            totalSymbols.fill(0);
-                            for (let i = 0; i < this.huffman.tableSizes[iType]; i++) {
-                                totalSymbols[curHuffmanTable.codeSize[i]]++;
-                            }
-
-                            let total = 0;
-                            let usedSymbols = 0;
-                            nextCode[0] = 0;
-                            nextCode[1] = 0;
-                            for (let i = 1; i <= 15; i++) {
-                                usedSymbols += totalSymbols[i];
-                                total = ((total + totalSymbols[i]) << 1);
-                                nextCode[i + 1] = total;
-                            }
-
-                            if ((total != 65536) && (usedSymbols > 1)) {
+                            let len = (b.readBits(8) | (b.readBits(8) << 8));
+                            let nlen = (0xFFFF ^ (b.readBits(8) | (b.readBits(8) << 8)));
+                            if (len != nlen) {
                                 //  error
-                                console.log("ERROR: Huffman table generation (1)");
+                                console.log("ERROR: Raw block header LEN/NLEN mismatch!");
                             }
 
-                            let treeNext = -1;
-                            for (let symbolIndex = 0; symbolIndex < this.huffman.tableSizes[iType]; symbolIndex++) {
-
-                                let codeSize = curHuffmanTable.codeSize[symbolIndex];
-                                if (codeSize == 0) {
-                                    continue;
-                                }
-
-                                let currentCode = nextCode[codeSize]++;
-
-                                let reverseCode = 0;
-                                for (let l = codeSize; l > 0; l--) {
-                                    reverseCode = (reverseCode << 1) | (currentCode & 1);
-                                    currentCode >>= 1;
-                                }
-
-                                if (codeSize <= TINFL_FAST_LOOKUP_BITS) {
-                                    let k = ((codeSize << 9) | symbolIndex);
-                                    while (reverseCode < TINFL_FAST_LOOKUP_SIZE) {
-                                        curHuffmanTable.lookUp[reverseCode] = k;
-                                        reverseCode += (1 << codeSize);
-                                    }
-                                    continue;
-                                }
-
-                                let treeCurrent = curHuffmanTable.lookUp[reverseCode & (TINFL_FAST_LOOKUP_SIZE - 1)];
-                                if (treeCurrent == 0) {
-                                    curHuffmanTable.lookUp[reverseCode & (TINFL_FAST_LOOKUP_SIZE - 1)] = treeNext;
-                                    treeCurrent = treeNext;
-                                    treeNext -= 2;
-                                }
-
-                                reverseCode >>= (TINFL_FAST_LOOKUP_BITS - 1);
-                                for (let j = codeSize; j > (TINFL_FAST_LOOKUP_BITS + 1); j--) {
-                                    treeCurrent -= ((reverseCode >>= 1) & 1);
-                                    if (!curHuffmanTable.tree[-treeCurrent - 1]) {
-                                        curHuffmanTable.tree[-treeCurrent - 1] = treeNext;
-                                        treeCurrent = treeNext;
-                                        treeNext -= 2;
-                                    } else {
-                                        treeCurrent = curHuffmanTable.tree[-treeCurrent - 1];
-                                    }
-                                }
-                                treeCurrent -= ((reverseCode >>= 1) & 1);
-                                curHuffmanTable.tree[-treeCurrent - 1] = symbolIndex;
-                            }
-
-                            if (iType == 2) {
-
-                                let distance = 0;
-
-                                for (counter = 0; counter < (this.huffman.tableSizes[0] + this.huffman.tableSizes[1]);) {
-
-                                    distance = this.huffmanDecode(b, 2);
-
-                                    if (distance < 16) {
-                                        this.huffman.lengthCodes[counter++] = distance;
-                                        continue;
-                                    }
-                                    if ((distance == 16) && (!counter)) {
-                                        //  Error, TODO: handle
-                                        console.log("ERROR: Huffman table generation (2)")
-                                    }
-
-                                    let numExtra = [2, 3, 7][distance - 16];
-                                    let s = b.readBits(numExtra);
-                                    s += [3, 3, 11][distance - 16];
-
-                                    for (let i = 0; i < s; i++) {
-                                        this.huffman.lengthCodes[counter + i] = (distance == 16 ? this.huffman.lengthCodes[counter - 1] : 0);
-                                    }
-                                    counter += s;
-                                }
-                                if ((this.huffman.tableSizes[0] + this.huffman.tableSizes[1]) != counter) {
-                                    //TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
-                                    //  Error, TODO: handle
-                                    console.log("ERROR: Huffman table generation (3)")
-                                }
-
-                                this.huffman.tables[0].codeSize = this.huffman.lengthCodes.slice(0, this.huffman.tableSizes[0]);
-                                this.huffman.tables[1].codeSize = this.huffman.lengthCodes.slice(this.huffman.tableSizes[0], this.huffman.tableSizes[0] + this.huffman.tableSizes[1]);
-                            }
-
-                        }
-
-                    }
-
-                    for (; ;) {
-                        for (; ;) {
-                            if ((b.remainingBits() < 32 || this.outputBuffer.remainingBits() < 16)) {
-                                //  TODO: this path not tested
-                                counter = this.huffmanDecode(b, 0);
-                                if (counter >= 256)
-                                    break;
-                                if (this.outputBuffer.bytePointer >= this.outputBuffer.buffer.byteLength) {
-                                    //  error: TODO: handle
-                                    console.log("Attempting to write outside output buffer!");
-                                }
-                                this.outputBuffer.writeUint8(counter);
-                            } else {
-
-                                let sym2 = this.huffmanDecode(b, 0, true);
-
-                                counter = sym2;
-
-                                if (counter & 256)
-                                    break;
-
-                                sym2 = this.huffmanDecode(b, 0, true);
-
-                                this.outputBuffer.writeUint8(counter & 255);
-                                if (sym2 & 256) {
-                                    counter = sym2;
-                                    break;
-                                }
-                                this.outputBuffer.writeUint8(sym2 & 255);
-                            }
-                        }
-
-                        if ((counter &= 511) == 256) {
-                            break;
-                        }
-
-                        let numExtra = s_length_extra[counter - 257];
-                        counter = s_length_base[counter - 257];
-                        if (numExtra) {
-                            let extraBits = b.readBits(numExtra);
-                            counter += extraBits;
-                        }
-
-                        let dist = this.huffmanDecode(b, 1);
-                        numExtra = s_dist_extra[dist];
-                        dist = s_dist_base[dist];
-                        if (numExtra > 0) {
-                            let extraBits = b.readBits(numExtra);
-                            dist += extraBits;
-                        }
-
-                        let dist_from_out_buf_start = this.outputBuffer.bytePointer;
-                        // dist_from_out_buf_start = pOut_buf_cur - pOut_buf_start;
-                        // if ((dist > dist_from_out_buf_start) && (decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) {
-                        //     TINFL_CR_RETURN_FOREVER(37, TINFL_STATUS_FAILED);
-                        // }
-
-                        let byteIndex = (dist_from_out_buf_start - dist);
-                        //                         pSrc = pOut_buf_start + ((dist_from_out_buf_start - dist) & out_buf_size_mask);
-
-                        if (Math.max(this.outputBuffer.bytePointer, byteIndex) > this.outputBuffer.buffer.byteLength - 1) {
-                            while (counter--) {
-                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(dist_from_out_buf_start - dist));
-                                dist_from_out_buf_start++;
-                            }
+                            this.outputBuffer.consume(b, len);
                             continue;
                         }
 
-                        if (b.remainingBits() == 0) {
-                            console.log("DONE!");
+                        if (blockType == 3) {
+                            //  reserved (error)
+                            console.log("ERROR: Reserved block type (3)");
                         }
-                        //                         if ((MZ_MAX(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
-                        //                             while (counter--) {
-                        //                                 while (pOut_buf_cur >= pOut_buf_end) {
-                        //                                     TINFL_CR_RETURN(53, TINFL_STATUS_HAS_MORE_OUTPUT);
-                        //                                 }
-                        //                                 *pOut_buf_cur++ = pOut_buf_start[(dist_from_out_buf_start++ - dist) & out_buf_size_mask];
-                        //                             }
-                        //                             continue;
-                        //                         }
 
-                        // #if MINIZ_USE_UNALIGNED_LOADS_AND_STORES
-                        //                         else if ((counter >= 9) && (counter <= dist)) {
-                        //                             const mz_uint8 * pSrc_end = pSrc + (counter & ~7);
-                        //                             do {
-                        //                                 ((mz_uint32 *)pOut_buf_cur)[0] = ((const mz_uint32 *)pSrc)[0];
-                        //                                 ((mz_uint32 *)pOut_buf_cur)[1] = ((const mz_uint32 *)pSrc)[1];
-                        //                                 pOut_buf_cur += 8;
-                        //                             } while ((pSrc += 8) < pSrc_end);
-                        //                             if ((counter &= 7) < 3) {
-                        //                                 if (counter) {
-                        //                                     pOut_buf_cur[0] = pSrc[0];
-                        //                                     if (counter > 1)
-                        //                                         pOut_buf_cur[1] = pSrc[1];
-                        //                                     pOut_buf_cur += counter;
-                        //                                 }
-                        //                                 continue;
-                        //                             }
-                        //                         }
-                        // #endif
-                        do {
-                            this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 0));
-                            this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
-                            this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 2));
-                            byteIndex += 3;
-                            // pOut_buf_cur[0] = pSrc[0];
-                            // pOut_buf_cur[1] = pSrc[1];
-                            // pOut_buf_cur[2] = pSrc[2];
-                            // pOut_buf_cur += 3;
-                            // pSrc += 3;
-                            // } while ((int)(counter -= 3) > 2);
-                        } while ((counter -= 3) > 2);
+                        let counter = 0;
 
-                        if (counter > 0) {
-                            this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex));
-                            if (counter > 1) {
-                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
+                        if (blockType == 1 || blockType == 2) {
+                            //  compression with Huffman codes
+
+                            for (let i = 0; i < TINFL_MAX_HUFF_TABLES; i++) {
+                                this.huffman.tables[i].codeSize.fill(0);
+                                this.huffman.tables[i].lookUp.fill(0);
+                                this.huffman.tables[i].tree.fill(0);
                             }
+
+                            if (blockType == 1) {
+                                //  compression with fixed Huffman codes
+                                //  TODO: this
+                                console.log("TODO: handle blocks compressed with fixed Huffman codes");
+                            } else {
+                                //  compression with dynamic Huffman codes
+                                this.huffman.tableSizes = [
+                                    b.readBits(5) + s_min_table_sizes[0],
+                                    b.readBits(5) + s_min_table_sizes[1],
+                                    b.readBits(4) + s_min_table_sizes[2]
+                                ];
+                                for (let i = 0; i < this.huffman.tableSizes[2]; i++) {
+                                    this.huffman.tables[2].codeSize[s_length_dezigzag[i]] = b.readBits(3);
+                                }
+                                this.huffman.tableSizes[2] = 19;
+                            }
+
+                            let nextCode = new Array(17);
+                            let totalSymbols = new Array(16);
+                            for (let iType = blockType; iType >= 0; iType--)  //  [(2,) 1, 0]
+                            {
+                                let curHuffmanTable = this.huffman.tables[iType];
+
+                                totalSymbols.fill(0);
+                                for (let i = 0; i < this.huffman.tableSizes[iType]; i++) {
+                                    totalSymbols[curHuffmanTable.codeSize[i]]++;
+                                }
+
+                                let total = 0;
+                                let usedSymbols = 0;
+                                nextCode[0] = 0;
+                                nextCode[1] = 0;
+                                for (let i = 1; i <= 15; i++) {
+                                    usedSymbols += totalSymbols[i];
+                                    total = ((total + totalSymbols[i]) << 1);
+                                    nextCode[i + 1] = total;
+                                }
+
+                                if ((total != 65536) && (usedSymbols > 1)) {
+                                    //  error
+                                    console.log("ERROR: Huffman table generation (1)");
+                                }
+
+                                let treeNext = -1;
+                                for (let symbolIndex = 0; symbolIndex < this.huffman.tableSizes[iType]; symbolIndex++) {
+
+                                    let codeSize = curHuffmanTable.codeSize[symbolIndex];
+                                    if (codeSize == 0) {
+                                        continue;
+                                    }
+
+                                    let currentCode = nextCode[codeSize]++;
+
+                                    let reverseCode = 0;
+                                    for (let l = codeSize; l > 0; l--) {
+                                        reverseCode = (reverseCode << 1) | (currentCode & 1);
+                                        currentCode >>= 1;
+                                    }
+
+                                    if (codeSize <= TINFL_FAST_LOOKUP_BITS) {
+                                        let k = ((codeSize << 9) | symbolIndex);
+                                        while (reverseCode < TINFL_FAST_LOOKUP_SIZE) {
+                                            curHuffmanTable.lookUp[reverseCode] = k;
+                                            reverseCode += (1 << codeSize);
+                                        }
+                                        continue;
+                                    }
+
+                                    let treeCurrent = curHuffmanTable.lookUp[reverseCode & (TINFL_FAST_LOOKUP_SIZE - 1)];
+                                    if (treeCurrent == 0) {
+                                        curHuffmanTable.lookUp[reverseCode & (TINFL_FAST_LOOKUP_SIZE - 1)] = treeNext;
+                                        treeCurrent = treeNext;
+                                        treeNext -= 2;
+                                    }
+
+                                    reverseCode >>= (TINFL_FAST_LOOKUP_BITS - 1);
+                                    for (let j = codeSize; j > (TINFL_FAST_LOOKUP_BITS + 1); j--) {
+                                        treeCurrent -= ((reverseCode >>= 1) & 1);
+                                        if (!curHuffmanTable.tree[-treeCurrent - 1]) {
+                                            curHuffmanTable.tree[-treeCurrent - 1] = treeNext;
+                                            treeCurrent = treeNext;
+                                            treeNext -= 2;
+                                        } else {
+                                            treeCurrent = curHuffmanTable.tree[-treeCurrent - 1];
+                                        }
+                                    }
+                                    treeCurrent -= ((reverseCode >>= 1) & 1);
+                                    curHuffmanTable.tree[-treeCurrent - 1] = symbolIndex;
+                                }
+
+                                if (iType == 2) {
+
+                                    let distance = 0;
+
+                                    for (counter = 0; counter < (this.huffman.tableSizes[0] + this.huffman.tableSizes[1]);) {
+
+                                        distance = this.huffmanDecode(b, 2);
+
+                                        if (distance < 16) {
+                                            this.huffman.lengthCodes[counter++] = distance;
+                                            continue;
+                                        }
+                                        if ((distance == 16) && (!counter)) {
+                                            //  Error, TODO: handle
+                                            console.log("ERROR: Huffman table generation (2)")
+                                        }
+
+                                        let numExtra = [2, 3, 7][distance - 16];
+                                        let s = b.readBits(numExtra);
+                                        s += [3, 3, 11][distance - 16];
+
+                                        for (let i = 0; i < s; i++) {
+                                            this.huffman.lengthCodes[counter + i] = (distance == 16 ? this.huffman.lengthCodes[counter - 1] : 0);
+                                        }
+                                        counter += s;
+                                    }
+                                    if ((this.huffman.tableSizes[0] + this.huffman.tableSizes[1]) != counter) {
+                                        //TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
+                                        //  Error, TODO: handle
+                                        console.log("ERROR: Huffman table generation (3)")
+                                    }
+
+                                    this.huffman.tables[0].codeSize = this.huffman.lengthCodes.slice(0, this.huffman.tableSizes[0]);
+                                    this.huffman.tables[1].codeSize = this.huffman.lengthCodes.slice(this.huffman.tableSizes[0], this.huffman.tableSizes[0] + this.huffman.tableSizes[1]);
+                                }
+
+                            }
+
                         }
-                        // if ((int)counter > 0) {
-                        //     pOut_buf_cur[0] = pSrc[0];
-                        //     if ((int)counter > 1)
-                        //         pOut_buf_cur[1] = pSrc[1];
-                        //     pOut_buf_cur += counter;
-                        // }
+
+                        for (; ;) {
+                            for (; ;) {
+                                if ((b.remainingBits() < 32 || this.outputBuffer.remainingBits() < 16)) {
+                                    //  TODO: this path not tested
+                                    counter = this.huffmanDecode(b, 0);
+                                    if (counter >= 256)
+                                        break;
+                                    if (this.outputBuffer.bytePointer >= this.outputBuffer.buffer.byteLength) {
+                                        //  error: TODO: handle
+                                        console.log("Attempting to write outside output buffer!");
+                                    }
+                                    this.outputBuffer.writeUint8(counter);
+                                } else {
+
+                                    let sym2 = this.huffmanDecode(b, 0, true);
+
+                                    counter = sym2;
+
+                                    if (counter & 256)
+                                        break;
+
+                                    sym2 = this.huffmanDecode(b, 0, true);
+
+                                    this.outputBuffer.writeUint8(counter & 255);
+                                    if (sym2 & 256) {
+                                        counter = sym2;
+                                        break;
+                                    }
+                                    this.outputBuffer.writeUint8(sym2 & 255);
+                                }
+                            }
+
+                            if ((counter &= 511) == 256) {
+                                break;
+                            }
+
+                            let numExtra = s_length_extra[counter - 257];
+                            counter = s_length_base[counter - 257];
+                            if (numExtra) {
+                                let extraBits = b.readBits(numExtra);
+                                counter += extraBits;
+                            }
+
+                            let dist = this.huffmanDecode(b, 1);
+                            numExtra = s_dist_extra[dist];
+                            dist = s_dist_base[dist];
+                            if (numExtra > 0) {
+                                let extraBits = b.readBits(numExtra);
+                                dist += extraBits;
+                            }
+
+                            let dist_from_out_buf_start = this.outputBuffer.bytePointer;
+                            // dist_from_out_buf_start = pOut_buf_cur - pOut_buf_start;
+                            // if ((dist > dist_from_out_buf_start) && (decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) {
+                            //     TINFL_CR_RETURN_FOREVER(37, TINFL_STATUS_FAILED);
+                            // }
+
+                            let byteIndex = (dist_from_out_buf_start - dist);
+                            //                         pSrc = pOut_buf_start + ((dist_from_out_buf_start - dist) & out_buf_size_mask);
+
+                            if (Math.max(this.outputBuffer.bytePointer, byteIndex) > this.outputBuffer.buffer.byteLength - 1) {
+                                while (counter--) {
+                                    this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(dist_from_out_buf_start - dist));
+                                    dist_from_out_buf_start++;
+                                }
+                                continue;
+                            }
+
+                            if (b.remainingBits() == 0) {
+                                console.log("DONE!");
+                            }
+                            //                         if ((MZ_MAX(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
+                            //                             while (counter--) {
+                            //                                 while (pOut_buf_cur >= pOut_buf_end) {
+                            //                                     TINFL_CR_RETURN(53, TINFL_STATUS_HAS_MORE_OUTPUT);
+                            //                                 }
+                            //                                 *pOut_buf_cur++ = pOut_buf_start[(dist_from_out_buf_start++ - dist) & out_buf_size_mask];
+                            //                             }
+                            //                             continue;
+                            //                         }
+
+                            // #if MINIZ_USE_UNALIGNED_LOADS_AND_STORES
+                            //                         else if ((counter >= 9) && (counter <= dist)) {
+                            //                             const mz_uint8 * pSrc_end = pSrc + (counter & ~7);
+                            //                             do {
+                            //                                 ((mz_uint32 *)pOut_buf_cur)[0] = ((const mz_uint32 *)pSrc)[0];
+                            //                                 ((mz_uint32 *)pOut_buf_cur)[1] = ((const mz_uint32 *)pSrc)[1];
+                            //                                 pOut_buf_cur += 8;
+                            //                             } while ((pSrc += 8) < pSrc_end);
+                            //                             if ((counter &= 7) < 3) {
+                            //                                 if (counter) {
+                            //                                     pOut_buf_cur[0] = pSrc[0];
+                            //                                     if (counter > 1)
+                            //                                         pOut_buf_cur[1] = pSrc[1];
+                            //                                     pOut_buf_cur += counter;
+                            //                                 }
+                            //                                 continue;
+                            //                             }
+                            //                         }
+                            // #endif
+                            do {
+                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 0));
+                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
+                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 2));
+                                byteIndex += 3;
+                                // pOut_buf_cur[0] = pSrc[0];
+                                // pOut_buf_cur[1] = pSrc[1];
+                                // pOut_buf_cur[2] = pSrc[2];
+                                // pOut_buf_cur += 3;
+                                // pSrc += 3;
+                                // } while ((int)(counter -= 3) > 2);
+                            } while ((counter -= 3) > 2);
+
+                            if (counter > 0) {
+                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex));
+                                if (counter > 1) {
+                                    this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
+                                }
+                            }
+                            // if ((int)counter > 0) {
+                            //     pOut_buf_cur[0] = pSrc[0];
+                            //     if ((int)counter > 1)
+                            //         pOut_buf_cur[1] = pSrc[1];
+                            //     pOut_buf_cur += counter;
+                            // }
+                        }
+
+
+                        // let s = "";
+                        // s += scanLine + ", " + dataSize;
+                        // s += ", z: " + JSON.stringify(z);
+                        // // for (let i = 0; i < 10; i++)
+                        // //     s += ", 0x" + b.readUint8().toString(16);
+                        // console.log(s);
+                        // console.log("bFinalBlock: " + bFinalBlock + ", blockType: " + blockType);
+
+                    } while (!bFinalBlock);
+
+                }
+
+                //  EXR postprocess for ZIP and RLE
+                let numChunks = this.dimensions.h / this.scanLinesPerChunk;
+                let chunkSize = this.scanLinesPerChunk * this.dimensions.w * this.pixelSize;
+                let halfChunkSize = Math.floor((chunkSize + 1) / 2);
+                let tmpBuffer = new NvisBitBuffer(new ArrayBuffer(chunkSize));
+
+                for (let chunkId = 0; chunkId < numChunks; chunkId++) {
+
+                    //  predictor
+                    let chunkIndex = chunkId * chunkSize;
+                    for (let i = chunkIndex + 1; i < chunkIndex + chunkSize; i++) {
+                        let d = this.outputBuffer.getUint8(i - 1) + this.outputBuffer.getUint8(i) - 128;
+                        this.outputBuffer.setUint8(i, d);
                     }
 
+                    //  swizzle
+                    let srcIndex = chunkIndex;
+                    for (let i = 0; i < chunkSize; i += 2) {
+                        let value1 = this.outputBuffer.getUint8(srcIndex);
+                        let value2 = this.outputBuffer.getUint8(srcIndex + halfChunkSize);
+                        tmpBuffer.setUint8(i, value1);
+                        tmpBuffer.setUint8(i + 1, value2);
+                        srcIndex++;
+                    }
 
-                    // let s = "";
-                    // s += scanLine + ", " + dataSize;
-                    // s += ", z: " + JSON.stringify(z);
-                    // // for (let i = 0; i < 10; i++)
-                    // //     s += ", 0x" + b.readUint8().toString(16);
-                    // console.log(s);
-                    // console.log("bFinalBlock: " + bFinalBlock + ", blockType: " + blockType);
-
-                } while (!bFinalBlock);
-
+                    this.outputBuffer.copy(tmpBuffer, chunkIndex);
+                }
+                return;
             }
 
-            //  EXR postprocess for ZIP and RLE
-            let numChunks = this.dimensions.h / this.scanLinesPerChunk;
-            let chunkSize = this.scanLinesPerChunk * this.dimensions.w * this.pixelSize;
-            let halfChunkSize = Math.floor((chunkSize + 1) / 2);
-            let tmpBuffer = new NvisBitBuffer(new ArrayBuffer(chunkSize));
+            if (compression == EXR_PIZ_COMPRESSION) {
+                //  Copyright (c) 2004, Industrial Light & Magic, a division of Lucas Digital Ltd. LLC)
+                //  (3-clause BSD license)
 
-            for (let chunkId = 0; chunkId < numChunks; chunkId++) {
 
-                //  predictor
-                let chunkIndex = chunkId * chunkSize;
-                for (let i = chunkIndex + 1; i < chunkIndex + chunkSize; i++) {
-                    let d = this.outputBuffer.getUint8(i - 1) + this.outputBuffer.getUint8(i) - 128;
-                    this.outputBuffer.setUint8(i, d);
-                }
 
-                //  swizzle
-                let srcIndex = chunkIndex;
-                for (let i = 0; i < chunkSize; i += 2) {
-                    let value1 = this.outputBuffer.getUint8(srcIndex);
-                    let value2 = this.outputBuffer.getUint8(srcIndex + halfChunkSize);
-                    tmpBuffer.setUint8(i, value1);
-                    tmpBuffer.setUint8(i + 1, value2);
-                    srcIndex++;
-                }
-
-                this.outputBuffer.copy(tmpBuffer, chunkIndex);
+                return;
             }
-
         }
 
         huffmanDecode(bitBuffer, tableId, bTest = false) {
@@ -2445,7 +2549,13 @@ var nvis = new function () {
                         let srcLoc = (y * this.pixelSize + channelOffset) * this.dimensions.w + x * channelSize;
 
                         let value = 0;
-                        value = this.outputBuffer.getFloat16(srcLoc);
+                        if (channel.pixelType == EXR_UINT) {
+                            value = this.outputBuffer.getUint32();
+                        } else if (channel.pixelType == EXR_HALF) {
+                            value = this.outputBuffer.getFloat16(srcLoc);
+                        } else {
+                            value = this.outputBuffer.getFloat32(srcLoc);
+                        }
                         data[dstLoc + ChannelMap[channel.name]] = value;
                     }
                     data[dstLoc + ChannelMap["A"]] = 1.0;  //  alpha
@@ -2743,13 +2853,15 @@ var nvis = new function () {
 
                             let file = new NvisEXRFile(fileName, this.response);
 
-                            self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
+                            if (file.bSuccess) {
+                                self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
 
-                            if (numFilesLoaded == fileNames.length) {
-                                self.setDimensions(file.dimensions, true);
-                                //callback(file.dimensions);
-                                windows.setStreamPxDimensions(file.dimensions);
-                                windows.adjust();
+                                if (numFilesLoaded == fileNames.length) {
+                                    self.setDimensions(file.dimensions, true);
+                                    //callback(file.dimensions);
+                                    windows.setStreamPxDimensions(file.dimensions);
+                                    windows.adjust();
+                                }
                             }
                         }
                     };
@@ -2778,7 +2890,7 @@ var nvis = new function () {
         }
 
 
-        drop(files, callback) {
+        drop(files, windows) {
 
             //  TODO: combine with this.load()
 
@@ -2812,8 +2924,10 @@ var nvis = new function () {
                             numFilesLoaded++;
 
                             if (numFilesLoaded == files.length) {
-                                self.setDimensions({ w: image.width, h: image.height }, false);
-                                callback({ w: image.width, h: image.height });
+                                let dimensions = { w: image.width, h: image.height };
+                                self.setDimensions(dimensions, false);
+                                windows.setStreamPxDimensions(dimensions);
+                                windows.adjust();
                             }
                         }
 
@@ -2828,12 +2942,15 @@ var nvis = new function () {
 
                         let file = new NvisEXRFile(files[0].name, reader.result);
 
-                        self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
-                        numFilesLoaded++;
+                        if (file.bSuccess) {
+                            self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
+                            numFilesLoaded++;
 
-                        if (numFilesLoaded == files.length) {
-                            self.setDimensions(file.dimensions, true);
-                            callback(file.dimensions);
+                            if (numFilesLoaded == files.length) {
+                                self.setDimensions(file.dimensions, true);
+                                windows.setStreamPxDimensions(file.dimensions);
+                                windows.adjust();
+                            }
                         }
 
                     }
@@ -2887,7 +3004,16 @@ var nvis = new function () {
         getFileName() {
             //  TODO: fix
             //  TODO: remove bFileStream, use shaderId instead
-            return (this.fileNames.length > 0 ? this.fileNames[0] : "Shader");
+            let fileName = "";
+            if (this.fileNames.length > 0) {
+                fileName += this.fileNames[0];
+                if (this.fileNames.length > 1) {
+                    fileName += (" (" + this.fileNames.length + ")");
+                }
+            } else {
+                fileName = "Shader TODO: fix!";
+            }
+            return fileName;
         }
 
 
@@ -3018,8 +3144,8 @@ var nvis = new function () {
                         let labelCell = document.createElement("td");
                         labelCell.innerHTML = label.outerHTML;
 
-                        row.appendChild(labelCell);
                         row.appendChild(elCell);
+                        row.appendChild(labelCell);
                     }
 
                     table.appendChild(row);
@@ -4011,61 +4137,139 @@ var nvis = new function () {
         }
 
         updateUiPopup() {
-            //  clear all children
-            this.uiPopup.textContent = '';
 
-            this.uiPopup.innerHTML = "<b>NVIS Online<br/><br/>";
+            this.uiPopup.innerHTML = "";
 
-            this.uiPopup.innerHTML += "Streams<br/>";
+            let title = document.createElement("span");
+            title.className = "title";
+            title.innerHTML = "Nvis Online";
+
+            let bar = document.createElement("div");
+            bar.className = "titleBarBar";
+            bar.style.backgroundColor = "#d0d0d0";
+            bar.style.flexGrow = "1";
+
+            let titleBar = document.createElement("div");
+            titleBar.setAttribute("onmousedown", "nvis.uiOnMouseDown(event)");
+            titleBar.className = "titleBar";
+            titleBar.appendChild(title);
+            titleBar.appendChild(bar)
+
+            this.uiPopup.appendChild(titleBar);
+
+
+
+            let tabs = document.createElement("div");
+            tabs.className = "tabs";
+
+            let tabSettings = document.createElement("button");
+            tabSettings.className = (_state.ui.tabId == "tabSettings" ? "tab active" : "tab");
+            tabSettings.setAttribute("onclick", "nvis.openTab(event, \"tabSettings\")");
+            tabSettings.innerHTML = "Settings";
+            let tabStreams = document.createElement("button");
+            tabStreams.className = (_state.ui.tabId == "tabStreams" ? "tab active" : "tab");
+            tabStreams.setAttribute("onclick", "nvis.openTab(event, \"tabStreams\")");
+            tabStreams.innerHTML = "Streams";
+            let tabWindows = document.createElement("button");
+            tabWindows.className = (_state.ui.tabId == "tabWindows" ? "tab active" : "tab");
+            tabWindows.setAttribute("onclick", "nvis.openTab(event, \"tabWindows\")");
+            tabWindows.innerHTML = "Windows";
+            let tabShaders = document.createElement("button");
+            tabShaders.className = (_state.ui.tabId == "tabShaders" ? "tab active" : "tab")
+            tabShaders.setAttribute("onclick", "nvis.openTab(event, \"tabShaders\")");
+            tabShaders.innerHTML = "Shaders";
+
+            tabs.appendChild(tabSettings);
+            tabs.appendChild(tabStreams);
+            tabs.appendChild(tabWindows);
+            tabs.appendChild(tabShaders);
+
+            this.uiPopup.appendChild(tabs);
+
+            //  settings
+            let settingsDiv = document.createElement("div");
+            settingsDiv.id = "tabSettings";
+            settingsDiv.className = "tabContent";
+            let automaticLayout = document.createElement("input");
+            automaticLayout.id = "bAutomaticLayout";
+            automaticLayout.type = "checkbox";
+            automaticLayout.setAttribute("onclick", "nvis.toggleAutomaticLayout()");
+            automaticLayout.innerHTML = "Automatic window placement";
+            if (_state.layout.bAutomatic) {
+                automaticLayout.setAttribute("checked", true);
+            }
+            settingsDiv.appendChild(automaticLayout);
+//            settingsDiv.innerHTML += "<input id=\"bAutomaticLayout\" " + (_state.layout.bAutomatic ? "checked " : "") + "type=\"checkbox\" onclick=\"nvis.toggleAutomaticLayout()\"> Automatic window layout";
+            this.uiPopup.appendChild(settingsDiv);
+
+            //  streams
+            let streamsDiv = document.createElement("div");
+            streamsDiv.id = "tabStreams";
+            streamsDiv.className = "tabContent";
             for (let streamId = 0; streamId < this.streams.length; streamId++) {
                 let ui = this.streams[streamId].getUI(streamId, this.streams, this.shaders);
-                this.uiPopup.appendChild(ui);
+                streamsDiv.appendChild(ui);
             }
-            for (let shaderId = 0; shaderId < this.shaders.length; shaderId++) {
-                let ui = document.createElement("p");
-                ui.innerHTML = "Shader: " + this.shaders[shaderId].name;
-                this.uiPopup.appendChild(ui);
-            }
-            this.uiPopup.innerHTML += "<br/>";
-            this.uiPopup.innerHTML += "<br/>";
+            this.uiPopup.appendChild(streamsDiv);
 
-            this.uiPopup.innerHTML += "Windows<br/>";
+            //  windows
+            let windowsDiv = document.createElement("div");
+            windowsDiv.id = "tabWindows";
+            windowsDiv.className = "tabContent";
             for (let windowId = 0; windowId < this.windows.getNumWindows(); windowId++) {
-                //let w = _windows.getWindow(i);
-                let label = "- window " + (windowId + 1) + ": ";
-                // _uiPopup.innerHTML += selector;
-                this.uiPopup.innerHTML += "<label for=\"windowStream\">" + label + "</label>";
-                let options = "";
+
+                let select = document.createElement("select");
+                select.id = "windowStream-" + windowId;
+                select.setAttribute("onchange", "nvis.setWindowStreamId(" + windowId + ")");
+
                 let windowStreamId = this.windows.getWindow(windowId).getStreamId();
                 for (let streamId = 0; streamId < this.streams.length; streamId++) {
                     let fileName = this.streams[streamId].getFileName();
-                    options += "<option";
+                    let option = document.createElement("option");
+                    option.innerHTML = fileName;
                     if (streamId == windowStreamId) {
-                        options += " selected";
+                        option.setAttribute("selected", true);
                     }
-                    options += (">" + fileName + "</option>");
+                    select.appendChild(option);
                 }
-                let select = ("<select id=\"windowStream-" + windowId + "\"");
-                select += (" onchange=\"nvis.setWindowStreamId(" + windowId + ")\"");
-                select += (" id=\"windowStream\">" + options + "</select>");
-                this.uiPopup.innerHTML += select;
-                this.uiPopup.innerHTML += "<br/>";
+
+                let label = document.createElement("label");
+                label.innerHTML = "- window " + (windowId + 1) + ": ";
+
+                let selectDiv = document.createElement("div");
+                selectDiv.appendChild(label);
+                selectDiv.appendChild(select);
+                windowsDiv.appendChild(selectDiv);
             }
-            this.uiPopup.innerHTML += "<hr>";
-            this.uiPopup.innerHTML += "<br/>";
-            this.uiPopup.innerHTML += "<input id=\"bAutomaticLayout\" " + (_state.layout.bAutomatic ? "checked " : "") + "type=\"checkbox\" onclick=\"nvis.toggleAutomaticLayout()\"> Automatic window layout";
-            this.uiPopup.innerHTML += "<br/>";
+            this.uiPopup.appendChild(windowsDiv);
 
-            //  center popup
-            let w = window.getComputedStyle(this.uiPopup).getPropertyValue("width");
-            let h = window.getComputedStyle(this.uiPopup).getPropertyValue("height");
-            let x = Math.trunc((this.canvas.width - w.substring(0, w.indexOf('px'))) / 2);
-            let y = Math.trunc((this.canvas.height - h.substring(0, h.indexOf('px'))) / 2);
+            //  shaders
+            let shadersDiv = document.createElement("div");
+            shadersDiv.id = "tabShaders";
+            shadersDiv.className = "tabContent";
+            for (let shaderId = 0; shaderId < this.shaders.shaders.length; shaderId++) {
+                let ui = document.createElement("p");
+                ui.innerHTML = "Shader: " + this.shaders.shaders[shaderId].name;
+                shadersDiv.appendChild(ui);
+            }
+            this.uiPopup.appendChild(shadersDiv);
 
-            this.uiPopup.style.left = (x + "px");
-            this.uiPopup.style.top = (y + "px");
+            // //  center popup
+            // let w = window.getComputedStyle(this.uiPopup).getPropertyValue("width");
+            // let h = window.getComputedStyle(this.uiPopup).getPropertyValue("height");
+            // let x = Math.trunc((this.canvas.width - w.substring(0, w.indexOf('px'))) / 2);
+            // let y = Math.trunc((this.canvas.height - h.substring(0, h.indexOf('px'))) / 2);
+
+            document.getElementById(_state.ui.tabId).style.display = "block";
+            this.uiPopup.style.left = (_state.ui.position.x + "px");
+            this.uiPopup.style.top = (_state.ui.position.y + "px");
         }
 
+        updateUiPosition() {
+            this.uiPopup.style.left = (_state.ui.position.x + "px");
+            this.uiPopup.style.top = (_state.ui.position.y + "px");
+        }
+        
         onKeyDown(event) {
             event = event || window.event;
             let keyCode = event.keyCode || event.which;
@@ -4139,7 +4343,7 @@ var nvis = new function () {
                             break;
                         case '+':
                             _state.layout.bAutomatic = false;
-                            _windows.inc();
+                            this.windows.inc();
                             break;
                         case '-':
                             _state.layout.bAutomatic = false;
@@ -4229,6 +4433,7 @@ var nvis = new function () {
         onMouseDown(event) {
             _state.input.mouse.down = true;
             _state.input.mouse.clickPosition = { x: event.clientX, y: event.clientY };
+            console.log("mouse down");
         }
 
         onMouseMove(event) {
@@ -4308,7 +4513,7 @@ var nvis = new function () {
                     return a.name.localeCompare(b.name);
                 });
                 let newStream = new NvisStream(this.glContext);
-                newStream.drop(files, this.newStreamCallback);
+                newStream.drop(files, this.windows);
                 this.streams.push(newStream);
                 this.animation.numFrames = newStream.getNumImages();  //  TODO: check
                 this.addWindow(this.streams.length - 1);
@@ -4461,6 +4666,54 @@ var nvis = new function () {
 
     }
 
+    let _openTab = function (event, tabId) {
+        let oldTabId = _state.ui.tabId;
+
+        // let tabContents = document.getElementsByClassName("tabContent");
+        // for (let i = 0; i < tabContents.length; i++) {
+        //     tabContents[i].style.display = "none";
+        // }
+
+        document.getElementById(oldTabId).style.display = "none";
+        document.getElementById(tabId).style.display = "block";
+
+        _state.ui.tabId = tabId;
+        let tabs = document.getElementsByClassName("tab");
+        for (let i = 0; i < tabs.length; i++) {
+            tabs[i].className = tabs[i].className.replace(" active", "");
+        }
+
+        // document.getElementById(tabName).style.display = "block";
+        // document.getElementById(tabName).className += " active";
+        event.currentTarget.className += " active";
+    }
+
+    let _uiOnMouseDown = function (event) {
+        //event.stopPropagation();
+        //event.preventDefault();
+        _state.ui.mouseDown = true;
+        _state.ui.clickPosition = { x: event.clientX, y: event.clientY };
+        console.log("uiOnMouseDown: " + JSON.stringify(_state.ui.clickPosition));
+        document.body.addEventListener("mousemove", nvis.uiOnMouseMove);
+        document.body.addEventListener("mouseup", nvis.uiOnMouseUp);
+    }
+
+    let _uiOnMouseMove = function (event) {
+        let dist = { x: event.clientX - _state.ui.clickPosition.x, y: event.clientY - _state.ui.clickPosition.y };
+        _state.ui.position = { x: _state.ui.previousPosition.x + dist.x, y: _state.ui.previousPosition.y + dist.y };
+        _renderer.updateUiPosition();
+        console.log("uiOnMouseMove: position: " + JSON.stringify(_state.ui.position));
+    }
+
+    let _uiOnMouseUp = function (event) {
+        _state.ui.mouseDown = false;
+        _state.ui.previousPosition = _state.ui.position;
+        document.body.removeEventListener("mousemove", nvis.uiOnMouseMove)
+        document.body.removeEventListener("mouseup", nvis.uiOnMouseUp);
+        console.log("uiOnMouseUp: " + JSON.stringify(event));
+    }
+
+
     //  API
     let _stream = function (fileNames) {
         return _renderer.loadStream(Array.isArray(fileNames) ? fileNames : [fileNames]);
@@ -4529,7 +4782,7 @@ var nvis = new function () {
         console.log("update: " + streamId + ", " + elementId);
         _renderer.streams[streamId].uiUpdate(elementId);
         if (bUpdateUI) {
-            console.log("Updating UI");
+            // console.log("Updating UI");
             _renderer.updateUiPopup();
         }
     }
@@ -4559,6 +4812,10 @@ var nvis = new function () {
         streamUpdateParameter: _streamUpdateParameter,
         streamUpdateInput: _streamUpdateInput,
         setWindowStreamId: _setWindowStreamId,
-        toggleAutomaticLayout: _toggleAutomaticLayout
+        toggleAutomaticLayout: _toggleAutomaticLayout,
+        openTab: _openTab,
+        uiOnMouseDown: _uiOnMouseDown,
+        uiOnMouseUp: _uiOnMouseUp,
+        uiOnMouseMove: _uiOnMouseMove,
     }
 }

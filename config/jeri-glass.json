@@ -4,16 +4,12 @@
         "width": 3
     },
     "shaders": [
-        "glsl/difference.json"
-    ],
-    "windows": [
-        "Lena",
-        "Texture/Plane"
+        "glsl/mixer.json"
     ],
     "streams": [
         {
             "name": "Input",
-            "window": true,
+            "window": false,
             "files": [
                 "images/jeri-glass-input.exr"
             ]
@@ -30,6 +26,15 @@
             "window": false,
             "files": [
                 "images/jeri-glass-reference.exr"
+            ]
+        },
+        {
+            "name": "Mixer",
+            "window": true,
+            "shader": 0,
+            "inputs": [
+                0,
+                1
             ]
         }
     ]

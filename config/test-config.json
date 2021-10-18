@@ -4,7 +4,8 @@
         "width": 3
     },
     "shaders": [
-        "glsl/difference.json"
+        "glsl/difference.json",
+        "glsl/ssim.json"
     ],
     "windows": [
         "Lena",
@@ -45,6 +46,15 @@
             "name": "Texture/Plane",
             "window": true,
             "shader": 0,
+            "inputs": [
+                1,
+                2
+            ]
+        },
+        {
+            "name": "Texture/Plane SSIM",
+            "window": true,
+            "shader": 1,
             "inputs": [
                 1,
                 2

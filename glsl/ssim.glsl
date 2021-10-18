@@ -1,26 +1,23 @@
 #version 300 es
 
-#define DIFF_MODE_RGB           0
-#define DIFF_MODE_LAB_LENGTH    1
-#define DIFF_MODE_LUMINANCE     2
-
 precision highp float;
 
 //  common uniforms
 //uniform vec2 uDimensions;
-const vec2 uDimensions = vec2(512.0, 512.0);
 uniform vec2 uMouse;
 uniform float uTime;
 uniform float uFrame;
 
 //  shader-specific uniforms
-uniform bool uAbsolute;
-uniform bool uSignFlip;
-uniform bool uSquared;
-uniform bool uMarkInfNaN;
-uniform float uTolerance;
-uniform float uMultiplier;
 uniform int uMode;
+uniform float uC1;
+uniform float uC2;
+uniform float uC3;
+uniform float uSigma;
+uniform float uWeightLuminance;
+uniform float uWeightContrast;
+uniform float uWeightStructure;
+uniform bool uInvert;
 uniform int uColorMode;
 uniform int uShowColorMap;
 
@@ -33,14 +30,6 @@ in vec2 vTextureCoord;
 
 out vec4 outColor;
 
-// mat3 transpose(in mat3 matrix)
-// {
-//     vec3 i0 = matrix[0];
-//     vec3 i1 = matrix[1];
-//     vec3 i2 = matrix[2];
-
-//     return mat3(vec3(i0.x, i1.x, i2.x), vec3(i0.y, i1.y, i2.y), vec3(i0.z, i1.z, i2.z));
-// }
 
 float RGBtoLuma(vec3 color)
 {
@@ -223,51 +212,112 @@ vec3 lerp(vec3 a, vec3 b, float v)
     return a * (1.0 - v) + b * v;
 }
 
+#define KERNELWIDTH 11
+
+float ssim(ivec2 loc2d, float sigma)
+{
+    const int kKernelWidth = KERNELWIDTH;
+    const int kHalfKernelWidth = (kKernelWidth - 1) / 2;
+
+    //const float C1 = 0.01 * 0.01;
+    //const float C2 = 0.03 * 0.03;
+    //const float C3 = C2 * 0.5;
+
+    float weights[kKernelWidth];
+    float weightsSum = 0.0;
+    float sigmaSq = sigma * sigma;
+    int i = 0;
+    for (i = 0; i < kKernelWidth; i++)
+    {
+        float x = float(i - kHalfKernelWidth);
+        weights[i] = exp(-x * x / (2.0 * sigmaSq));
+        weightsSum += weights[i];
+    }
+    for (i = 0; i < kKernelWidth; i++)
+    {
+        weights[i] /= weightsSum;
+    }
+
+    float mu0 = 0.0, mu1 = 0.0;
+    {
+        for (int y = 0; y < kKernelWidth; y++)
+        {
+            for (int x = 0; x < kKernelWidth; x++)
+            {
+                float weight = weights[x] * weights[y];
+                mu0 += RGBtoLuma(texelFetch(uTexture0, loc2d + ivec2(x, y), 0).rgb) / 255.0;
+                mu1 += RGBtoLuma(texelFetch(uTexture1, loc2d + ivec2(x, y), 0).rgb) / 255.0;
+                // mu0 += s_Ref[threadId.y + y][threadId.x + x] * weight;
+                // mu1 += s_Test[threadId.y + y][threadId.x + x] * weight;
+            }
+        }
+    }
+
+    float mu0Sq = mu0 * mu0;
+    float mu1Sq = mu1 * mu1;
+    float mu0mu1 = mu0 * mu1;
+
+    float sigma0Sq = 0.0, sigma1Sq = 0.0, sigma01 = 0.0;
+    {
+        for (int y = 0; y < kKernelWidth; ++y)
+        {
+            for (int x = 0; x < kKernelWidth; ++x)
+            {
+                float weight = weights[x] * weights[y];
+                float color0 = RGBtoLuma(texelFetch(uTexture0, loc2d + ivec2(x, y), 0).rgb) / 255.0;
+                float color1 = RGBtoLuma(texelFetch(uTexture1, loc2d + ivec2(x, y), 0).rgb) / 255.0;
+                // float color0 = s_Ref[threadId.y + y][threadId.x + x];
+                // float color1 = s_Test[threadId.y + y][threadId.x + x];
+                sigma0Sq += (color0 - mu0) * (color0 - mu0) * weight;
+                sigma1Sq += (color1 - mu1) * (color1 - mu1) * weight;
+                sigma01 += (color0 - mu0) * (color1 - mu1) * weight;
+            }
+        }
+    }
+    float sigma0sigma1 = sqrt(sigma0Sq * sigma1Sq);
+
+    float ssimSimple = ((2.0 * mu0mu1 + uC1) * (2.0 * sigma01 + uC2)) / ((mu0Sq + mu1Sq + uC1) * (sigma0Sq + sigma1Sq + uC2));
+
+    float L = pow((2.0 * mu0mu1 + uC1) / (mu0Sq + mu1Sq + uC1), uWeightLuminance);
+    float C = pow((2.0 * sigma0sigma1 + uC2) / (sigma0Sq + sigma1Sq + uC2), uWeightContrast);
+    float S = (sigma01 + uC3) / (sigma0sigma1 + uC3);
+    S = (uWeightStructure == float(int(uWeightStructure)) ? S : pow(S, uWeightStructure));
+
+    float ssim = 1.0;
+    if (uMode == 0)
+        ssim = L * C * S;
+    else if (uMode == 1)
+        ssim = ssimSimple;
+    else if (uMode == 2)
+        ssim = L;
+    else if (uMode == 3)
+        ssim = C;
+    else if (uMode == 4)
+        ssim = S;
+
+    return ssim;
+}
+
 void main()
 {
-    vec3 value;
+    ivec2 dimensions = textureSize(uTexture0, 0);
+    ivec2 loc2d = ivec2(vTextureCoord * vec2(dimensions));
 
-    vec2 loc2d = vTextureCoord * uDimensions;
+    float ssimValue = ssim(loc2d, uSigma);
+    vec3 value = vec3(ssimValue, ssimValue, ssimValue);
 
-    vec3 colorA = texture(uTexture0, vTextureCoord).rgb;
-    vec3 colorB = texture(uTexture1, vTextureCoord).rgb;
-
-    if (uMode == DIFF_MODE_RGB)
-    {
-        value = (uSignFlip ? colorB - colorA : colorA - colorB);
-    }
-    else if (uMode == DIFF_MODE_LAB_LENGTH)
-    {
-        float l = length(RGBtoLAB(colorA) - RGBtoLAB(colorB));
-        value = vec3(l, l, l);
-    }
-    else if (uMode == DIFF_MODE_LUMINANCE)
-    {
-        float l = abs(RGBtoLuma(colorA) - RGBtoLuma(colorB));
-        value = vec3(l, l, l);
-    }
-
-    value = (uSquared ? value * value : value);
-    value = (uAbsolute ? abs(value) : value);
-
-    value.r *= (value.r >= uTolerance ? 1.0 : 0.0);
-    value.g *= (value.g >= uTolerance ? 1.0 : 0.0);
-    value.b *= (value.b >= uTolerance ? 1.0 : 0.0);
-
-    value = value * uMultiplier;
-
-    float error = RGBtoLuma(value); // single error value per pixel
+    //float error = RGBtoLuma(value); // single error value per pixel
 
     // A small legend color map
     float fade = 0.0;
-    if (uShowColorMap != 0)
+    if (uColorMode != 0 && uShowColorMap != 0)
     {
         vec2 paletteCorner = vec2((uShowColorMap == 1 || uShowColorMap == 3) ? 0.0 : 1.0, (uShowColorMap == 1 || uShowColorMap == 2) ? 0.0 : 1.0);
 
         float kPaletteEdgeWidth = 2.0;
-        float kPaletteLength = float(min(uDimensions.x, uDimensions.y)) * 0.1;
+        float kPaletteLength = float(min(dimensions.x, dimensions.y)) * 0.1;
         float kPaletteWidth = kPaletteLength / 5.0;
-        vec2 kPaletteCenter = abs(vec2(float(uDimensions.x), float(uDimensions.y)) * paletteCorner - vec2(kPaletteWidth * 5.0, kPaletteLength * 2.0));
+        vec2 kPaletteCenter = abs(vec2(float(dimensions.x), float(dimensions.y)) * paletteCorner - vec2(kPaletteWidth * 5.0, kPaletteLength * 2.0));
 
         vec2 paletteVec = vec2(loc2d) - vec2(float(kPaletteCenter.x), float(kPaletteCenter.y));
         vec2 paletteDim = vec2(kPaletteWidth, kPaletteLength);
@@ -292,9 +342,15 @@ void main()
         fade = max(distToEdge.x, distToEdge.y) * (bInsideEdge ? 1.0 : 0.0);
     }
 
-    vec3 color = colorMap(RGBtoLuma(value.rgb), uColorMode);
+    vec3 color;
+    if (uColorMode != 0) {
+        color = colorMap(RGBtoLuma(value.rgb), uColorMode);
+        color = lerp(color, vec3(0.5, 0.5, 0.5), fade);
+    } else
+        color = vec3(1.0 - ssimValue, 1.0 - ssimValue, 1.0 - ssimValue);
 
-    if (uMarkInfNaN)
+    //if (uMarkInfNaN)
+    if (false)
     {
         if (isNaN(value.r) || isNaN(value.g) || isNaN(value.b))
         {
@@ -305,7 +361,8 @@ void main()
             color = vec3(0.0, 1.0, 0.0);
         }
     }
-    color = lerp(color, vec3(0.5, 0.5, 0.5), fade);
+
+    //color = vec3(ssimValue, ssimValue, ssimValue) * 255.0;
 
     //outColor = vec4(color, error);
     outColor = vec4(color, 1.0);  //  TODO: allow error metric to be supplied in alpha channel
