@@ -236,13 +236,52 @@ var nvis = new function () {
             border-top: none;
         }`);
         
+    };
+
+
+    let _apiStream = function(files) {
+        _apiCommand({ command: "stream", argument: files });
     }
 
+    let _apiShader = function(shader) {
+        _apiCommand({ command: "shader", argument: shader });
+    }
+
+    let _apiWindow = function() {
+        _apiCommand({ command: "window", argument: undefined });
+    }
+
+    let _executeAPICommand = function(apiCommand) {
+        if (apiCommand.command == "stream") {
+            _stream(apiCommand.argument);
+        } else if (apiCommand.command == "shader") {
+            _shader(apiCommand.argument);
+        } else if (apiCommand.command == "window") {
+            //_shader(apiCommand.argument);
+            _renderer.addWindow(_renderer.streams.length - 1);
+        }
+    }
+
+    //  for async handling of API commands (_renderer might not be initialized at API command issue)
+    let _APIQueue = [];
+    let _apiCommand = function(apiCommand) {
+        //let apiCommand = { command: command, argument: argument };
+        if (_renderer === undefined) {
+            _APIQueue.push(apiCommand);
+        } else {
+            //  consume prior commands (if any)
+            while (_APIQueue.length > 0) {
+                _executeAPICommand(_APIQueue.shift());
+            }
+            _executeAPICommand(apiComamnd);
+        }
+    }
 
     let _init = function () {
         addStyles();
         _renderer = new NvisRenderer();
         _renderer.start();
+        //_consumeAPICommands();
     }
 
     window.onload = _init;
@@ -4010,7 +4049,7 @@ var nvis = new function () {
 
             this.animation = {
                 active: false,
-                fps: 5,
+                fps: 60,
                 pingPong: true,
                 direction: 1,
                 frameId: 0,
@@ -4723,7 +4762,7 @@ var nvis = new function () {
         _renderer.loadShader(fileName);
     }
 
-    let _config = function (fileName) {
+    let _apiConfig = function (fileName) {
         let xhr = new XMLHttpRequest();
         xhr.open("GET", fileName);
         xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
@@ -4751,7 +4790,8 @@ var nvis = new function () {
                         let files = streams[objectId].files;
                         let shaderId = streams[objectId].shader;
                         if (files !== undefined) {
-                            newStream = _stream(files);
+                            //newStream = _stream(files);
+                            _apiStream(files);
                         } else if (shaderId !== undefined) {
                             newStream = _renderer.addShaderStream(shaderId);
                             let inputStreamIds = streams[objectId].inputs;
@@ -4760,7 +4800,8 @@ var nvis = new function () {
                             }
                         }
                         if (newStream !== undefined && streams[objectId].window) {
-                            _renderer.addWindow(_renderer.streams.length - 1);
+                            //_renderer.addWindow(_renderer.streams.length - 1);
+                            _apiWindow();
                         }
                     }
                 }
@@ -4805,9 +4846,9 @@ var nvis = new function () {
 
     return {
         init: _init,
-        stream: _stream,
-        shader: _shader,
-        config: _config,
+        stream: _apiStream,
+        shader: _apiShader,
+        config: _apiConfig,
         //  below need to be visible to handle UI events
         streamUpdateParameter: _streamUpdateParameter,
         streamUpdateInput: _streamUpdateInput,

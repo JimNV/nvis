@@ -1,14 +1,12 @@
 #version 300 es
 
+precision highp float;
+
 #define DIFF_MODE_RGB           0
 #define DIFF_MODE_LAB_LENGTH    1
 #define DIFF_MODE_LUMINANCE     2
 
-precision highp float;
-
 //  common uniforms
-//uniform vec2 uDimensions;
-const vec2 uDimensions = vec2(512.0, 512.0);
 uniform vec2 uMouse;
 uniform float uTime;
 uniform float uFrame;
@@ -227,7 +225,9 @@ void main()
 {
     vec3 value;
 
-    vec2 loc2d = vTextureCoord * uDimensions;
+    ivec2 dimensions = textureSize(uTexture0, 0);
+    //ivec2 loc2d = ivec2(vTextureCoord * vec2(dimensions));
+    vec2 loc2d = vTextureCoord * vec2(dimensions);
 
     vec3 colorA = texture(uTexture0, vTextureCoord).rgb;
     vec3 colorB = texture(uTexture1, vTextureCoord).rgb;
@@ -265,9 +265,9 @@ void main()
         vec2 paletteCorner = vec2((uShowColorMap == 1 || uShowColorMap == 3) ? 0.0 : 1.0, (uShowColorMap == 1 || uShowColorMap == 2) ? 0.0 : 1.0);
 
         float kPaletteEdgeWidth = 2.0;
-        float kPaletteLength = float(min(uDimensions.x, uDimensions.y)) * 0.1;
+        float kPaletteLength = float(min(dimensions.x, dimensions.y)) * 0.1;
         float kPaletteWidth = kPaletteLength / 5.0;
-        vec2 kPaletteCenter = abs(vec2(float(uDimensions.x), float(uDimensions.y)) * paletteCorner - vec2(kPaletteWidth * 5.0, kPaletteLength * 2.0));
+        vec2 kPaletteCenter = abs(vec2(float(dimensions.x), float(dimensions.y)) * paletteCorner - vec2(kPaletteWidth * 5.0, kPaletteLength * 2.0));
 
         vec2 paletteVec = vec2(loc2d) - vec2(float(kPaletteCenter.x), float(kPaletteCenter.y));
         vec2 paletteDim = vec2(kPaletteWidth, kPaletteLength);
