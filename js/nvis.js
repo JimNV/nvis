@@ -238,42 +238,114 @@ var nvis = new function () {
         
     };
 
+    //  API handling
 
-    let _apiStream = function(files) {
-        _apiCommand({ command: "stream", argument: files });
+    let _apiStream = function(argument) {
+        _apiCommand({ command: "stream", argument: argument });
     }
 
-    let _apiShader = function(shader) {
-        _apiCommand({ command: "shader", argument: shader });
+    let _apiShader = function(fileName) {
+        _apiCommand({ command: "shader", argument: fileName });
     }
 
     let _apiWindow = function() {
         _apiCommand({ command: "window", argument: undefined });
     }
 
+    let _apiConfig = function (fileName) {
+        let xhr = new XMLHttpRequest();
+        xhr.open("GET", fileName);
+        xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+        xhr.onload = function () {
+            if (this.status == 200 && this.responseText !== null) {
+                let jsonObject = JSON.parse(this.responseText);
+                console.log("=====  Config JSON loaded (" + fileName + ")");
+                //  convert top-level keys to lowercase
+                let config = {};
+                for (let key of Object.keys(jsonObject)) {
+                    config[key.toLowerCase()] = jsonObject[key];
+                }
+
+                //  Zoom
+                let zoom = config.zoom;
+                if (zoom !== undefined) {
+                    _state.zoom.level = zoom;
+                }
+
+                //  shaders
+                let shaders = config.shaders;
+                if (shaders !== undefined) {
+                    for (let shaderId = 0; shaderId < shaders.length; shaderId++) {
+                        _apiShader(shaders[shaderId]);
+                    }
+                }
+                
+                //  streams
+                let streams = config.streams;
+                if (streams !== undefined) {
+                    for (let objectId = 0; objectId < streams.length; objectId++) {
+                        let newStream = undefined;
+                        let files = streams[objectId].files;
+                        let shaderId = streams[objectId].shader;
+                        if (files !== undefined) {
+                            _apiStream(streams[objectId]);
+                        } else if (shaderId !== undefined) {
+                            _apiStream(streams[objectId]);
+                        }
+                        if (newStream !== undefined && streams[objectId].window) {
+                            _apiWindow();
+                        }
+                    }
+                }
+
+                //  windows
+                let windows = config.windows;
+            }
+        };
+        xhr.send();
+    }
+
     let _executeAPICommand = function(apiCommand) {
+        let argument = apiCommand.argument;
         if (apiCommand.command == "stream") {
-            _stream(apiCommand.argument);
+            if (argument.files !== undefined) {
+                _renderer.loadStream(Array.isArray(argument.files) ? argument.files : [argument.files]);
+            } else if (argument.shader !== undefined) {
+                let shaderId = argument.shader;
+                let newStream = _renderer.addShaderStream(shaderId);
+                let inputStreamIds = argument.inputs;
+                if (inputStreamIds !== undefined) {
+                    newStream.setInputStreamIds(inputStreamIds);
+                }
+            }
+            if (argument.window) {
+                _renderer.addWindow(_renderer.streams.length - 1);
+            }
         } else if (apiCommand.command == "shader") {
-            _shader(apiCommand.argument);
+            _renderer.loadShader(apiCommand.argument);
         } else if (apiCommand.command == "window") {
-            //_shader(apiCommand.argument);
             _renderer.addWindow(_renderer.streams.length - 1);
         }
     }
 
-    //  for async handling of API commands (_renderer might not be initialized at API command issue)
+    //  for async handling of API commands (renderer might not be initialized at API command issue)
     let _APIQueue = [];
+
+    let _consumeAPICommands = function() {
+        while (_APIQueue.length > 0) {
+            _executeAPICommand(_APIQueue.shift());
+        }
+    }
+
     let _apiCommand = function(apiCommand) {
+        console.log("API: " + JSON.stringify(apiCommand));
         //let apiCommand = { command: command, argument: argument };
         if (_renderer === undefined) {
             _APIQueue.push(apiCommand);
         } else {
             //  consume prior commands (if any)
-            while (_APIQueue.length > 0) {
-                _executeAPICommand(_APIQueue.shift());
-            }
-            _executeAPICommand(apiComamnd);
+            _consumeAPICommands();
+            _executeAPICommand(apiCommand);
         }
     }
 
@@ -281,7 +353,7 @@ var nvis = new function () {
         addStyles();
         _renderer = new NvisRenderer();
         _renderer.start();
-        //_consumeAPICommands();
+        _consumeAPICommands();
     }
 
     window.onload = _init;
@@ -4677,6 +4749,7 @@ var nvis = new function () {
         }
 
         start() {
+            //this.render();
             requestAnimationFrame(() => this.animate());
         }
 
@@ -4754,70 +4827,14 @@ var nvis = new function () {
 
 
     //  API
-    let _stream = function (fileNames) {
-        return _renderer.loadStream(Array.isArray(fileNames) ? fileNames : [fileNames]);
-    }
+    // let _stream = function (fileNames) {
+    //     return _renderer.loadStream(Array.isArray(fileNames) ? fileNames : [fileNames]);
+    // }
 
-    let _shader = function (fileName) {
-        _renderer.loadShader(fileName);
-    }
+    // let _shader = function (fileName) {
+    //     _renderer.loadShader(fileName);
+    // }
 
-    let _apiConfig = function (fileName) {
-        let xhr = new XMLHttpRequest();
-        xhr.open("GET", fileName);
-        xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
-        xhr.onload = function () {
-            if (this.status == 200 && this.responseText !== null) {
-                let jsonObject = JSON.parse(this.responseText);
-                console.log("=====  Config JSON loaded (" + fileName + ")");
-                //  convert top-level keys to lowercase
-                let config = {};
-                for (let key of Object.keys(jsonObject)) {
-                    config[key.toLowerCase()] = jsonObject[key];
-                }
-
-                //  Zoom
-                let zoom = config.zoom;
-                if (zoom !== undefined) {
-                    _state.zoom.level = zoom;
-                }
-
-                //  streams
-                let streams = config.streams;
-                if (config.streams !== undefined) {
-                    for (let objectId = 0; objectId < streams.length; objectId++) {
-                        let newStream = undefined;
-                        let files = streams[objectId].files;
-                        let shaderId = streams[objectId].shader;
-                        if (files !== undefined) {
-                            //newStream = _stream(files);
-                            _apiStream(files);
-                        } else if (shaderId !== undefined) {
-                            newStream = _renderer.addShaderStream(shaderId);
-                            let inputStreamIds = streams[objectId].inputs;
-                            if (inputStreamIds !== undefined) {
-                                newStream.setInputStreamIds(inputStreamIds);
-                            }
-                        }
-                        if (newStream !== undefined && streams[objectId].window) {
-                            //_renderer.addWindow(_renderer.streams.length - 1);
-                            _apiWindow();
-                        }
-                    }
-                }
-
-                //  shaders
-                let shaders = config.shaders;
-                if (shaders !== undefined) {
-                    for (let shaderId = 0; shaderId < shaders.length; shaderId++) {
-                        _shader(shaders[shaderId]);
-                    }
-                }
-
-            }
-        };
-        xhr.send();
-    }
 
     let _streamUpdateParameter = function (streamId, elementId, bUpdateUI) {
         console.log("update: " + streamId + ", " + elementId);
@@ -4845,7 +4862,7 @@ var nvis = new function () {
 
 
     return {
-        init: _init,
+        //init: _init,
         stream: _apiStream,
         shader: _apiShader,
         config: _apiConfig,
