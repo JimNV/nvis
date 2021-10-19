@@ -257,6 +257,10 @@ var nvis = new function () {
         return _apiCommand({ command: "shader", argument: { fileName: fileName, inputs: inputs, window: bWindow }});
     }
 
+    let _apiGenerator = function(fileName, width, height, bWindow = true) {
+        return _apiCommand({ command: "generator", argument: { fileName: fileName, width: width, height: height, window: bWindow }});
+    }
+
     let _apiWindow = function(streamId = 0) {
         return _apiCommand({ command: "window", argument: streamId });
     }
@@ -286,6 +290,14 @@ var nvis = new function () {
                 if (shaders !== undefined) {
                     for (let i = 0; i < shaders.length; i++) {
                         _apiCommand({ command: "shader", argument: shaders[i] });
+                    }
+                }
+                
+                //  generators
+                let generators = config.generators;
+                if (generators !== undefined) {
+                    for (let i = 0; i < generators.length; i++) {
+                        _apiCommand({ command: "generator", argument: generators[i] });
                     }
                 }
                 
@@ -351,6 +363,18 @@ var nvis = new function () {
                 if (argument.window) {
                     _renderer.addWindow(_renderer.streams.length - 1);
                 }
+            }
+            return shaderId;
+        } else if (command == "generator") {
+            let shaderId = _renderer.loadShader(argument.fileName);
+            let newStream = _renderer.addShaderStream(shaderId);
+            let dimensions = { w: argument.width, h: argument.height };
+            newStream.setDimensions(dimensions);
+            if (_renderer.windows.streamPxDimensions === undefined) {
+                _renderer.windows.streamPxDimensions = dimensions;
+            }
+            if (argument.window) {
+                _renderer.addWindow(_renderer.streams.length - 1);
             }
             return shaderId;
         } else if (command == "window") {
@@ -430,6 +454,7 @@ var nvis = new function () {
         }
 
         let _setUniforms = function (glContext, shaderProgram) {
+
             for (let key of Object.keys(object)) {
                 let type = _object[key].type;
                 let uniform = glContext.getUniformLocation(shaderProgram, key);
@@ -2790,6 +2815,8 @@ var nvis = new function () {
             this.numTextures = 1;
             this.currentTexture = 0;
 
+            this.startTime = Date.now();
+
             this.defaultUI = `{
                 "uTonemapper": {
                     "type": "dropdown",
@@ -2858,7 +2885,6 @@ var nvis = new function () {
             return { r: data[0], g: data[1], b: data[2], a: data[3] };
         }
 
-
         setUniforms(shader) {
 
             let gl = this.glContext;
@@ -2873,6 +2899,12 @@ var nvis = new function () {
                 this.bUIReady = true;
             }
 
+            //  common uniforms
+            let uniform = gl.getUniformLocation(shader.getProgram(), "uTime");
+            if (uniform !== undefined) {
+                gl.uniform1f(uniform, (Date.now() - this.startTime) / 1000.0);
+            }            
+            
             let uiObject = this.shaderJSONObject.UI;
             if (uiObject === undefined) {
                 return;
@@ -4899,6 +4931,7 @@ var nvis = new function () {
         zoom: _apiZoom,
         stream: _apiStream,
         shader: _apiShader,
+        generator: _apiGenerator,
         config: _apiConfig,
         window: _apiWindow,
         //  below need to be visible to handle UI events
