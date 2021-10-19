@@ -240,16 +240,25 @@ var nvis = new function () {
 
     //  API handling
 
-    let _apiStream = function(argument) {
-        _apiCommand({ command: "stream", argument: argument });
+    let _apiClear = function() {
+        return _apiCommand({ command: "clear", argument: undefined });
     }
 
-    let _apiShader = function(fileName) {
-        _apiCommand({ command: "shader", argument: fileName });
+    let _apiZoom = function(level, position = undefined) {
+        return _apiCommand({ command: "zoom", argument: level })
     }
 
-    let _apiWindow = function() {
-        _apiCommand({ command: "window", argument: undefined });
+    let _apiStream = function(files, bWindow = true) {
+        files = (Array.isArray(files) ? files : [files]);
+        return _apiCommand({ command: "stream", argument: { name: files[0], files: files, window: bWindow } });
+    }
+
+    let _apiShader = function(fileName, inputs = undefined, bWindow = true) {
+        return _apiCommand({ command: "shader", argument: { fileName: fileName, inputs: inputs, window: bWindow }});
+    }
+
+    let _apiWindow = function(streamId = 0) {
+        return _apiCommand({ command: "window", argument: streamId });
     }
 
     let _apiConfig = function (fileName) {
@@ -269,47 +278,56 @@ var nvis = new function () {
                 //  Zoom
                 let zoom = config.zoom;
                 if (zoom !== undefined) {
-                    _state.zoom.level = zoom;
+                    _apiCommand({ command: "zoom", argument: zoom });
                 }
 
                 //  shaders
                 let shaders = config.shaders;
                 if (shaders !== undefined) {
-                    for (let shaderId = 0; shaderId < shaders.length; shaderId++) {
-                        _apiShader(shaders[shaderId]);
+                    for (let i = 0; i < shaders.length; i++) {
+                        _apiCommand({ command: "shader", argument: shaders[i] });
                     }
                 }
                 
                 //  streams
                 let streams = config.streams;
                 if (streams !== undefined) {
-                    for (let objectId = 0; objectId < streams.length; objectId++) {
-                        let newStream = undefined;
-                        let files = streams[objectId].files;
-                        let shaderId = streams[objectId].shader;
-                        if (files !== undefined) {
-                            _apiStream(streams[objectId]);
-                        } else if (shaderId !== undefined) {
-                            _apiStream(streams[objectId]);
-                        }
-                        if (newStream !== undefined && streams[objectId].window) {
-                            _apiWindow();
-                        }
+                    for (let i = 0; i < streams.length; i++) {
+                        _apiCommand({ command: "stream", argument: streams[i] });
                     }
                 }
 
                 //  windows
-                let windows = config.windows;
+                let streamIds = config.windows;
+                if (streamIds !== undefined) {
+                    for (let i = 0; i < streamIds.length; i++) {
+                        // _apiWindow(streamIds[i]);
+                        _apiCommand({ command: "window", argument: streamIds[i] });
+                    }
+                }
             }
         };
         xhr.send();
     }
 
     let _executeAPICommand = function(apiCommand) {
+        let command = apiCommand.command;
         let argument = apiCommand.argument;
-        if (apiCommand.command == "stream") {
+
+        if (command == "clear") {
+            _state.zoom.level = 1.0;
+            _renderer.streams = [];
+            _renderer.shaders.clear();
+            _renderer.windows.clear();
+            return true;
+        } else if (command == "zoom") {
+            _state.zoom.level = Math.min(Math.max(argument, 1.0), 256.0);
+            _renderer.windows.updateTextureCoordinates();
+            return _state.zoom.level;
+        } else if (command == "stream") {
+            let streamId = undefined;
             if (argument.files !== undefined) {
-                _renderer.loadStream(Array.isArray(argument.files) ? argument.files : [argument.files]);
+                streamId = _renderer.loadStream(Array.isArray(argument.files) ? argument.files : [argument.files]);
             } else if (argument.shader !== undefined) {
                 let shaderId = argument.shader;
                 let newStream = _renderer.addShaderStream(shaderId);
@@ -321,10 +339,25 @@ var nvis = new function () {
             if (argument.window) {
                 _renderer.addWindow(_renderer.streams.length - 1);
             }
-        } else if (apiCommand.command == "shader") {
-            _renderer.loadShader(apiCommand.argument);
-        } else if (apiCommand.command == "window") {
-            _renderer.addWindow(_renderer.streams.length - 1);
+            return streamId;
+        } else if (command == "shader") {
+            let shaderId = _renderer.loadShader(argument.fileName);
+            if (argument.inputs !== undefined) {
+                let newStream = _renderer.addShaderStream(shaderId);
+                let inputStreamIds = argument.inputs;
+                if (inputStreamIds !== undefined) {
+                    newStream.setInputStreamIds(inputStreamIds);
+                }
+                if (argument.window) {
+                    _renderer.addWindow(_renderer.streams.length - 1);
+                }
+            }
+            return shaderId;
+        } else if (command == "window") {
+            let streamId = argument;
+            if (streamId >= 0 && streamId < _renderer.streams.length) {
+                _renderer.addWindow(streamId);
+            }
         }
     }
 
@@ -339,13 +372,12 @@ var nvis = new function () {
 
     let _apiCommand = function(apiCommand) {
         console.log("API: " + JSON.stringify(apiCommand));
-        //let apiCommand = { command: command, argument: argument };
         if (_renderer === undefined) {
             _APIQueue.push(apiCommand);
         } else {
             //  consume prior commands (if any)
             _consumeAPICommands();
-            _executeAPICommand(apiCommand);
+            return _executeAPICommand(apiCommand);
         }
     }
 
@@ -1042,6 +1074,10 @@ var nvis = new function () {
         }
 
 
+        clear() {
+            this.shaders = [];
+        }
+
         load(jsonFileName, callback) {
             let self = this;
 
@@ -1057,6 +1093,7 @@ var nvis = new function () {
             };
 
             xhr.send();
+            return this.shaders.length;
         }
 
     }
@@ -3399,6 +3436,13 @@ var nvis = new function () {
             this.adjust();
         }
 
+
+        clear() {
+            this.windows = [];
+            this.adjust();
+        }
+
+
         insideWindow(canvasPxCoords) {
             return !(canvasPxCoords.x < 0 || canvasPxCoords.x >= this.canvas.width || canvasPxCoords.y < 0 || canvasPxCoords.y >= this.canvas.height);
         }
@@ -4706,7 +4750,7 @@ var nvis = new function () {
 
         loadShader(jsonFileName) {
             // this.shaders.load(jsonFileName, function () { this.shaderLoaded(); });
-            this.shaders.load(jsonFileName, () => this.shaderLoaded());
+            return this.shaders.load(jsonFileName, () => this.shaderLoaded());
         }
 
         newStreamCallback(streamPxDimensions) {
@@ -4728,7 +4772,7 @@ var nvis = new function () {
             this.streams.push(newStream);
             this.windows.adjust();
 
-            return newStream;
+            return this.streams.length - 1;
         }
 
         addShaderStream(shaderId) {
@@ -4778,6 +4822,8 @@ var nvis = new function () {
 
     }
 
+    //  Global callbacks
+
     let _openTab = function (event, tabId) {
         let oldTabId = _state.ui.tabId;
 
@@ -4795,8 +4841,6 @@ var nvis = new function () {
             tabs[i].className = tabs[i].className.replace(" active", "");
         }
 
-        // document.getElementById(tabName).style.display = "block";
-        // document.getElementById(tabName).className += " active";
         event.currentTarget.className += " active";
     }
 
@@ -4805,7 +4849,7 @@ var nvis = new function () {
         //event.preventDefault();
         _state.ui.mouseDown = true;
         _state.ui.clickPosition = { x: event.clientX, y: event.clientY };
-        console.log("uiOnMouseDown: " + JSON.stringify(_state.ui.clickPosition));
+        // console.log("uiOnMouseDown: " + JSON.stringify(_state.ui.clickPosition));
         document.body.addEventListener("mousemove", nvis.uiOnMouseMove);
         document.body.addEventListener("mouseup", nvis.uiOnMouseUp);
     }
@@ -4814,7 +4858,7 @@ var nvis = new function () {
         let dist = { x: event.clientX - _state.ui.clickPosition.x, y: event.clientY - _state.ui.clickPosition.y };
         _state.ui.position = { x: _state.ui.previousPosition.x + dist.x, y: _state.ui.previousPosition.y + dist.y };
         _renderer.updateUiPosition();
-        console.log("uiOnMouseMove: position: " + JSON.stringify(_state.ui.position));
+        // console.log("uiOnMouseMove: position: " + JSON.stringify(_state.ui.position));
     }
 
     let _uiOnMouseUp = function (event) {
@@ -4822,19 +4866,8 @@ var nvis = new function () {
         _state.ui.previousPosition = _state.ui.position;
         document.body.removeEventListener("mousemove", nvis.uiOnMouseMove)
         document.body.removeEventListener("mouseup", nvis.uiOnMouseUp);
-        console.log("uiOnMouseUp: " + JSON.stringify(event));
+        // console.log("uiOnMouseUp: " + JSON.stringify(event));
     }
-
-
-    //  API
-    // let _stream = function (fileNames) {
-    //     return _renderer.loadStream(Array.isArray(fileNames) ? fileNames : [fileNames]);
-    // }
-
-    // let _shader = function (fileName) {
-    //     _renderer.loadShader(fileName);
-    // }
-
 
     let _streamUpdateParameter = function (streamId, elementId, bUpdateUI) {
         console.log("update: " + streamId + ", " + elementId);
@@ -4862,10 +4895,12 @@ var nvis = new function () {
 
 
     return {
-        //init: _init,
+        clear: _apiClear,
+        zoom: _apiZoom,
         stream: _apiStream,
         shader: _apiShader,
         config: _apiConfig,
+        window: _apiWindow,
         //  below need to be visible to handle UI events
         streamUpdateParameter: _streamUpdateParameter,
         streamUpdateInput: _streamUpdateInput,

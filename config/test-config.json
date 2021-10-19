@@ -8,8 +8,7 @@
         "glsl/ssim.json"
     ],
     "windows": [
-        "Lena",
-        "Texture/Plane"
+        0, 1
     ],
     "streams": [
         {

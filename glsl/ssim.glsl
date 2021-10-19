@@ -303,7 +303,7 @@ void main()
     ivec2 dimensions = textureSize(uTexture0, 0);
     ivec2 loc2d = ivec2(vTextureCoord * vec2(dimensions));
 
-    float ssimValue = ssim(loc2d, uSigma);
+    float ssimValue = 1.0 - ssim(loc2d, uSigma);
     vec3 value = vec3(ssimValue, ssimValue, ssimValue);
 
     //float error = RGBtoLuma(value); // single error value per pixel
