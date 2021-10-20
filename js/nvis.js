@@ -235,33 +235,33 @@ var nvis = new function () {
             border: 1px solid #808080;
             border-top: none;
         }`);
-        
+
     };
 
     //  API handling
 
-    let _apiClear = function() {
+    let _apiClear = function () {
         return _apiCommand({ command: "clear", argument: undefined });
     }
 
-    let _apiZoom = function(level, position = undefined) {
+    let _apiZoom = function (level, position = undefined) {
         return _apiCommand({ command: "zoom", argument: level })
     }
 
-    let _apiStream = function(files, bWindow = true) {
+    let _apiStream = function (files, bWindow = true) {
         files = (Array.isArray(files) ? files : [files]);
         return _apiCommand({ command: "stream", argument: { name: files[0], files: files, window: bWindow } });
     }
 
-    let _apiShader = function(fileName, inputs = undefined, bWindow = true) {
-        return _apiCommand({ command: "shader", argument: { fileName: fileName, inputs: inputs, window: bWindow }});
+    let _apiShader = function (fileName, inputs = undefined, bWindow = true) {
+        return _apiCommand({ command: "shader", argument: { fileName: fileName, inputs: inputs, window: bWindow } });
     }
 
-    let _apiGenerator = function(fileName, width, height, bWindow = true) {
-        return _apiCommand({ command: "generator", argument: { fileName: fileName, width: width, height: height, window: bWindow }});
+    let _apiGenerator = function (fileName, width, height, bWindow = true) {
+        return _apiCommand({ command: "generator", argument: { fileName: fileName, width: width, height: height, window: bWindow } });
     }
 
-    let _apiWindow = function(streamId = 0) {
+    let _apiWindow = function (streamId = 0) {
         return _apiCommand({ command: "window", argument: streamId });
     }
 
@@ -292,7 +292,7 @@ var nvis = new function () {
                         _apiCommand({ command: "shader", argument: shaders[i] });
                     }
                 }
-                
+
                 //  generators
                 let generators = config.generators;
                 if (generators !== undefined) {
@@ -300,7 +300,7 @@ var nvis = new function () {
                         _apiCommand({ command: "generator", argument: generators[i] });
                     }
                 }
-                
+
                 //  streams
                 let streams = config.streams;
                 if (streams !== undefined) {
@@ -322,7 +322,7 @@ var nvis = new function () {
         xhr.send();
     }
 
-    let _executeAPICommand = function(apiCommand) {
+    let _executeAPICommand = function (apiCommand) {
         let command = apiCommand.command;
         let argument = apiCommand.argument;
 
@@ -388,13 +388,13 @@ var nvis = new function () {
     //  for async handling of API commands (renderer might not be initialized at API command issue)
     let _APIQueue = [];
 
-    let _consumeAPICommands = function() {
+    let _consumeAPICommands = function () {
         while (_APIQueue.length > 0) {
             _executeAPICommand(_APIQueue.shift());
         }
     }
 
-    let _apiCommand = function(apiCommand) {
+    let _apiCommand = function (apiCommand) {
         console.log("API: " + JSON.stringify(apiCommand));
         if (_renderer === undefined) {
             _APIQueue.push(apiCommand);
@@ -2900,11 +2900,20 @@ var nvis = new function () {
             }
 
             //  common uniforms
-            let uniform = gl.getUniformLocation(shader.getProgram(), "uTime");
+            let uniform = gl.getUniformLocation(shader.getProgram(), "uDimensions");
+            if (uniform !== undefined) {
+                gl.uniform2f(uniform, this.dimensions.w, this.dimensions.h);
+            }
+            uniform = gl.getUniformLocation(shader.getProgram(), "uTime");
             if (uniform !== undefined) {
                 gl.uniform1f(uniform, (Date.now() - this.startTime) / 1000.0);
-            }            
-            
+            }
+            uniform = gl.getUniformLocation(shader.getProgram(), "uMouse");
+            if (uniform !== undefined) {
+                gl.uniform4f(uniform, _state.input.mouse.canvasCoords.x, _state.input.mouse.canvasCoords.y,
+                    (_state.input.mouse.down ? 1.0 : 0.0), 0.0);
+            }
+
             let uiObject = this.shaderJSONObject.UI;
             if (uiObject === undefined) {
                 return;
@@ -4386,7 +4395,7 @@ var nvis = new function () {
                 automaticLayout.setAttribute("checked", true);
             }
             settingsDiv.appendChild(automaticLayout);
-//            settingsDiv.innerHTML += "<input id=\"bAutomaticLayout\" " + (_state.layout.bAutomatic ? "checked " : "") + "type=\"checkbox\" onclick=\"nvis.toggleAutomaticLayout()\"> Automatic window layout";
+            //            settingsDiv.innerHTML += "<input id=\"bAutomaticLayout\" " + (_state.layout.bAutomatic ? "checked " : "") + "type=\"checkbox\" onclick=\"nvis.toggleAutomaticLayout()\"> Automatic window layout";
             this.uiPopup.appendChild(settingsDiv);
 
             //  streams
@@ -4456,7 +4465,7 @@ var nvis = new function () {
             this.uiPopup.style.left = (_state.ui.position.x + "px");
             this.uiPopup.style.top = (_state.ui.position.y + "px");
         }
-        
+
         onKeyDown(event) {
             event = event || window.event;
             let keyCode = event.keyCode || event.which;

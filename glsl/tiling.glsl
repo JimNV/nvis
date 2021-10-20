@@ -3,14 +3,11 @@
 precision highp float;
 
 //  common uniforms
-//uniform ivec2 uDimensions;
-vec2 uDimensions = vec2(512.0, 512.0);
-uniform vec3 uMouse;
+uniform vec2 uDimensions;
+uniform vec4 uMouse;
 uniform float uTime;
 
 //  shader-specific uniforms
-uniform int uDirection;
-uniform float uLevel;
 
 // Texture
 in vec2 vTextureCoord;
