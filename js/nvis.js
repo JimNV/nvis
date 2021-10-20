@@ -189,6 +189,18 @@ var nvis = new function () {
                 #a0a0a0 20px
             );
         }`);
+        addStylesheetRules(`.uiPopup table {
+            margin-left: 50px;
+        }`);
+        addStylesheetRules(`.uiPopup select {
+            font: 20px Arial;
+        }`);
+        addStylesheetRules(`.uiPopup label {
+            margin-left: 5px;
+        }`);
+        addStylesheetRules(`.uiPopup input[type=range] {
+            width: 300px;
+        }`);
 
         addStylesheetRules(`.infoPopup {
             width: 100%;
@@ -200,13 +212,6 @@ var nvis = new function () {
             left: -50px;
             top: 5px;
             text-shadow: 5px 5px 10px black;
-        }`);
-
-        addStylesheetRules(`.uiTable {
-            margin-left: 50px;
-        }`);
-        addStylesheetRules(`select {
-            font: 20px Arial;
         }`);
 
         //  UI tabs
@@ -1119,17 +1124,20 @@ var nvis = new function () {
 
             let xhr = new XMLHttpRequest();
 
+            let shaderId = this.shaders.length;
+            this.shaders.push(undefined);
+
             xhr.open("GET", jsonFileName);
             xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
             xhr.onload = function () {
                 if (this.status == 200 && this.responseText !== null) {
                     //  set position of shader, filled in later
-                    self.shaders.push(new NvisShader(self.glContext, { json: this.responseText, callback: callback }));
+                    self.shaders[shaderId] = new NvisShader(self.glContext, { json: this.responseText, callback: callback });
                 }
             };
-
             xhr.send();
-            return this.shaders.length;
+            
+            return shaderId;
         }
 
     }
@@ -2829,7 +2837,7 @@ var nvis = new function () {
             this.dom = document.createDocumentFragment();
 
             let table = document.createElement("table");
-            table.className = "uiTable";
+            //table.className = "uiTable";
 
             for (let key of Object.keys(object)) {
 
@@ -4295,8 +4303,10 @@ var nvis = new function () {
                 for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
                     let activeTexture = this.TextureUnits[inputId];
                     gl.activeTexture(activeTexture);
-                    gl.bindTexture(gl.TEXTURE_2D, streams[stream.getInputStreamId(inputId)].getTexture(frameId));
-                    gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
+                    if (stream.getInputStreamId(inputId) !== undefined) {
+                        gl.bindTexture(gl.TEXTURE_2D, streams[stream.getInputStreamId(inputId)].getTexture(frameId));
+                        gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
+                    }
                 }
             }
             gl.viewport(0, 0, streamDim.w, streamDim.h);
