@@ -32,26 +32,6 @@ var nvis = new function () {
     let _renderer = undefined;
     let _streams = [];
 
-    let _settings = [
-        {
-            "type": "title",
-            "text": "Windows"
-        },
-        {
-            "id": "bAutomaticLayout",
-            "type": "bool",
-            "name": "Automatic layout",
-            "value": true
-        },
-        {
-            "id": "layoutWidth",
-            "type": "int",
-            "name": "Automatic layout",
-            "value": 2,
-            "min": 1
-        }
-    ];
-
     let _state = {
         ui: {
             tabId: "tabSettings",
@@ -101,6 +81,37 @@ var nvis = new function () {
             }
         }
     }
+
+    let _settings = {
+        title: "Settings",
+        bAutomaticLayout: {
+            name: "Automatic layout",
+            type: "bool",
+            value: _state.layout.bAutomatic
+        },
+        layoutWidth: {
+            name: "Layout width",
+            type: "int",
+            value: _state.layout.dimensions.w,
+            min: 1,
+            max: "#windows",
+            condition: "!bAutomaticLayout"
+        },
+        canvasBorder: {
+            name: "Border width",
+            type: "int",
+            value: _state.layout.border,
+            min: 0,
+            max: 200,
+            step: 1
+        },
+        clearAll: {
+            name: "Clear all streams and windows",
+            type: "button",
+            value: "Clear all"
+        }
+    };
+
 
     function addStylesheetRules(rules) {
         let styleElement = document.createElement('style');
@@ -445,7 +456,7 @@ var nvis = new function () {
             let type = _object[key].type;
             _object[key].value = (type == "bool" ? element.checked : (type == "dropdown" ? element.selectedIndex : element.value));
 
-            let elementValue = document.getElementById(elementId + "-Value");
+            let elementValue = document.getElementById(elementId + "-value");
             if (elementValue !== null) {
                 elementValue.innerHTML = element.value;
             }
@@ -518,7 +529,7 @@ var nvis = new function () {
                         el.setAttribute("step", (_object[key].step ? _object[key].step : 0.1));
                         el.setAttribute("oninput", callbackString);
                         let oEl = document.createElement("span");
-                        oEl.id = (elementId + "-Value");
+                        oEl.id = (elementId + "-value");
                         oEl.innerHTML = (oEl.innerHTML == "" ? _object[key].value : oEl.innerHTML);
                         //console.log("oEL: '" + oEl.innerHTML + "'");
                         label.innerHTML += " (" + oEl.outerHTML + ")";
@@ -2790,6 +2801,183 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
 
+    class NvisUI {
+
+        constructor(id, object, renderer) {
+            this.id = id;
+            this.object = object;
+            this.renderer = renderer;
+            this.build();
+        }
+
+        createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI = true) {
+            let callbackString = "nvis.uiUpdateParameter(\"" + uniqueId + "\", \"" + elementId + "\", \"" + rowId + "\", " + bAllConditionsMet + ", " + bUpdateUI + ")";
+            console.log(callbackString);
+            return callbackString;
+        }
+
+        createConfirmCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI = true) {
+            let callbackString = "if (confirm('Are you sure?')) nvis.uiUpdateParameter(\"" + uniqueId + "\", \"" + elementId + "\", \"" + rowId + "\", " + bAllConditionsMet + ", " + bUpdateUI + ")";
+            console.log(callbackString);
+            return callbackString;
+        }
+
+        build() {
+            let object = this.object;
+            let uniqueId = this.id;
+
+            this.dom = document.createDocumentFragment();
+
+            let table = document.createElement("table");
+            table.className = "uiTable";
+
+            for (let key of Object.keys(object)) {
+
+                let bConditionMet = true;
+                let bAllConditionsMet = true;
+
+                let bConditionNegated = false;
+                let conditionVariable = "";
+                let conditionValue = "";
+
+                let conditionString = object[key].condition;
+                if (conditionString !== undefined) {
+                    conditionString = conditionString.replace(/\s+/g, '');
+                    let conditionStrings = conditionString.split("&");
+                    for (let i = 0; i < conditionStrings.length; i++) {
+                        let condition = conditionStrings[i];
+
+                        let equalPosition = condition.lastIndexOf("=");
+                        if (equalPosition != -1) {
+                            //  numeric conditional
+                            bConditionNegated = (condition[equalPosition - 1] == "!");
+                            conditionVariable = condition.substring(0, equalPosition - 1);
+                            conditionValue = condition.substring(equalPosition + 1);
+                            let conditionValues = conditionValue.split(",");
+                            bConditionMet = conditionValues.includes(object[conditionVariable].value.toString())
+                            bConditionMet = (bConditionNegated ? !bConditionMet : bConditionMet);
+                        } else {
+                            //  boolean conditional
+                            bConditionNegated = (condition[0] == '!');
+                            conditionVariable = condition.substring(bConditionNegated ? 1 : 0);
+                            bConditionMet = (!bConditionNegated && object[conditionVariable].value) || (bConditionNegated && !object[conditionVariable].value);
+                        }
+                    }
+
+                    bAllConditionsMet &&= bConditionMet;
+                }
+
+                let label = document.createElement("label");
+                label.setAttribute("for", key);
+                label.innerHTML = object[key].name;
+
+                let elementId = (uniqueId + "-" + key);  //  need uniqueness
+                let rowId = elementId + "-row";
+
+                let row = document.createElement("tr");
+                row.setAttribute("id", rowId);
+                row.style.display = (bAllConditionsMet ? "" : "none");
+
+                let el = undefined;
+                let type = object[key].type;
+                if (type == "bool" || type == "int" || type == "float") {
+                    el = document.createElement("input");
+                    el.setAttribute("id", elementId);
+
+                    if (type == "bool") {
+                        el.setAttribute("type", "checkbox");
+                        if (object[key].value) {
+                            el.setAttribute("checked", true);
+                        } else {
+                            el.removeAttribute("checked");
+                        }
+                        el.setAttribute("onclick", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
+                    } else if (type == "int") {
+                        el.setAttribute("type", "range");
+                        el.setAttribute("min", (object[key].min ? object[key].min : 0.0));
+                        if (object[key].max === undefined) {
+                            el.setAttribute("max", 1.0);
+                        } else {
+                            if (object[key].max == "#windows" && this.renderer.windows !== undefined) {
+                                el.setAttribute("max", this.renderer.windows.windows.length);
+                            } else {
+                                el.setAttribute("max", object[key].max);
+                            }
+                        }
+                        el.setAttribute("value", (object[key].value ? object[key].value : 0.0));
+                        el.setAttribute("step", (object[key].step ? object[key].step : 1.0));
+                        el.setAttribute("oninput", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, false));
+                        let oEl = document.createElement("span");
+                        oEl.id = (elementId + "-value");
+                        oEl.innerHTML = (oEl.innerHTML == "" ? object[key].value : oEl.innerHTML);
+
+                        label.innerHTML += " (" + oEl.outerHTML + ")";
+                    } else if (type == "float") {
+                        el.setAttribute("type", "range");
+                        el.setAttribute("min", (object[key].min ? object[key].min : 0.0));
+                        el.setAttribute("max", (object[key].max ? object[key].max : 1.0));
+                        el.setAttribute("value", (object[key].value ? object[key].value : 0.0));
+                        el.setAttribute("step", (object[key].step ? object[key].step : 0.1));
+                        el.setAttribute("oninput", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, false));
+                        let oEl = document.createElement("span");
+                        oEl.id = (elementId + "-value");
+                        oEl.innerHTML = (oEl.innerHTML == "" ? object[key].value : oEl.innerHTML);
+
+                        label.innerHTML += " (" + oEl.outerHTML + ")";
+                    }
+                } else if (type == "dropdown") {
+                    el = document.createElement("select");
+                    el.setAttribute("id", elementId);
+                    el.setAttribute("onchange", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
+                    for (let optionId = 0; optionId < object[key].alternatives.length; optionId++) {
+                        let oEl = document.createElement("option");
+                        if (object[key].value == optionId) {
+                            oEl.setAttribute("selected", true);
+                        }
+                        oEl.innerHTML = object[key].alternatives[optionId];
+                        el.appendChild(oEl);
+                    }
+                } else if (type == "button") {
+                    el = document.createElement("button");
+                    el.setAttribute("id", elementId);
+                    el.innerHTML = object[key].value;
+                    el.setAttribute("onclick", this.createConfirmCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
+                }
+
+                if (el !== undefined) {
+                    if (type == "bool" || type == "button") {
+                        let cell = document.createElement("td");
+                        cell.setAttribute("colspan", 2);
+                        cell.innerHTML = el.outerHTML + label.outerHTML;
+
+                        row.appendChild(cell);
+                    } else {
+                        let elCell = document.createElement("td");
+                        elCell.innerHTML = el.outerHTML;
+                        let labelCell = document.createElement("td");
+                        labelCell.innerHTML = label.outerHTML;
+
+                        row.appendChild(elCell);
+                        row.appendChild(labelCell);
+                    }
+
+                    table.appendChild(row);
+                }
+            }
+
+            this.dom.appendChild(table);
+        }
+
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
     class NvisStream {
 
         constructor(glContext, shaderId = -1) {
@@ -2950,7 +3138,7 @@ var nvis = new function () {
             let type = object.type;
             object.value = (type == "bool" ? element.checked : (type == "dropdown" ? element.selectedIndex : element.value));
 
-            let elementValue = document.getElementById(elementId + "-Value");
+            let elementValue = document.getElementById(elementId + "-value");
             if (elementValue !== null) {
                 elementValue.innerHTML = element.value;
             }
@@ -3300,7 +3488,7 @@ var nvis = new function () {
                         el.setAttribute("step", (object[key].step ? object[key].step : 0.1));
                         el.setAttribute("oninput", this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet, false));
                         let oEl = document.createElement("span");
-                        oEl.id = (elementId + "-Value");
+                        oEl.id = (elementId + "-value");
                         oEl.innerHTML = (oEl.innerHTML == "" ? object[key].value : oEl.innerHTML);
 
                         label.innerHTML += " (" + oEl.outerHTML + ")";
@@ -3479,6 +3667,7 @@ var nvis = new function () {
 
 
         clear() {
+            this.streamPxDimensions = undefined;
             this.windows = [];
             this.adjust();
         }
@@ -3793,6 +3982,11 @@ var nvis = new function () {
 
 
         translate(canvasOffset, bPixels = true) {
+
+            if (this.windows.length == 0) {
+                return;
+            }
+
             //  bPixels: x and y are in pixels
             if (bPixels) {
                 canvasOffset = {
@@ -3809,6 +4003,11 @@ var nvis = new function () {
 
 
         zoom(direction, canvasPxCoords, bHigh = false) {
+
+            if (this.windows.length == 0) {
+                return 0;
+            }
+
             let winRelCoords = this.getWindowCoordinates(canvasPxCoords);
             if (winRelCoords !== undefined) {
 
@@ -4204,6 +4403,8 @@ var nvis = new function () {
 
             this.uiHtml = "";
 
+            this.settingsUI = new NvisUI("settings", _settings, this);
+
             this.animation = {
                 active: false,
                 fps: 60,
@@ -4354,7 +4555,6 @@ var nvis = new function () {
             this.uiPopup.appendChild(titleBar);
 
 
-
             let tabs = document.createElement("div");
             tabs.className = "tabs";
 
@@ -4386,15 +4586,19 @@ var nvis = new function () {
             let settingsDiv = document.createElement("div");
             settingsDiv.id = "tabSettings";
             settingsDiv.className = "tabContent";
-            let automaticLayout = document.createElement("input");
-            automaticLayout.id = "bAutomaticLayout";
-            automaticLayout.type = "checkbox";
-            automaticLayout.setAttribute("onclick", "nvis.toggleAutomaticLayout()");
-            automaticLayout.innerHTML = "Automatic window placement";
-            if (_state.layout.bAutomatic) {
-                automaticLayout.setAttribute("checked", true);
-            }
-            settingsDiv.appendChild(automaticLayout);
+
+            this.settingsUI.build();
+            settingsDiv.appendChild(this.settingsUI.dom);
+
+            // let automaticLayout = document.createElement("input");
+            // automaticLayout.id = "bAutomaticLayout";
+            // automaticLayout.type = "checkbox";
+            // automaticLayout.setAttribute("onclick", "nvis.toggleAutomaticLayout()");
+            // automaticLayout.innerHTML = "Automatic window placement";
+            // if (_state.layout.bAutomatic) {
+            //     automaticLayout.setAttribute("checked", true);
+            // }
+            // settingsDiv.appendChild(automaticLayout);
             //            settingsDiv.innerHTML += "<input id=\"bAutomaticLayout\" " + (_state.layout.bAutomatic ? "checked " : "") + "type=\"checkbox\" onclick=\"nvis.toggleAutomaticLayout()\"> Automatic window layout";
             this.uiPopup.appendChild(settingsDiv);
 
@@ -4515,6 +4719,7 @@ var nvis = new function () {
                         case 'a':
                             _state.layout.bAutomatic = !_state.layout.bAutomatic;
                             this.popupInfo("Automatic window placement: " + (_state.layout.bAutomatic ? "on" : "off"));
+                            this.updateUiPopup();
                             this.windows.adjust();
                             break;
                         case 'p':
@@ -4522,6 +4727,7 @@ var nvis = new function () {
                             break;
                         case 'd':
                             this.windows.delete(_state.input.mouse.canvasCoords);
+                            this.updateUiPopup();
                             break;
                         case 'o':
                             document.getElementById("fileInput").click();
@@ -4533,6 +4739,7 @@ var nvis = new function () {
                             break;
                         case 'w':
                             this.windows.add();
+                            this.updateUiPopup();
                             break;
                         case 'h':
                             this.helpPopup.style.display = "block";
@@ -4540,10 +4747,12 @@ var nvis = new function () {
                         case '+':
                             _state.layout.bAutomatic = false;
                             this.windows.inc();
+                            this.updateUiPopup();
                             break;
                         case '-':
                             _state.layout.bAutomatic = false;
                             this.windows.dec();
+                            this.updateUiPopup();
                             break;
                         default:
                             console.log("KEYDOWN   key: '" + key + "', keyCode: " + keyCode);
@@ -4910,6 +5119,54 @@ var nvis = new function () {
         // console.log("uiOnMouseUp: " + JSON.stringify(event));
     }
 
+    let _uiUpdateParameter = function (objectId, elementId, rowId, bAllConditionsMet, bUpdateUI) {
+        console.log("update: " + objectId + ", " + elementId + ", " + bUpdateUI);
+
+        let key = elementId.replace(/^.*\-/, "");
+        let element = document.getElementById(elementId);
+        let object = _settings[key];
+        let type = object.type;
+
+        if (type == "bool") {
+            object.value = element.checked;
+        }
+        if (type == "int" || type == "float") {
+            object.value = element.value;
+        }
+        if (type == "dropdown") {
+            object.value = element.selectedIndex;
+        }
+
+        if (key == "bAutomaticLayout") {
+            _state.layout.bAutomatic = object.value;
+            _renderer.windows.adjust();
+        }
+
+        if (key == "layoutWidth") {
+            _state.layout.dimensions.w = Math.min(object.value, _renderer.windows.windows.length);
+            _renderer.windows.adjust();
+        }
+
+        if (key == "canvasBorder") {
+            _state.layout.border = object.value;
+            _renderer.windows.adjust();
+        }
+
+        if (key == "clearAll") {
+            _apiClear();
+        }
+
+        let elementValue = document.getElementById(elementId + "-value");
+        if (elementValue !== null) {
+            elementValue.innerHTML = element.value;
+        }
+
+        if (bUpdateUI) {
+            console.log("Updating UI");
+            _renderer.updateUiPopup();
+        }
+    }
+
     let _streamUpdateParameter = function (streamId, elementId, bUpdateUI) {
         console.log("update: " + streamId + ", " + elementId);
         _renderer.streams[streamId].uiUpdate(elementId);
@@ -4952,5 +5209,6 @@ var nvis = new function () {
         uiOnMouseDown: _uiOnMouseDown,
         uiOnMouseUp: _uiOnMouseUp,
         uiOnMouseMove: _uiOnMouseMove,
+        uiUpdateParameter: _uiUpdateParameter
     }
 }

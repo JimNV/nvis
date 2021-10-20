@@ -7,5 +7,5 @@ for /D %%D in ("%SCRIPT_DIR%") do (
 )
 
 rem #PYTHON_VERSION=`python --version`
-rem echo "Starting HTTP server on port ${PORT} in ${SCRIPT_DIR}"
+echo [Nvis]  Starting HTTP server on port %PORT% in %NVIS_DIR%
 python -m http.server --bind localhost %PORT% -d %NVIS_DIR%
