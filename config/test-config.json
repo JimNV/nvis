@@ -5,59 +5,50 @@
     },
     "shaders": [
         "glsl/difference.json",
-        "glsl/ssim.json"
+        "glsl/ssim.json",
+        "glsl/tiling.json"
     ],
-    "windows": [
-        0, 1
-    ],
+    "windows": [ ],
     "streams": [
         {
             "name": "Lena",
             "window": true,
-            "files": [
-                "images/lena.png"
-            ]
+            "images": "images/lena.png"
         },
         {
             "name": "Texture",
             "window": false,
-            "files": [
-                "images/texture.png"
-            ]
+            "images": "images/texture.png"
         },
         {
             "name": "Plane",
             "window": true,
-            "files": [
-                "images/plane.png"
-            ]
+            "images": "images/plane.png"
         },
         {
-            "name": "Lena/Texture",
+            "name": "Lena/Texture difference",
             "window": true,
             "shader": 0,
-            "inputs": [
-                0,
-                1
-            ]
+            "inputs": [ 0, 1 ]
         },
         {
-            "name": "Texture/Plane",
+            "name": "Texture/Plane difference",
             "window": true,
             "shader": 0,
-            "inputs": [
-                1,
-                2
-            ]
+            "inputs": [ 1, 2 ]
+        },
+        {
+            "name": "Tiling",
+            "window": true,
+            "shader": 2,
+            "width": 512,
+            "height": 512
         },
         {
             "name": "Texture/Plane SSIM",
             "window": true,
             "shader": 1,
-            "inputs": [
-                1,
-                2
-            ]
+            "inputs": [ 1, 5 ]
         }
     ]
 }

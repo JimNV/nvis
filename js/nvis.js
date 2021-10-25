@@ -73,6 +73,7 @@ var nvis = new function () {
             mouse: {
                 canvasCoords: { x: 0, y: 0 },
                 previousCanvasCoords: { x: 0, y: 0 },
+                streamCoords: undefined,
                 clickPosition: { x: 0, y: 0 },
                 down: false
             },
@@ -264,9 +265,9 @@ var nvis = new function () {
         return _apiCommand({ command: "zoom", argument: level })
     }
 
-    let _apiStream = function (files, bWindow = true) {
-        files = (Array.isArray(files) ? files : [files]);
-        return _apiCommand({ command: "stream", argument: { name: files[0], files: files, window: bWindow } });
+    let _apiStream = function (images, bWindow = true) {
+        images = (Array.isArray(images) ? images : [images]);
+        return _apiCommand({ command: "stream", argument: { name: images[0], images: images, window: bWindow } });
     }
 
     let _apiShader = function (fileName, inputs = undefined, bWindow = true) {
@@ -305,15 +306,8 @@ var nvis = new function () {
                 let shaders = config.shaders;
                 if (shaders !== undefined) {
                     for (let i = 0; i < shaders.length; i++) {
-                        _apiCommand({ command: "shader", argument: shaders[i] });
-                    }
-                }
-
-                //  generators
-                let generators = config.generators;
-                if (generators !== undefined) {
-                    for (let i = 0; i < generators.length; i++) {
-                        _apiCommand({ command: "generator", argument: generators[i] });
+                        _apiCommand({ command: "loadShader", argument: shaders[i] });
+                        //let shaderId = _renderer.loadShader(argument.shader);
                     }
                 }
 
@@ -354,20 +348,39 @@ var nvis = new function () {
             return _state.zoom.level;
         } else if (command == "stream") {
             let streamId = undefined;
-            if (argument.files !== undefined) {
-                streamId = _renderer.loadStream(Array.isArray(argument.files) ? argument.files : [argument.files]);
+            if (argument.images !== undefined) {
+                streamId = _renderer.loadStream(Array.isArray(argument.images) ? argument.images : [argument.images]);
             } else if (argument.shader !== undefined) {
+                //let shaderId = _renderer.loadShader(argument.shader);
                 let shaderId = argument.shader;
                 let newStream = _renderer.addShaderStream(shaderId);
                 let inputStreamIds = argument.inputs;
-                if (inputStreamIds !== undefined) {
+                if (inputStreamIds === undefined) {
+                    //  no inputs => generator => fetch dimensions from config
+                    let dimensions = { w: argument.width, h: argument.height };
+                    newStream.setDimensions(dimensions);
+                    if (_renderer.windows.streamPxDimensions === undefined) {
+                        _renderer.windows.streamPxDimensions = dimensions;
+                    }
+                } else {
                     newStream.setInputStreamIds(inputStreamIds);
                 }
+            // } else if (argument.generator !== undefined) {
+            //     let shaderId = _renderer.loadShader(argument.generator);
+            //     let newStream = _renderer.addShaderStream(shaderId);
+            //     let dimensions = { w: argument.width, h: argument.height };
+            //     newStream.setDimensions(dimensions);
+            //     if (_renderer.windows.streamPxDimensions === undefined) {
+            //         _renderer.windows.streamPxDimensions = dimensions;
+            //     }
             }
             if (argument.window) {
                 _renderer.addWindow(_renderer.streams.length - 1);
             }
             return streamId;
+        } else if (command == "loadShader") {
+            let shaderId = _renderer.loadShader(argument);
+            return shaderId;
         } else if (command == "shader") {
             let shaderId = _renderer.loadShader(argument.fileName);
             if (argument.inputs !== undefined) {
@@ -1136,7 +1149,7 @@ var nvis = new function () {
                 }
             };
             xhr.send();
-            
+
             return shaderId;
         }
 
@@ -3105,8 +3118,8 @@ var nvis = new function () {
                 gl.uniform1f(uniform, (Date.now() - this.startTime) / 1000.0);
             }
             uniform = gl.getUniformLocation(shader.getProgram(), "uMouse");
-            if (uniform !== undefined) {
-                gl.uniform4f(uniform, _state.input.mouse.canvasCoords.x, _state.input.mouse.canvasCoords.y,
+            if (uniform !== undefined && _state.input.mouse.streamCoords !== undefined) {
+                gl.uniform4f(uniform, _state.input.mouse.streamCoords.x, _state.input.mouse.streamCoords.y,
                     (_state.input.mouse.down ? 1.0 : 0.0), 0.0);
             }
 
@@ -4744,7 +4757,8 @@ var nvis = new function () {
                             break;
                         case 'D':
                             if (this.streams.length > 1) {
-                                this.renderer.loadShader("glsl/difference.json");
+                                _apiShader("glsl/difference.json", [0, 1], true);
+                                //this.renderer.loadShader("glsl/difference.json");
                             }
                             break;
                         case 'w':
@@ -4857,6 +4871,9 @@ var nvis = new function () {
                 x: event.clientX - _state.layout.border,
                 y: event.clientY - _state.layout.border
             };
+            if (this.windows.streamPxDimensions !== undefined && this.windows.winPxDimensions !== undefined) {
+                _state.input.mouse.streamCoords = this.windows.getStreamCoordinates(_state.input.mouse.canvasCoords, true);
+            }
 
             if (_state.input.mouse.down) {
                 let canvasOffset = {
@@ -5130,7 +5147,7 @@ var nvis = new function () {
     }
 
     let _uiUpdateParameter = function (objectId, elementId, rowId, bAllConditionsMet, bUpdateUI) {
-        console.log("update: " + objectId + ", " + elementId + ", " + bUpdateUI);
+        console.log("uiUpdateParameter(" + objectId + ", " + elementId + ", " + bUpdateUI + ")");
 
         let key = elementId.replace(/^.*\-/, "");
         let element = document.getElementById(elementId);
@@ -5178,7 +5195,7 @@ var nvis = new function () {
     }
 
     let _streamUpdateParameter = function (streamId, elementId, bUpdateUI) {
-        console.log("update: " + streamId + ", " + elementId);
+        console.log("streamUpdateParamter(" + streamId + ", " + elementId + ")");
         _renderer.streams[streamId].uiUpdate(elementId);
         if (bUpdateUI) {
             // console.log("Updating UI");
@@ -5187,7 +5204,7 @@ var nvis = new function () {
     }
 
     let _streamUpdateInput = function (streamId, inputId) {
-        console.log("update: " + streamId + ", " + inputId);
+        console.log("streamUpdateInput(" + streamId + ", " + inputId + ")");
         let elementId = ("input-" + streamId + "-" + inputId);
         let inputStreamId = document.getElementById(elementId).selectedIndex;
         _renderer.streams[streamId].setInputStreamId(inputId, inputStreamId);
