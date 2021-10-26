@@ -14,9 +14,6 @@ Tab - open *nvis* UI, to manipulate settings, streams, and shaders
 'o' - open file input dialog
 ```
 
-*nvis* is an image stream viewer, with the goal to facilitate image and image stream comparisons. Streams can be of browser-compatible images, or EXR images.  Shaders can be added that have image streams as input (or not).  These can implement any type of function, and the accompanying JSON user interface description allows for interactive adjustment of shader parameters.
-
-
 **API**
 
 ```
@@ -33,9 +30,9 @@ nvis.generator()
 nvis.video()
 ```
 
-**Config**
+**Configuration**
 
-Example:
+Example configuration file, e.g., `test.json`:
 ```
 {
     "name": "Example configuration",
