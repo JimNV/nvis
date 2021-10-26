@@ -9,7 +9,7 @@
 **Keyboard commands**
 
 ```
-Tab - open *nvis* UI, to manipulate settings, streams, and shaders
+Tab - open user interface, to manipulate settings, streams, and shaders
 'h' - hold to show the list of keyboard shortcut commands
 'o' - open file input dialog
 ```
