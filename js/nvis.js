@@ -80,6 +80,51 @@ var nvis = new function () {
             keyboard: {
                 shift: false
             }
+        },
+        animation: {
+            active: false,
+            fps: 60,
+            pingPong: true,
+            direction: 1,
+            frameId: 0,
+            numFrames: 1,  //  TODO: fix this!
+            minFrameId: 0,
+            maxFrameId: 0,
+            time: undefined,
+
+            toggleActive: function () {
+                this.active = !this.active;
+            },
+
+            togglePingPong: function () {
+                this.pingPong = !this.pingPong;
+            },
+
+            inc: function () {
+                this.frameId = (this.frameId + 1) % this.numFrames;
+                console.log("frameId: " + this.frameId);
+            },
+
+            dec: function () {
+                this.frameId = (this.frameId + this.numFrames - 1) % this.numFrames;
+                console.log("frameId: " + this.frameId);
+            },
+
+            update: function () {
+                if (this.active) {
+                    if (this.pingPong) {
+                        this.frameId += this.direction;
+                        this.frameId = Math.max(this.frameId, 0);
+                        this.frameId = Math.min(this.frameId, this.numFrames - 1);
+                            if (this.frameId == 0 || this.frameId == this.numFrames - 1) {
+                            this.direction = -this.direction;
+                        }
+                    }
+                    else {
+                        this.frameId = (this.frameId + this.numFrames + this.direction) % this.numFrames;
+                    }
+                }
+            }
         }
     }
 
@@ -110,6 +155,33 @@ var nvis = new function () {
             name: "Clear all streams and windows",
             type: "button",
             value: "Clear all"
+        },
+        bAnimate: {
+            name: "Animate",
+            type: "bool",
+            value: _state.animation.active
+        },
+        bPingPong: {
+            name: "Ping-pong",
+            type: "bool",
+            value: _state.animation.pingPong,
+            condition: "bAnimate"
+        },
+        fps: {
+            name: "Frames per second",
+            type: "int",
+            value: _state.animation.fps,
+            min: 1,
+            max: 60,  //  TODO: maximize according to browser and screen capability
+            step: 1
+        },
+        frameId: {
+            name: "Frame",
+            type: "int",
+            value: _state.animation.frameId + 1,
+            min: 1,
+            max: "#frames",
+            step: 1
         }
     };
 
@@ -2986,11 +3058,15 @@ var nvis = new function () {
 
                     if (type == "bool") {
                         el.setAttribute("type", "checkbox");
+                        el.checked = object[key].value;
+                        console.log(key + ": " + object[key].value);
+                        //document.getElementById(elementId).checked = object[key].value;
                         if (object[key].value) {
                             el.setAttribute("checked", true);
-                        } else {
-                            el.removeAttribute("checked");
                         }
+                        // else {
+                        //     el.removeAttribute("checked");
+                        // }
                         el.setAttribute("onclick", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
                     } else if (type == "int") {
                         el.setAttribute("type", "range");
@@ -3000,6 +3076,8 @@ var nvis = new function () {
                         } else {
                             if (object[key].max == "#windows" && this.renderer.windows !== undefined) {
                                 el.setAttribute("max", this.renderer.windows.windows.length);
+                            } else if (object[key].max == "#frames" && this.renderer.windows !== undefined) {
+                                el.setAttribute("max", _state.animation.numFrames);
                             } else {
                                 el.setAttribute("max", object[key].max);
                             }
@@ -3067,7 +3145,6 @@ var nvis = new function () {
 
             this.dom.appendChild(table);
         }
-
     }
 
 
@@ -3257,8 +3334,8 @@ var nvis = new function () {
 
             if (bFloat) {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, dimensions.w, dimensions.h, 0, gl.RGBA, gl.FLOAT, image);
-            } else if (dimensions !== undefined) {  // XXXXXXXXXXXXXXXXXx
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            // } else if (dimensions !== undefined) {  // XXXXXXXXXXXXXXXXXx
+            //     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
             } else {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
@@ -4530,52 +4607,52 @@ var nvis = new function () {
 
             this.settingsUI = new NvisUI("settings", _settings, this);
 
-            this.animation = {
-                active: false,
-                fps: 60,
-                pingPong: true,
-                direction: 1,
-                frameId: 0,
-                numFrames: 1,  //  TODO: fix this!
-                minFrameId: 0,
-                maxFrameId: 0,
-                time: undefined,
+            // this.animation = {
+            //     active: false,
+            //     fps: 60,
+            //     pingPong: true,
+            //     direction: 1,
+            //     frameId: 0,
+            //     numFrames: 1,  //  TODO: fix this!
+            //     minFrameId: 0,
+            //     maxFrameId: 0,
+            //     time: undefined,
 
-                toggleActive: function () {
-                    this.active = !this.active;
-                },
+            //     toggleActive: function () {
+            //         this.active = !this.active;
+            //     },
 
-                togglePingPong: function () {
-                    this.pingPong = !this.pingPong;
-                },
+            //     togglePingPong: function () {
+            //         this.pingPong = !this.pingPong;
+            //     },
 
-                inc: function () {
-                    this.frameId = (this.frameId + 1) % this.numFrames;
-                    console.log("frameId: " + this.frameId);
-                },
+            //     inc: function () {
+            //         this.frameId = (this.frameId + 1) % this.numFrames;
+            //         console.log("frameId: " + this.frameId);
+            //     },
 
-                dec: function () {
-                    this.frameId = (this.frameId + this.numFrames - 1) % this.numFrames;
-                    console.log("frameId: " + this.frameId);
-                },
+            //     dec: function () {
+            //         this.frameId = (this.frameId + this.numFrames - 1) % this.numFrames;
+            //         console.log("frameId: " + this.frameId);
+            //     },
 
-                update: function () {
-                    if (this.active) {
-                        this.frameId += this.direction;
-                        this.frameId = Math.max(this.frameId, 0);
-                        this.frameId = Math.min(this.frameId, this.numFrames - 1);
+            //     update: function () {
+            //         if (this.active) {
+            //             this.frameId += this.direction;
+            //             this.frameId = Math.max(this.frameId, 0);
+            //             this.frameId = Math.min(this.frameId, this.numFrames - 1);
 
-                        if (this.pingPong) {
-                            if (this.frameId == 0 || this.frameId == this.numFrames - 1) {
-                                this.direction = -this.direction;
-                            }
-                        }
-                        else {
-                            this.frameId %= this.numFrames;
-                        }
-                    }
-                }
-            };
+            //             if (this.pingPong) {
+            //                 if (this.frameId == 0 || this.frameId == this.numFrames - 1) {
+            //                     this.direction = -this.direction;
+            //                 }
+            //             }
+            //             else {
+            //                 this.frameId %= this.numFrames;
+            //             }
+            //         }
+            //     }
+            // };
 
             this.canvas = document.createElement("canvas");
             document.body.appendChild(this.canvas);
@@ -4678,7 +4755,6 @@ var nvis = new function () {
             titleBar.appendChild(bar)
 
             this.uiPopup.appendChild(titleBar);
-
 
             let tabs = document.createElement("div");
             tabs.className = "tabs";
@@ -4800,6 +4876,11 @@ var nvis = new function () {
             let keyCode = event.keyCode || event.which;
             let key = event.key;
 
+            if (keyCode != 9) {  //  Tab
+                this.uiPopup.style.display = "none";  //  TODO: improve
+                this.updateUiPopup();
+            }
+
             // if (keyCode != 116)  //  F5
             //     event.preventDefault();
 
@@ -4808,24 +4889,24 @@ var nvis = new function () {
             switch (keyCode) {
                 case 9:  //  Tab
                     event.preventDefault();
-                    if (this.uiPopup.style.display == "") {
+                    if (this.uiPopup.style.display == "none") {
                         this.uiPopup.style.display = "block";
                         this.updateUiPopup();
                     } else {
-                        this.uiPopup.style.display = "";
+                        this.uiPopup.style.display = "none";
                     }
                     break;
                 case 16:  //  Shift
                     _state.input.keyboard.shift = true;
                     break;
                 case 37:  //  ArrowLeft
-                    this.animation.dec();
+                    _state.animation.dec();
                     break;
                 case 38:  //  ArrowUp
                     this.windows.incStream(_state.input.mouse.canvasCoords, this.streams);
                     break;
                 case 39:  //  ArrowRight
-                    this.animation.inc();
+                    _state.animation.inc();
                     break;
                 case 40:  //  ArrowDown
                     this.windows.decStream(_state.input.mouse.canvasCoords, this.streams);
@@ -4839,16 +4920,16 @@ var nvis = new function () {
                             }
                             break;
                         case ' ':
-                            this.animation.toggleActive();
+                            _state.animation.toggleActive();
                             break;
                         case 'a':
                             _state.layout.bAutomatic = !_state.layout.bAutomatic;
                             this.popupInfo("Automatic window placement: " + (_state.layout.bAutomatic ? "on" : "off"));
-                            this.updateUiPopup();
                             this.windows.adjust();
                             break;
                         case 'p':
-                            this.animation.togglePingPong();
+                            _state.animation.togglePingPong();
+                            this.updateUiPopup();
                             break;
                         case 'd':
                             this.windows.delete(_state.input.mouse.canvasCoords);
@@ -5028,7 +5109,7 @@ var nvis = new function () {
                 newStream.setupTexture(texture, frame, false, dimensions);
             }
             this.streams.push(newStream);
-            this.animation.numFrames = newStream.getNumImages();  //  TODO: check
+            _state.animation.numFrames = newStream.getNumImages();  //  TODO: check
             this.addWindow(this.streams.length - 1);
             this.windows.setStreamPxDimensions(dimensions);
             this.windows.adjust();
@@ -5075,7 +5156,7 @@ var nvis = new function () {
                 let newStream = new NvisStream(this.glContext);
                 newStream.drop(files, this.windows);
                 this.streams.push(newStream);
-                this.animation.numFrames = newStream.getNumImages();  //  TODO: check
+                _state.animation.numFrames = newStream.getNumImages();  //  TODO: check
                 this.addWindow(this.streams.length - 1);
                 this.windows.adjust();
             }
@@ -5149,7 +5230,7 @@ var nvis = new function () {
             gl.clearColor(0.2, 0.2, 0.2, 1.0);
             gl.clear(this.glContext.COLOR_BUFFER_BIT);
 
-            this.windows.render(this.animation.frameId, this.streams, this.shaders);
+            this.windows.render(_state.animation.frameId, this.streams, this.shaders);
         }
 
         shaderLoaded() {
@@ -5176,7 +5257,7 @@ var nvis = new function () {
             newStream.load(fileNames, this.windows);
 
             //  TODO: fix this
-            this.animation.numFrames = newStream.getNumImages();
+            _state.animation.numFrames = newStream.getNumImages();
 
             this.streams.push(newStream);
             this.windows.adjust();
@@ -5209,17 +5290,17 @@ var nvis = new function () {
         animate(timeStamp) {
             // TODO: fix this...
 
-            let fps = this.animation.fps;
+            let fps = _state.animation.fps;
 
-            if (this.animation.time === undefined) {
-                this.animation.time = timeStamp;
+            if (_state.animation.time === undefined) {
+                _state.animation.time = timeStamp;
             }
 
-            const elapsed = timeStamp - this.animation.time;
+            const elapsed = timeStamp - _state.animation.time;
 
             if (elapsed >= 1000.0 / fps) {
-                this.animation.update();
-                this.animation.time = timeStamp;
+                _state.animation.update();
+                _state.animation.time = timeStamp;
             }
 
             setTimeout(() => {
@@ -5309,6 +5390,22 @@ var nvis = new function () {
         if (key == "canvasBorder") {
             _state.layout.border = object.value;
             _renderer.windows.adjust();
+        }
+
+        if (key == "bAnimate") {
+            _state.animation.active = object.value;
+        }
+
+        if (key == "bPingPong") {
+            _state.animation.pingPong = object.value;
+        }
+
+        if (key == "fps") {
+            _state.animation.fps = object.value;
+        }
+
+        if (key == "frameId") {
+            _state.animation.frameId = object.value - 1;
         }
 
         if (key == "clearAll") {
