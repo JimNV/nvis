@@ -4,9 +4,7 @@
 
 **Copyright:** See below
 
-- - -
-
-**Keyboard commands**
+## Keyboard commands
 
 ```
 Tab - open user interface, to manipulate settings, streams, and shaders
@@ -14,7 +12,7 @@ Tab - open user interface, to manipulate settings, streams, and shaders
 'o' - open file input dialog
 ```
 
-**API**
+## API
 
 ```
 nvis.zoom(<value>) - Set zoom level to <value> (default: 1.0)
@@ -30,7 +28,7 @@ nvis.generator()
 nvis.video()
 ```
 
-**Configuration**
+## Configuration
 
 Example configuration file, e.g., `test.json`:
 ```
@@ -84,7 +82,7 @@ Example configuration file, e.g., `test.json`:
 ```
 
 
-- - -
+## Copyright
 
 **Copyright 2021 NVIDIA Corporation**
 
