@@ -270,6 +270,10 @@ var nvis = new function () {
         return _apiCommand({ command: "stream", argument: { name: images[0], images: images, window: bWindow } });
     }
 
+    let _apiVideo = function (fileName, bWindow = true) {
+        return _apiCommand({ command: "video", argument: { name: fileName, fileName: fileName, window: bWindow } });
+    }
+
     let _apiShader = function (fileName, inputs = undefined, bWindow = true) {
         return _apiCommand({ command: "shader", argument: { fileName: fileName, inputs: inputs, window: bWindow } });
     }
@@ -332,6 +336,7 @@ var nvis = new function () {
         xhr.send();
     }
 
+
     let _executeAPICommand = function (apiCommand) {
         let command = apiCommand.command;
         let argument = apiCommand.argument;
@@ -346,6 +351,9 @@ var nvis = new function () {
             _state.zoom.level = Math.min(Math.max(argument, 1.0), 256.0);
             _renderer.windows.updateTextureCoordinates();
             return _state.zoom.level;
+        } else if (command == "video") {
+            let frames = new NvisVideoParser(argument.fileName, (frames) => _renderer.setupVideo(frames));
+            // console.log("#frames: " + frames.length);
         } else if (command == "stream") {
             let streamId = undefined;
             if (argument.images !== undefined) {
@@ -451,6 +459,77 @@ var nvis = new function () {
 
     let _clamp = function (value, min = 0.0, max = 1.0) {
         return Math.max(Math.min(value, max), min);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    let VideoToFramesMethod = {
+        fps : 0,
+        totalFrames : 1
+    };
+      
+    class NvisVideoParser {
+        
+        constructor(fileName, callback, amount = 10, type = VideoToFramesMethod.fps) {
+            this.fileName = fileName;
+            this.frames = [];
+            this.amount = amount;
+            this.type = type;
+            this.duration = undefined;
+            this.dimensions = undefined;
+            this.canvas = document.createElement("canvas");
+            this.context = this.canvas.getContext("2d");
+
+            let self = this;
+            this.video = document.createElement("video");
+            this.video.preload = "auto";
+            this.video.src = this.fileName;
+            this.video.addEventListener("loadeddata", async function() {
+                self.dimensions = {
+                    w: self.video.videoWidth,
+                    h: self.video.videoHeight
+                };
+                self.canvas.width = self.video.videoWidth;
+                self.canvas.height = self.video.videoHeight;
+    
+                self.duration = self.video.duration;
+                let totalFrames = amount;
+                if (type === VideoToFramesMethod.fps) {
+                    totalFrames = self.duration * self.amount;
+                }
+                for (let time = 0; time < self.duration; time += self.duration / totalFrames) {
+                    let frame = await self.getVideoFrame(self.video, self.context, time);
+                    self.frames.push(frame);
+                }
+                console.log("#frames: " + self.frames.length);
+
+                callback(self.frames);
+                //resolve(frames);
+            });
+            this.video.load();
+        }
+
+        getVideoFrame(video, context, time) {
+            let self = this;
+            return new Promise((resolve, reject) => {
+                let eventCallback = function (event) {
+                    video.removeEventListener('seeked', eventCallback);
+                    self.storeFrame(video, context, resolve);
+                };
+                video.addEventListener('seeked', eventCallback);
+                video.currentTime = time.toString();
+                _renderer.popupInfo("Decoding video: " + video.currentTime.toFixed(1) + "s")
+            });
+        }
+        
+        storeFrame(video, context, resolve) {
+            context.drawImage(this.video, 0, 0, this.video.videoWidth, this.video.videoHeight);
+            resolve(context.getImageData(0, 0, this.video.videoWidth, this.video.videoHeight));
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -3178,6 +3257,8 @@ var nvis = new function () {
 
             if (bFloat) {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, dimensions.w, dimensions.h, 0, gl.RGBA, gl.FLOAT, image);
+            } else if (dimensions !== undefined) {  // XXXXXXXXXXXXXXXXXx
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
             } else {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
@@ -3264,7 +3345,13 @@ var nvis = new function () {
                         }
                     };
                     xhr.send();
-
+                // } else if (fileName.match(/.mp4$/)) {
+                //     let reader = new FileReader();
+                //     reader.onload = function (event) {
+                //         let v = event.target.result;
+                //         console.log("Video loaded");
+                //     }
+                //     reader.readAsDataURL(fileName);XXXXXXXXXXXXXXXXX
                 } else {
 
                     const image = new Image();
@@ -3297,7 +3384,7 @@ var nvis = new function () {
             let self = this;
 
             for (let fileId = 0; fileId < files.length; fileId++) {
-                if (!files[fileId].type.match(/image.*/) && !files[0].name.match(/.exr$/)) {
+                if (!files[fileId].type.match(/image.*/) && !files[fileId].type.match(/video.*/) && !files[0].name.match(/.exr$/)) {
                     continue;
                 }
 
@@ -3332,12 +3419,23 @@ var nvis = new function () {
                     }
 
                     reader.readAsDataURL(file);
+                }
 
-                } else if (files[0].name.match(/.exr$/)) {
+                if (file.type.match(/video.*/)) {
+                    let reader = new FileReader();
+                    reader.onload = function (event) {
+                        let v = event.target.result;
+                        console.log("Video loaded");
+                    }
+                    reader.readAsDataURL(file);
+                }
+
+                if (files[0].name.match(/.exr$/)) {
                     let reader = new FileReader();
 
                     reader.onload = function (event) {
 
+                        //  TODO: allow streams of EXRs
                         let file = new NvisEXRFile(files[0].name, reader.result);
 
                         if (file.bSuccess) {
@@ -3355,6 +3453,10 @@ var nvis = new function () {
 
                     reader.readAsArrayBuffer(file);
                 }
+                
+                if (file.type.match(/video.*/)) {
+
+                }                
             }
         }
 
@@ -4906,6 +5008,32 @@ var nvis = new function () {
             this.windows.getWindow(windowId).setStreamId(newStreamId);
         }
 
+        setupVideo(frames) {
+            let gl = this.glContext;
+            console.log("Here...");
+            let newStream = new NvisStream(this.glContext);
+            //newStream.drop(frames, this.windows);
+            let dimensions = { w: frames[0].width, h: frames[0].height };
+            for (let frameId = 0; frameId < frames.length; frameId++) {
+                let frame = frames[frameId];
+                // if (frameId == 0) {
+                //     for (let i = 0; i < frame.data.length; i++) {
+                //         if (frame.data[i] != 0)
+                //             console.log(frame.data[i]);
+                //     }
+                // }
+                let texture = gl.createTexture();
+                newStream.textures.push(texture);
+                newStream.setDimensions(dimensions);
+                newStream.setupTexture(texture, frame, false, dimensions);
+            }
+            this.streams.push(newStream);
+            this.animation.numFrames = newStream.getNumImages();  //  TODO: check
+            this.addWindow(this.streams.length - 1);
+            this.windows.setStreamPxDimensions(dimensions);
+            this.windows.adjust();
+        }
+
         onFileDrop(event) {
             event.stopPropagation();
             event.preventDefault();
@@ -4950,6 +5078,10 @@ var nvis = new function () {
                 this.animation.numFrames = newStream.getNumImages();  //  TODO: check
                 this.addWindow(this.streams.length - 1);
                 this.windows.adjust();
+            }
+
+            if (files[0].type.match(/video.*/)) {
+                let videoParser = new NvisVideoParser(files[0].name, this.setupVideo);
             }
 
             document.getElementById("fileInput").value = "";  //  force onchange event if same files
@@ -5227,6 +5359,7 @@ var nvis = new function () {
         generator: _apiGenerator,
         config: _apiConfig,
         window: _apiWindow,
+        video: _apiVideo,
         //  below need to be visible to handle UI events
         streamUpdateParameter: _streamUpdateParameter,
         streamUpdateInput: _streamUpdateInput,

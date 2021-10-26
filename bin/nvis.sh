@@ -2,6 +2,8 @@
 PORT=80
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 NVIS_DIR=${SCRIPT_DIR%/*}
+SERVER=http.server
+#SERVER=RangeHTTPServer
 
 #PYTHON_VERSION=`python --version`
 echo [Nvis]  Starting HTTP server on port ${PORT} in ${NVIS_DIR}

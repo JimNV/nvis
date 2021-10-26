@@ -7,7 +7,7 @@
         {
             "name": "Reference stream",
             "window": true,
-            "files": [
+            "images": [
                 "images/triangle.0000.png",
                 "images/triangle.0001.png",
                 "images/triangle.0002.png",
@@ -22,7 +22,7 @@
         {
             "name": "Test stream",
             "window": true,
-            "files": [
+            "images": [
                 "images/triangle.0001.png",
                 "images/triangle.0002.png",
                 "images/triangle.0003.png",
