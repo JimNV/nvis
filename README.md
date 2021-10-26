@@ -6,23 +6,19 @@
 
 **Copyright:** See below
 
-- - -
-
-**Prerequisites**
+## Prerequisites
 
 Python - a version that supports `http.server`
 
-**Installation**
+## Installation
 
-1. Clone the repository to your favorite location:  `>  git clone https://github.com/JimNV/nvis-online.git`
+1. Clone the repository to your favorite location:  `git clone https://github.com/JimNV/nvis-online.git`
 
-2. Start a Python `http.server` by running the start script: `>  <nvis-location>/bin/nvis.{sh|bat}`
+2. Start a Python `http.server` by running the start script: `<nvis-location>/bin/nvis.{sh|bat}`
 
-3. Browse to `localhost`
+3. Browse to `localhost`.  Tested with Chrome and Firefox.
 
-- - -
-
-**Details**
+## Details
 
 A minimal HTML file (e.g., `index.html`) to start *nvis* is the following:
 
@@ -49,7 +45,8 @@ To create a static *nvis* page with streams and shaders, insert API commands wit
   </script>
 </body>
 ```
-- - -
+
+## Copyright
 
 **Copyright 2021 NVIDIA Corporation**
 
