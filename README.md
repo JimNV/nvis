@@ -42,6 +42,7 @@ To create a static *nvis* page with streams and shaders, insert API commands wit
 ```
 <body>
   <script>
+    nvis.zoom(2.0);
     nvis.stream([ "ref/image.0000.png", "ref/image.0001.png", "ref/image.0002.png", "ref/image.0003.png" ]);
     nvis.stream([ "test/image.0000.png", "test/image.0001.png", "test/image.0002.png", "test/image.0003.png" ]);
     nvis.shader("glsl/difference.json", [ 0, 1 ], true);
