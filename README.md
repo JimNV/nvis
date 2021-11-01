@@ -25,7 +25,7 @@ A minimal HTML file (e.g., `index.html`) to start *nvis* is the following:
 ```
 <!DOCTYPE html>
 <head>
-    <title><i>nvis</i></title>
+    <title>nvis</title>
     <script type="text/javascript" src="js/nvis.js"></script>
 </head>
 <body>
