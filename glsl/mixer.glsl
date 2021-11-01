@@ -3,10 +3,11 @@
 precision highp float;
 
 //  common uniforms
-//  TODO!
+uniform vec4 uMouse;
 
 //  shader-specific uniforms
 uniform int uDirection;
+uniform bool uUseMouse;
 uniform float uLevel;
 
 // Texture uniforms
@@ -29,7 +30,8 @@ void main()
     vec4 colorB = texture(uTexture1, vTextureCoord);
 
     float value = (uDirection == 0 ? position.x : position.y);
-    float compValue = uLevel * (uDirection == 0 ? dimensions.x : dimensions.y);
+    float compValue = (uUseMouse && uMouse.z > 0.0 ? (uDirection == 0 ? uMouse.x / dimensions.x : uMouse.y / dimensions.y) : uLevel);
+    compValue *= (uDirection == 0 ? dimensions.x : dimensions.y);
 
     if (value < compValue - 1.0)
         outColor = colorA;

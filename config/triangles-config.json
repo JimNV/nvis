@@ -1,12 +1,13 @@
 {
     "name": "Test configuration",
     "shaders": [
-        "glsl/difference.json"
+        "glsl/difference.json",
+        "glsl/mixer.json"
     ],
     "streams": [
         {
             "name": "Reference stream",
-            "window": true,
+            "window": false,
             "images": [
                 "images/triangle.0000.png",
                 "images/triangle.0001.png",
@@ -21,7 +22,7 @@
         },
         {
             "name": "Test stream",
-            "window": true,
+            "window": false,
             "images": [
                 "images/triangle.0001.png",
                 "images/triangle.0002.png",
@@ -38,6 +39,15 @@
             "window": true,
             "name": "Difference stream",
             "shader": 0,
+            "inputs": [
+                0,
+                1
+            ]
+        },
+        {
+            "window": true,
+            "name": "Mixer stream",
+            "shader": 1,
             "inputs": [
                 0,
                 1

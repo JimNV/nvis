@@ -51,6 +51,7 @@ var nvis = new function () {
                 w: 1,
                 h: 1
             },
+            bLockTranslation: false,
             getDimensions: function () {
                 return (_state.layout.bAutomatic ? _state.layout.automaticDimensions : _state.layout.dimensions);
             }
@@ -142,6 +143,11 @@ var nvis = new function () {
             min: 1,
             max: "#windows",
             condition: "!bAutomaticLayout"
+        },
+        bLockTranslation: {
+            name: "Lock translation",
+            type: "bool",
+            value: _state.layout.bLockTranslation
         },
         canvasBorder: {
             name: "Border width",
@@ -2989,8 +2995,8 @@ var nvis = new function () {
         }
 
         createConfirmCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI = true) {
-            let callbackString = "if (confirm('Are you sure?')) nvis.uiUpdateParameter(\"" + uniqueId + "\", \"" + elementId + "\", \"" + rowId + "\", " + bAllConditionsMet + ", " + bUpdateUI + ")";
-            console.log(callbackString);
+            let callbackString = "if (confirm('Are you sure?')) " + this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI); //"nvis.uiUpdateParameter(\"" + uniqueId + "\", \"" + elementId + "\", \"" + rowId + "\", " + bAllConditionsMet + ", " + bUpdateUI + ")";
+            //console.log(callbackString);
             return callbackString;
         }
 
@@ -4791,16 +4797,6 @@ var nvis = new function () {
             this.settingsUI.build();
             settingsDiv.appendChild(this.settingsUI.dom);
 
-            // let automaticLayout = document.createElement("input");
-            // automaticLayout.id = "bAutomaticLayout";
-            // automaticLayout.type = "checkbox";
-            // automaticLayout.setAttribute("onclick", "nvis.toggleAutomaticLayout()");
-            // automaticLayout.innerHTML = "Automatic window placement";
-            // if (_state.layout.bAutomatic) {
-            //     automaticLayout.setAttribute("checked", true);
-            // }
-            // settingsDiv.appendChild(automaticLayout);
-            //            settingsDiv.innerHTML += "<input id=\"bAutomaticLayout\" " + (_state.layout.bAutomatic ? "checked " : "") + "type=\"checkbox\" onclick=\"nvis.toggleAutomaticLayout()\"> Automatic window layout";
             this.uiPopup.appendChild(settingsDiv);
 
             //  streams
@@ -4877,8 +4873,7 @@ var nvis = new function () {
             let key = event.key;
 
             if (keyCode != 9) {  //  Tab
-                this.uiPopup.style.display = "none";  //  TODO: improve
-                this.updateUiPopup();
+                this.uiPopup.style.display = "none";  //  TODO: perhaps improve
             }
 
             // if (keyCode != 116)  //  F5
@@ -4901,12 +4896,14 @@ var nvis = new function () {
                     break;
                 case 37:  //  ArrowLeft
                     _state.animation.dec();
+                    this.popupInfo("Frame: " + _state.animation.frameId);
                     break;
                 case 38:  //  ArrowUp
                     this.windows.incStream(_state.input.mouse.canvasCoords, this.streams);
                     break;
                 case 39:  //  ArrowRight
                     _state.animation.inc();
+                    this.popupInfo("Frame: " + _state.animation.frameId);
                     break;
                 case 40:  //  ArrowDown
                     this.windows.decStream(_state.input.mouse.canvasCoords, this.streams);
@@ -4921,15 +4918,19 @@ var nvis = new function () {
                             break;
                         case ' ':
                             _state.animation.toggleActive();
+                            _settings.bAnimate.value = _state.animation.active;
+                            this.popupInfo("Animation: " + (_state.animation.active ? "on" : "off"));
                             break;
                         case 'a':
                             _state.layout.bAutomatic = !_state.layout.bAutomatic;
+                            _settings.bAutomaticLayout.value = _state.layout.bAutomatic;
                             this.popupInfo("Automatic window placement: " + (_state.layout.bAutomatic ? "on" : "off"));
                             this.windows.adjust();
                             break;
                         case 'p':
                             _state.animation.togglePingPong();
-                            this.updateUiPopup();
+                            _settings.bPingPong.value = _state.animation.pingPong;
+                            this.popupInfo("Animation ping-pong: " + (_state.animation.pingPong ? "on" : "off"));
                             break;
                         case 'd':
                             this.windows.delete(_state.input.mouse.canvasCoords);
@@ -5063,7 +5064,9 @@ var nvis = new function () {
                     x: _state.input.mouse.previousCanvasCoords.x - _state.input.mouse.canvasCoords.x,
                     y: _state.input.mouse.previousCanvasCoords.y - _state.input.mouse.canvasCoords.y
                 }
-                this.windows.translate(canvasOffset);
+                if (!_state.layout.bLockTranslation) {
+                    this.windows.translate(canvasOffset);
+                }
             }
         }
 
@@ -5387,6 +5390,11 @@ var nvis = new function () {
             _renderer.windows.adjust();
         }
 
+        if (key == "bLockTranslation") {
+            _state.layout.bLockTranslation = object.value;
+            _renderer.windows.adjust();
+        }
+
         if (key == "canvasBorder") {
             _state.layout.border = object.value;
             _renderer.windows.adjust();
@@ -5443,10 +5451,6 @@ var nvis = new function () {
         _renderer.setWindowStreamId(windowId);
     }
 
-    let _toggleAutomaticLayout = function () {
-        console.log(document.getElementById("bAutomaticLayout").checked);
-    }
-
 
     return {
         clear: _apiClear,
@@ -5461,7 +5465,6 @@ var nvis = new function () {
         streamUpdateParameter: _streamUpdateParameter,
         streamUpdateInput: _streamUpdateInput,
         setWindowStreamId: _setWindowStreamId,
-        toggleAutomaticLayout: _toggleAutomaticLayout,
         openTab: _openTab,
         uiOnMouseDown: _uiOnMouseDown,
         uiOnMouseUp: _uiOnMouseUp,
