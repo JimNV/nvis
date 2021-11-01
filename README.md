@@ -12,7 +12,7 @@ Python - a version that supports `http.server`
 
 ## Installation
 
-1. Clone the repository to your favorite location:  `git clone https://github.com/JimNV/nvis-online.git`
+1. Clone the repository to your favorite location:  `git clone https://github.com/JimNV/nvis.git`
 
 2. Start a Python `http.server` by running the start script: `<nvis-location>/bin/nvis.{sh|bat}`
 
