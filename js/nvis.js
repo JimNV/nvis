@@ -669,7 +669,7 @@ var nvis = new function () {
                 if (self.type === VideoToFramesMethod.fps) {
                     totalFrames = self.duration * self.amount;
                 }
-                let frameRate = 15.0;
+                let frameRate = 30.0;
                 totalFrames = self.duration * frameRate;  //  TODO: figure out frame rate of video (assuming 30 FPS for now)
                 let frameTime = 1.0 / frameRate;
                 //for (let time = 0; time < self.duration; time += self.duration / totalFrames) {
