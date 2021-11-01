@@ -430,7 +430,9 @@ var nvis = new function () {
             _renderer.windows.updateTextureCoordinates();
             return _state.zoom.level;
         } else if (command == "video") {
-            let frames = new NvisVideoParser(argument.fileName, (frames) => _renderer.setupVideo(frames));
+            // let frames = new NvisVideoParser(argument.fileName, (frames) => _renderer.setupVideo(frames));
+            let videoParser = new NvisVideoParser((frames) => _renderer.setupVideo(frames));
+            videoParser.fromFile(argument.fileName);
             // console.log("#frames: " + frames.length);
         } else if (command == "stream") {
             let streamId = undefined;
@@ -551,44 +553,20 @@ var nvis = new function () {
     };
       
     class NvisVideoParser {
-        
-        constructor(fileName, callback, amount = 10, type = VideoToFramesMethod.fps) {
-            this.fileName = fileName;
+
+        static canvas = document.createElement("canvas");
+        static context = NvisVideoParser.canvas.getContext("2d");
+
+        constructor(callback, amount = 10, type = VideoToFramesMethod.fps) {
             this.frames = [];
             this.amount = amount;
             this.type = type;
             this.duration = undefined;
             this.dimensions = undefined;
-            this.canvas = document.createElement("canvas");
-            this.context = this.canvas.getContext("2d");
+            this.callback = callback;
 
-            let self = this;
             this.video = document.createElement("video");
             this.video.preload = "auto";
-            this.video.src = this.fileName;
-            this.video.addEventListener("loadeddata", async function() {
-                self.dimensions = {
-                    w: self.video.videoWidth,
-                    h: self.video.videoHeight
-                };
-                self.canvas.width = self.video.videoWidth;
-                self.canvas.height = self.video.videoHeight;
-    
-                self.duration = self.video.duration;
-                let totalFrames = amount;
-                if (type === VideoToFramesMethod.fps) {
-                    totalFrames = self.duration * self.amount;
-                }
-                for (let time = 0; time < self.duration; time += self.duration / totalFrames) {
-                    let frame = await self.getVideoFrame(self.video, self.context, time);
-                    self.frames.push(frame);
-                }
-                console.log("#frames: " + self.frames.length);
-
-                callback(self.frames);
-                //resolve(frames);
-            });
-            this.video.load();
         }
 
         getVideoFrame(video, context, time) {
@@ -600,13 +578,116 @@ var nvis = new function () {
                 };
                 video.addEventListener('seeked', eventCallback);
                 video.currentTime = time.toString();
-                _renderer.popupInfo("Decoding video: " + video.currentTime.toFixed(1) + "s")
+                _renderer.popupInfo("Decoding video: " + self.frames.length + " frames (" + video.currentTime.toFixed(1) + "s)")
             });
         }
         
         storeFrame(video, context, resolve) {
             context.drawImage(this.video, 0, 0, this.video.videoWidth, this.video.videoHeight);
             resolve(context.getImageData(0, 0, this.video.videoWidth, this.video.videoHeight));
+        }
+
+
+        fromFile(fileName) {
+            let self = this;
+            this.fileName = fileName;
+
+            let xhr = new XMLHttpRequest();
+            xhr.open("GET", fileName);
+            xhr.responseType = 'blob';
+            xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+            xhr.onload = function () {
+                if (this.status == 200 && this.response !== null) {
+                    self.fromBlob(this.response);
+                }
+            }
+            xhr.send();
+        }
+
+        // fromFile2(fileName) {
+        //     let self = this;
+        //     this.fileName = fileName;
+
+        //     this.video.addEventListener("loadeddata", async function() {
+        //         self.dimensions = {
+        //             w: self.video.videoWidth,
+        //             h: self.video.videoHeight
+        //         };
+        //         NvisVideoParser.canvas.width = self.video.videoWidth;
+        //         NvisVideoParser.canvas.height = self.video.videoHeight;
+    
+        //         self.duration = self.video.duration;
+        //         let totalFrames = self.amount;
+        //         if (self.type === VideoToFramesMethod.fps) {
+        //             totalFrames = self.duration * self.amount;
+        //         }
+        //         for (let time = 0; time < self.duration; time += self.duration / totalFrames) {
+        //             let frame = await self.getVideoFrame(self.video, NvisVideoParser.context, time);
+        //             self.frames.push(frame);
+        //         }
+        //         console.log("#frames: " + self.frames.length);
+
+        //         self.callback(self.frames);
+        //         //resolve(frames);
+        //     });
+
+        //     this.video.src = this.fileName;
+        //     this.video.load();
+        // }
+
+
+        fromBlob(videoFile) {
+            let self = this;
+
+            // if (!(videoFile instanceof Blob))
+            //     throw new Error('`videoFile` must be a Blob or File object.'); // The `File` prototype extends the `Blob` prototype, so `instanceof Blob` works for both.
+            // if (!(this.video instanceof HTMLVideoElement))
+            //     throw new Error('`video` must be a <video> element.');
+
+            const newObjectUrl = URL.createObjectURL(videoFile);
+
+            // URLs created by `URL.createObjectURL` always use the `blob:` URI scheme: https://w3c.github.io/FileAPI/#dfn-createObjectURL
+            const oldObjectUrl = this.video.currentSrc;
+            if (oldObjectUrl && oldObjectUrl.startsWith('blob:')) {
+                // It is very important to revoke the previous ObjectURL to prevent memory leaks. Un-set the `src` first.
+                // See https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL
+
+                this.video.src = ''; // <-- Un-set the src property *before* revoking the object URL.
+                URL.revokeObjectURL(oldObjectUrl);
+            }
+
+            this.video.addEventListener("loadeddata", async function() {
+                self.dimensions = {
+                    w: self.video.videoWidth,
+                    h: self.video.videoHeight
+                };
+                NvisVideoParser.canvas.width = self.video.videoWidth;
+                NvisVideoParser.canvas.height = self.video.videoHeight;
+    
+                self.duration = self.video.duration;
+                let totalFrames = self.amount;
+                if (self.type === VideoToFramesMethod.fps) {
+                    totalFrames = self.duration * self.amount;
+                }
+                let frameRate = 15.0;
+                totalFrames = self.duration * frameRate;  //  TODO: figure out frame rate of video (assuming 30 FPS for now)
+                let frameTime = 1.0 / frameRate;
+                //for (let time = 0; time < self.duration; time += self.duration / totalFrames) {
+                for (let time = 0; time < self.duration; time += frameTime) {
+                    let frame = await self.getVideoFrame(self.video, NvisVideoParser.context, time);
+                    self.frames.push(frame);
+                }
+                console.log("#frames: " + self.frames.length);
+
+                self.callback(self.frames);
+                //resolve(frames);
+            });
+
+            // Then set the new URL:
+            this.video.src = newObjectUrl;
+
+            // And load it:
+            this.video.load(); // https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/load
         }
     }
 
@@ -3508,7 +3589,7 @@ var nvis = new function () {
                     let reader = new FileReader();
                     reader.onload = function (event) {
                         let v = event.target.result;
-                        console.log("Video loaded");
+                        console.log("Video loaded: " + JSON.stringify(v));
                     }
                     reader.readAsDataURL(file);
                 }
@@ -5100,12 +5181,6 @@ var nvis = new function () {
             let dimensions = { w: frames[0].width, h: frames[0].height };
             for (let frameId = 0; frameId < frames.length; frameId++) {
                 let frame = frames[frameId];
-                // if (frameId == 0) {
-                //     for (let i = 0; i < frame.data.length; i++) {
-                //         if (frame.data[i] != 0)
-                //             console.log(frame.data[i]);
-                //     }
-                // }
                 let texture = gl.createTexture();
                 newStream.textures.push(texture);
                 newStream.setDimensions(dimensions);
@@ -5141,8 +5216,7 @@ var nvis = new function () {
                             files.push(items[i].getAsFile());
                         }
                     }
-                }
-                else {
+                } else {
                     //  finally, a drop
                     files = Array.from(event.dataTransfer.files);
                 }
@@ -5165,7 +5239,8 @@ var nvis = new function () {
             }
 
             if (files[0].type.match(/video.*/)) {
-                let videoParser = new NvisVideoParser(files[0].name, this.setupVideo);
+                let videoParser = new NvisVideoParser((frames) => _renderer.setupVideo(frames));
+                videoParser.fromBlob(files[0]);
             }
 
             document.getElementById("fileInput").value = "";  //  force onchange event if same files
