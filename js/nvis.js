@@ -791,6 +791,10 @@ var nvis = new function () {
                     glContext.uniform1i(uniform, (_object[key].value ? 1 : 0));
                 }
 
+                if (type == "int") {
+                    glContext.uniform1i(uniform, _object[key].value);
+                }
+
                 if (type == "float") {
                     glContext.uniform1f(uniform, _object[key].value);
                 }
@@ -820,7 +824,7 @@ var nvis = new function () {
 
                 let el = undefined;
                 let type = _object[key].type;
-                if (type == "bool" || type == "float") {
+                if (type == "bool" || type == "int" || type == "float") {
                     el = document.createElement("input");
                     el.setAttribute("id", elementId);
 
@@ -833,8 +837,19 @@ var nvis = new function () {
                             el.removeAttribute("checked");
                         }
                         el.setAttribute("onclick", callbackString);
-                    }
-                    else if (type == "float") {
+                    } else if (type == "int") {
+                        el.setAttribute("type", "range");
+                        el.setAttribute("min", (_object[key].min ? _object[key].min : 0));
+                        el.setAttribute("max", (_object[key].max ? _object[key].max : 1));
+                        el.setAttribute("value", (_object[key].value ? _object[key].value : 0));
+                        el.setAttribute("step", (_object[key].step ? _object[key].step : 1));
+                        el.setAttribute("oninput", callbackString);
+                        let oEl = document.createElement("span");
+                        oEl.id = (elementId + "-value");
+                        oEl.innerHTML = (oEl.innerHTML == "" ? _object[key].value : oEl.innerHTML);
+                        //console.log("oEL: '" + oEl.innerHTML + "'");
+                        label.innerHTML += " (" + oEl.outerHTML + ")";
+                    } else if (type == "float") {
                         el.setAttribute("type", "range");
                         el.setAttribute("min", (_object[key].min ? _object[key].min : 0.0));
                         el.setAttribute("max", (_object[key].max ? _object[key].max : 1.0));
@@ -3213,7 +3228,7 @@ var nvis = new function () {
                         el.setAttribute("onclick", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
                     } else if (type == "int") {
                         el.setAttribute("type", "range");
-                        el.setAttribute("min", (object[key].min ? object[key].min : 0.0));
+                        el.setAttribute("min", (object[key].min ? object[key].min : 0));
                         if (object[key].max === undefined) {
                             el.setAttribute("max", 1.0);
                         } else {
@@ -3225,8 +3240,8 @@ var nvis = new function () {
                                 el.setAttribute("max", object[key].max);
                             }
                         }
-                        el.setAttribute("value", (object[key].value ? object[key].value : 0.0));
-                        el.setAttribute("step", (object[key].step ? object[key].step : 1.0));
+                        el.setAttribute("value", (object[key].value ? object[key].value : 0));
+                        el.setAttribute("step", (object[key].step ? object[key].step : 1));
                         el.setAttribute("oninput", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, false));
                         let oEl = document.createElement("span");
                         oEl.id = (elementId + "-value");
@@ -3393,6 +3408,7 @@ var nvis = new function () {
             return { r: data[0], g: data[1], b: data[2], a: data[3] };
         }
 
+
         setUniforms(shader) {
 
             let gl = this.glContext;
@@ -3437,6 +3453,10 @@ var nvis = new function () {
 
                 if (type == "bool") {
                     gl.uniform1i(uniform, (uiObject[key].value ? 1 : 0));
+                }
+
+                if (type == "int") {
+                    gl.uniform1i(uniform, uiObject[key].value);
                 }
 
                 if (type == "float") {
@@ -3810,7 +3830,7 @@ var nvis = new function () {
 
                 let el = undefined;
                 let type = object[key].type;
-                if (type == "bool" || type == "float") {
+                if (type == "bool" || type == "int" || type == "float") {
                     el = document.createElement("input");
                     el.setAttribute("id", elementId);
 
@@ -3822,8 +3842,19 @@ var nvis = new function () {
                             el.removeAttribute("checked");
                         }
                         el.setAttribute("onclick", this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet));
-                    }
-                    else if (type == "float") {
+                    } else if (type == "int") {
+                        el.setAttribute("type", "range");
+                        el.setAttribute("min", (object[key].min ? object[key].min : 0));
+                        el.setAttribute("max", (object[key].max ? object[key].max : 1));
+                        el.setAttribute("value", (object[key].value ? object[key].value : 0));
+                        el.setAttribute("step", (object[key].step ? object[key].step : 1));
+                        el.setAttribute("oninput", this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet, false));
+                        let oEl = document.createElement("span");
+                        oEl.id = (elementId + "-value");
+                        oEl.innerHTML = (oEl.innerHTML == "" ? object[key].value : oEl.innerHTML);
+
+                        label.innerHTML += " (" + oEl.outerHTML + ")";
+                    } else if (type == "float") {
                         el.setAttribute("type", "range");
                         el.setAttribute("min", (object[key].min ? object[key].min : 0.0));
                         el.setAttribute("max", (object[key].max ? object[key].max : 1.0));
@@ -4194,7 +4225,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             if (this.windows.length == 0) {
                 this.logo.parentElement.removeChild(this.logo);
             }
-            
+
             this.windows.push(win);
             this.adjust();
 
@@ -5581,7 +5612,15 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         //console.log("streamUpdateInput(" + streamId + ", " + inputId + ")");
         let elementId = ("input-" + streamId + "-" + inputId);
         let inputStreamId = document.getElementById(elementId).selectedIndex;
-        _renderer.streams[streamId].setInputStreamId(inputId, inputStreamId);
+        //  we have to account for "unselectable" streams, i.e., feedback loops
+        let correctStreamId = inputStreamId;
+        for (let otherStreamId = 0; otherStreamId < _renderer.streams.length && otherStreamId <= inputStreamId; otherStreamId++) {
+            if (otherStreamId == streamId) {
+                //  TODO:  could we break here?
+                correctStreamId++;
+            }
+        }
+        _renderer.streams[streamId].setInputStreamId(inputId, correctStreamId);
     }
 
     let _setWindowStreamId = function (windowId) {
