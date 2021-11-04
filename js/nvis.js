@@ -51,7 +51,6 @@ var nvis = new function () {
                 w: 1,
                 h: 1
             },
-            bLockTranslation: false,
             getDimensions: function () {
                 return (_state.layout.bAutomatic ? _state.layout.automaticDimensions : _state.layout.dimensions);
             }
@@ -76,7 +75,8 @@ var nvis = new function () {
                 previousCanvasCoords: { x: 0, y: 0 },
                 streamCoords: undefined,
                 clickPosition: { x: 0, y: 0 },
-                down: false
+                down: false,
+                showInfo: false
             },
             keyboard: {
                 shift: false
@@ -103,12 +103,12 @@ var nvis = new function () {
 
             inc: function () {
                 this.frameId = (this.frameId + 1) % this.numFrames;
-                console.log("frameId: " + this.frameId);
+                //console.log("frameId: " + this.frameId);
             },
 
             dec: function () {
                 this.frameId = (this.frameId + this.numFrames - 1) % this.numFrames;
-                console.log("frameId: " + this.frameId);
+                //console.log("frameId: " + this.frameId);
             },
 
             update: function () {
@@ -147,7 +147,22 @@ var nvis = new function () {
         bLockTranslation: {
             name: "Lock translation",
             type: "bool",
-            value: _state.layout.bLockTranslation
+            value: false
+        },
+        bDrawGrid: {
+            name: "Draw grid when zooming",
+            type: "bool",
+            value: true
+        },
+        bDrawPixel: {
+            name: "Draw pixel marker when zooming",
+            type: "bool",
+            value: true
+        },
+        bAlphaCheckerboard: {
+            name: "Show alpha with checkboard",
+            type: "bool",
+            value: true
         },
         canvasBorder: {
             name: "Border width",
@@ -155,6 +170,14 @@ var nvis = new function () {
             value: _state.layout.border,
             min: 0,
             max: 200,
+            step: 1
+        },
+        pixelValueDecimals: {
+            name: "Pixel value decimals",
+            type: "int",
+            value: 3,
+            min: 0,
+            max: 16,
             step: 1
         },
         clearAll: {
@@ -329,6 +352,29 @@ var nvis = new function () {
             padding: 6px 12px;
             border: 1px solid #808080;
             border-top: none;
+        }`);
+
+        //  pixel info overlay
+        addStylesheetRules(`div.overlay {
+            display: none;
+            padding: 10px;
+            margin: 20px;
+            position: absolute;
+            color: white;
+            border-radius: 10px;
+            border: 1px solid #606060;
+            background-color: #303030;
+            font: 16px Consolas;
+            left: 10px;
+            top: 10px;
+        }`);
+        addStylesheetRules(`div.overlay span {
+            display: inline-block;
+            padding: 0px;
+            margin: 0px 15px 0px 15px;
+            width: 15px;
+            height: 15px;
+            border: 0px solid #f0f0f0;
         }`);
 
     };
@@ -652,7 +698,7 @@ var nvis = new function () {
                 // It is very important to revoke the previous ObjectURL to prevent memory leaks. Un-set the `src` first.
                 // See https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL
 
-                this.video.src = ''; // <-- Un-set the src property *before* revoking the object URL.
+                this.video.src = '';
                 URL.revokeObjectURL(oldObjectUrl);
             }
 
@@ -1302,25 +1348,7 @@ var nvis = new function () {
             precision highp float;
             in vec2 vTextureCoord;
             uniform sampler2D uSampler;
-            out vec4 color;
-
-            void main()
-            {
-                if (vTextureCoord.x < 0.0 || vTextureCoord.x > 1.0 || vTextureCoord.y < 0.0 || vTextureCoord.y > 1.0) {
-                    color = vec4(0.1, 0.1, 0.1, 1.0);
-                    return;
-                }
-                color = texture(uSampler, vTextureCoord);
-            }`;
-
-            this.streamFragmentSource = `#version 300 es
-            precision highp float;
-            in vec2 vTextureCoord;
-            uniform sampler2D uSampler;
-            uniform vec2 uDimensions;
-            uniform int uTonemapper;
-            uniform float uGamma;
-            uniform float uExposure;
+            uniform bool uAlphaCheckerboard;
             out vec4 color;
 
             float modi(float a, float b) {
@@ -1329,13 +1357,45 @@ var nvis = new function () {
 
             void main()
             {
+                if (vTextureCoord.x < 0.0 || vTextureCoord.x > 1.0 || vTextureCoord.y < 0.0 || vTextureCoord.y > 1.0) {
+                    color = vec4(0.1, 0.1, 0.1, 1.0);
+                    return;
+                }
+
                 vec4 c = texture(uSampler, vTextureCoord);
-
-                float xx = (vTextureCoord.x * uDimensions.x) / 16.0;
-                float yy = (vTextureCoord.y * uDimensions.y) / 16.0;
                 color = vec4(c.r, c.g, c.b, 1.0);
+                
+                //  gray checkerboard for background
+                if (uAlphaCheckerboard && c.a < 1.0)
+                {
+                    vec2 dimensions = vec2(textureSize(uSampler, 0));
+                    float xx = (vTextureCoord.x * dimensions.x) / 16.0;
+                    float yy = (vTextureCoord.y * dimensions.y) / 16.0;
+                        vec4 gridColor = vec4(0.6, 0.6, 0.6, 1.0);
+                    if (modi(xx, 2.0) == 0.0 ^^ modi(yy, 2.0) == 0.0) {
+                        gridColor = vec4(0.5, 0.5, 0.5, 1.0);
+                    }
 
-                if (false) {  //  TODO: handle tonemapping
+                    color = gridColor + vec4(color.rgb * color.a, 1.0);
+                }
+                //color = texture(uSampler, vTextureCoord);
+            }`;
+
+            this.streamFragmentSource = `#version 300 es
+            precision highp float;
+            in vec2 vTextureCoord;
+            uniform sampler2D uSampler;
+            uniform int uTonemapper;
+            uniform float uGamma;
+            uniform float uExposure;
+            out vec4 color;
+
+            void main()
+            {
+                color = texture(uSampler, vTextureCoord);
+
+                //  TODO: handle tonemapping with UI
+                if (false) {
                     float invGamma = 1.0 / 2.2;
                     float exposure = 2.0;
 
@@ -1344,16 +1404,6 @@ var nvis = new function () {
                     color.b = exposure * pow(color.b, invGamma);
                 }
 
-                //  gray checkerboard for background
-                if (c.a < 1.0)
-                {
-                    vec4 gridColor = vec4(0.6, 0.6, 0.6, 1.0);
-                    if (modi(xx, 2.0) == 0.0 ^^ modi(yy, 2.0) == 0.0) {
-                        gridColor = vec4(0.5, 0.5, 0.5, 1.0);
-                    }
-
-                    color = gridColor + vec4(color.rgb * color.a, 1.0);
-                }
             }`;
 
             this.textureShader = new NvisShader(glContext, { source: this.textureFragmentSource });
@@ -3071,7 +3121,7 @@ var nvis = new function () {
 
         createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI = true) {
             let callbackString = "nvis.uiUpdateParameter(\"" + uniqueId + "\", \"" + elementId + "\", \"" + rowId + "\", " + bAllConditionsMet + ", " + bUpdateUI + ")";
-            console.log(callbackString);
+            //console.log(callbackString);
             return callbackString;
         }
 
@@ -3146,14 +3196,9 @@ var nvis = new function () {
                     if (type == "bool") {
                         el.setAttribute("type", "checkbox");
                         el.checked = object[key].value;
-                        console.log(key + ": " + object[key].value);
-                        //document.getElementById(elementId).checked = object[key].value;
                         if (object[key].value) {
                             el.setAttribute("checked", true);
                         }
-                        // else {
-                        //     el.removeAttribute("checked");
-                        // }
                         el.setAttribute("onclick", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
                     } else if (type == "int") {
                         el.setAttribute("type", "range");
@@ -3352,7 +3397,7 @@ var nvis = new function () {
             }
 
             //  common uniforms
-            let uniform = gl.getUniformLocation(shader.getProgram(), "uDimensions");
+            let uniform = gl.getUniformLocation(shader.getProgram(), "uDimensions");  //  TODO: not needed
             if (uniform !== undefined) {
                 gl.uniform2f(uniform, this.dimensions.w, this.dimensions.h);
             }
@@ -3879,42 +3924,74 @@ var nvis = new function () {
 
     class NvisOverlay {
 
-        constructor() {
+        constructor(canvas) {
+            this.canvas = canvas;
             this.position = { x: 10, y: 10 };
-            this.size = { w: 120, h: 25 };
+            this.size = { w: 0, h: 0 };
             this.text = "";
-            this.overlay = document.createElement("div");;
+            this.div = document.createElement("div");
+            this.div.className = "overlay";
 
-            this.overlay.style.display = "none";
-            this.overlay.style.position = "absolute";
-            this.overlay.style.color = "white";
-            this.overlay.style.font = "20px Consolas";
-            this.overlay.style.backgroundColor = "green";
-            // this.overlay.style.left = _canvas.offsetLeft;
-            // this.overlay.style.top = (_canvas.height + _canvas.offsetTop) + "px";
-            this.overlay.style.left = this.position.x + "px";
-            this.overlay.style.top = this.position.y + "px";
-            // this.overlay.style.width = _canvas.width + "px";
-            // this.overlay.style.height = "50px";
-            this.overlay.style.width = this.size.w + "px";
-            this.overlay.style.height = this.size.h + "px";
-
-            this.#setText("Testing...");
+            // this.div.style.left = this.position.x + "px";
+            // this.div.style.top = this.position.y + "px";
+            // this.div.style.width = this.size.w + "px";
+            // this.div.style.height = this.size.h + "px";
         }
 
-        #setText(text) {
-            this.text = text;
-            this.overlay.innerHTML = text;
+        show() {
+            this.div.style.display = "block";
         }
 
-        getNode() {
-            return this.overlay;
+        hide() {
+            this.div.style.display = "none";
         }
 
-        resize(position, dimensions) {
-            //console.log("overlay resize: " + position.x + ", " + position.y);
-            this.overlay.style.left = position.x + "px";
-            this.overlay.style.top = position.y + "px";
+        update(windowId, coordinates, color, bFloat) {
+            if (this.windowId == windowId && this.coordinates.x == coordinates.x && this.coordinates.y == coordinates.y) {
+                 return;
+            }
+            
+            // console.log("windowId: " + windowId + ", coords: " + JSON.stringify(coordinates) + ", color: " + JSON.stringify(color));
+
+            this.windowId = windowId;
+            this.coordinates = coordinates;
+            this.color = color;
+
+            this.text = "";
+            if (coordinates === undefined) {
+                this.text += "N/A";  //  TODO: should not happen, checked before call
+            } else {
+                let factor = (bFloat ? 255.0 : 1.0);
+                let r = color.r * factor;
+                let g = color.g * factor;;
+                let b = color.b * factor;;
+                let a = color.a * factor;
+                let decimals = _settings.pixelValueDecimals.value;
+                this.text += "position: " + Math.floor(coordinates.x) + ", " + Math.floor(coordinates.y) + "<br/>";
+                this.text += "<span style=\"background-color: rgb(" + r + ",0,0)\"></span>R: " + (bFloat ? color.r.toFixed(decimals) : color.r) + "<br/>";
+                this.text += "<span style=\"background-color: rgb(0," + g + ",0)\"></span>G: " + (bFloat ? color.g.toFixed(decimals) : color.g) + "<br/>";
+                this.text += "<span style=\"background-color: rgb(0,0," + b + ")\"></span>B: " + (bFloat ? color.b.toFixed(decimals) : color.b) + "<br/>";
+                this.text += "<span style=\"background-color: rgb(" + a + "," + a + "," + a + ")\"></span>A: " + (bFloat ? color.a.toFixed(decimals) : color.a);
+            }
+            this.div.innerHTML = this.text;
+
+            //  TODO: below can be used for fixed placement
+            // let w = window.getComputedStyle(this.div).getPropertyValue("width");
+            // let h = window.getComputedStyle(this.div).getPropertyValue("height");
+            // this.size = { w: Math.floor(w.substring(0, w.indexOf('px'))), h: Math.floor(h.substring(0, h.indexOf('px'))) };
+
+            let cCoords = _state.input.mouse.canvasCoords;
+            let layoutDims = _state.layout.getDimensions();
+            let winPxDims = { w: this.canvas.width / layoutDims.w, h: this.canvas.height / layoutDims.h };
+            let topLeftWinCoords = { x: cCoords.x % winPxDims.w, y: cCoords.y % winPxDims.h };
+            let winPos = { x: windowId % layoutDims.w, y: Math.floor(windowId / layoutDims.w) };
+            let winCoords = { x: topLeftWinCoords.x + winPos.x * winPxDims.w, y: topLeftWinCoords.y + winPos.y * winPxDims.h };
+
+            let left = _state.layout.border + winCoords.x;
+            let top = _state.layout.border + winCoords.y;
+            this.position = { x: left, y: top };
+            this.div.style.left = left + "px";
+            this.div.style.top = top + "px";
         }
     }
 
@@ -3977,7 +4054,6 @@ var nvis = new function () {
             if (!this.insideWindow(canvasPxCoords)) {
                 return undefined;
             }
-
 
             let xx = canvasPxCoords.x / this.canvas.width;
             let yy = canvasPxCoords.y / this.canvas.height;
@@ -4095,6 +4171,8 @@ var nvis = new function () {
         delete(canvasPxCoords) {
             let windowId = this.getWindowId(canvasPxCoords);
             if (this.windows.length > 1 && windowId !== undefined) {
+                let overlayDiv = this.windows[windowId].overlay.div;
+                overlayDiv.parentElement.removeChild(overlayDiv);
                 this.windows.splice(windowId, 1);
                 this.adjust();
             }
@@ -4348,7 +4426,7 @@ var nvis = new function () {
                 this.windows[windowId].render(windowId, frameId, streams, shaders);
             }
 
-            if (_state.zoom.level >= 8.0) {
+            if (_settings.bDrawPixel.value && _state.zoom.level >= 8.0) {
                 let canvasCoords = _state.input.mouse.canvasCoords;
                 let activeWindowId = this.getWindowId(canvasCoords);
 
@@ -4369,7 +4447,6 @@ var nvis = new function () {
                 if (wc === undefined) {
                     return;
                 }
-
 
                 for (let windowId = 0; windowId < this.windows.length; windowId++) {
                     let window = this.windows[windowId];
@@ -4451,8 +4528,8 @@ var nvis = new function () {
             gl.bindBuffer(gl.ARRAY_BUFFER, this.fullTextureCoordinateBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, fullTextureCoordinates, gl.STATIC_DRAW);
 
-            this.overlay = new NvisOverlay();
-
+            this.overlay = new NvisOverlay(this.canvas);
+            document.body.appendChild(this.overlay.div);
             //this.canvas.parentNode.insertBefore(this.overlay.getNode(), this.canvas.nextSibling);
 
             this.resize({ x: 0.0, y: 0.0 }, { w: 1.0, h: 1.0 });
@@ -4503,9 +4580,6 @@ var nvis = new function () {
 
             gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, this.vertexPositions, gl.STATIC_DRAW);
-
-            //  TODO: fix overlay...
-            this.overlay.resize({ x: position.x * 100, y: position.y * 100 }, dimensions);
         }
 
 
@@ -4546,6 +4620,16 @@ var nvis = new function () {
                 if (!bStreamDimKnown) {
                     return;
                 }
+            }
+
+            if (_state.input.mouse.showInfo && _state.input.mouse.streamCoords !== undefined) {
+                let loc = _state.input.mouse.streamCoords;
+                loc = { x: Math.floor(loc.x), y: Math.floor(loc.y) };
+                let color = stream.getPixelValue(loc);
+                this.overlay.update(windowId, loc, color, stream.bFloat);
+                this.overlay.show();
+            } else {
+                this.overlay.hide();
             }
 
             let shader = undefined;
@@ -4618,6 +4702,8 @@ var nvis = new function () {
 
             let uSampler = gl.getUniformLocation(shaderProgram, 'uSampler');
             gl.uniform1i(uSampler, 0);
+            let uAlphaCheckerboard = gl.getUniformLocation(shaderProgram, 'uAlphaCheckerboard');
+            gl.uniform1i(uAlphaCheckerboard, _settings.bAlphaCheckerboard.value);
 
             gl.uniform2f(gl.getUniformLocation(shaderProgram, "uDimensions"), streamDim.w, streamDim.h);
 
@@ -4626,6 +4712,10 @@ var nvis = new function () {
 
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
+
+            if (!_settings.bDrawGrid.value) {
+                return;
+            }
 
             //  TODO: move elsewhere?
             let layout = _state.layout;
@@ -4694,60 +4784,23 @@ var nvis = new function () {
 
             this.settingsUI = new NvisUI("settings", _settings, this);
 
-            // this.animation = {
-            //     active: false,
-            //     fps: 60,
-            //     pingPong: true,
-            //     direction: 1,
-            //     frameId: 0,
-            //     numFrames: 1,  //  TODO: fix this!
-            //     minFrameId: 0,
-            //     maxFrameId: 0,
-            //     time: undefined,
-
-            //     toggleActive: function () {
-            //         this.active = !this.active;
-            //     },
-
-            //     togglePingPong: function () {
-            //         this.pingPong = !this.pingPong;
-            //     },
-
-            //     inc: function () {
-            //         this.frameId = (this.frameId + 1) % this.numFrames;
-            //         console.log("frameId: " + this.frameId);
-            //     },
-
-            //     dec: function () {
-            //         this.frameId = (this.frameId + this.numFrames - 1) % this.numFrames;
-            //         console.log("frameId: " + this.frameId);
-            //     },
-
-            //     update: function () {
-            //         if (this.active) {
-            //             this.frameId += this.direction;
-            //             this.frameId = Math.max(this.frameId, 0);
-            //             this.frameId = Math.min(this.frameId, this.numFrames - 1);
-
-            //             if (this.pingPong) {
-            //                 if (this.frameId == 0 || this.frameId == this.numFrames - 1) {
-            //                     this.direction = -this.direction;
-            //                 }
-            //             }
-            //             else {
-            //                 this.frameId %= this.numFrames;
-            //             }
-            //         }
-            //     }
-            // };
-
             this.canvas = document.createElement("canvas");
-            document.body.appendChild(this.canvas);
+
+            this.glContext = this.canvas.getContext("webgl2");
+            if (this.glContext === null) {
+                alert("Unable to initialize WebGL!");
+                return;
+            }
+
+            //  extensions
+            this.glContext.getExtension("EXT_color_buffer_float")
+
+            this.windows = new NvisWindows(this.glContext, this.canvas);
+            this.shaders = new NvisShaders(this.glContext);
 
             this.helpPopup = document.createElement("div");
             this.helpPopup.className = "helpPopup";
-
-            this.helpPopup.innerHTML = "<b>Nvis Online</b><br/>";
+            this.helpPopup.innerHTML = "<b><i>nvis</i><br/>";
             this.helpPopup.innerHTML += "<br/>";
             this.helpPopup.innerHTML += "Drag-and-drop files to this window...<br/>";
             this.helpPopup.innerHTML += "<br/>";
@@ -4768,6 +4821,7 @@ var nvis = new function () {
             this.uiPopup = document.createElement("div");
             this.uiPopup.id = "uiPopup";
             this.uiPopup.className = "uiPopup";
+            this.updateUiPopup();
 
             this.fileInput = document.createElement("input");
             this.fileInput.id = "fileInput";
@@ -4780,19 +4834,9 @@ var nvis = new function () {
             document.body.appendChild(this.helpPopup);
             document.body.appendChild(this.fileInput);
             document.body.appendChild(this.infoPopup);
+            document.body.appendChild(this.canvas);
 
-            this.glContext = this.canvas.getContext("webgl2");
-            if (this.glContext === null) {
-                alert("Unable to initialize WebGL!");
-                return;
-            }
-
-            //  extensions
-            this.glContext.getExtension("EXT_color_buffer_float")
-
-            this.windows = new NvisWindows(this.glContext, this.canvas);
-            this.shaders = new NvisShaders(this.glContext);
-
+            //  event listeners
             window.addEventListener("resize", this.windows.boundAdjust);
 
             this.canvas.addEventListener("click", (event) => this.onClick(event));
@@ -4828,7 +4872,9 @@ var nvis = new function () {
 
             let title = document.createElement("span");
             title.className = "title";
-            title.innerHTML = "Nvis Online";
+            let titleText = document.createElement("i");
+            titleText.innerHTML = "nvis";
+            title.appendChild(titleText);
 
             let bar = document.createElement("div");
             bar.className = "titleBarBar";
@@ -4868,32 +4914,31 @@ var nvis = new function () {
             tabs.appendChild(tabWindows);
             tabs.appendChild(tabShaders);
 
-            this.uiPopup.appendChild(tabs);
-
             //  settings
+            this.settingsUI.build();
             let settingsDiv = document.createElement("div");
             settingsDiv.id = "tabSettings";
             settingsDiv.className = "tabContent";
-
-            this.settingsUI.build();
+            settingsDiv.style.display = (_state.ui.tabId == "tabSettings" ? "block" : "none");
             settingsDiv.appendChild(this.settingsUI.dom);
 
-            this.uiPopup.appendChild(settingsDiv);
 
             //  streams
             let streamsDiv = document.createElement("div");
             streamsDiv.id = "tabStreams";
             streamsDiv.className = "tabContent";
+            streamsDiv.style.display = (_state.ui.tabId == "tabStreams" ? "block" : "none");
             for (let streamId = 0; streamId < this.streams.length; streamId++) {
                 let ui = this.streams[streamId].getUI(streamId, this.streams, this.shaders);
                 streamsDiv.appendChild(ui);
             }
-            this.uiPopup.appendChild(streamsDiv);
+
 
             //  windows
             let windowsDiv = document.createElement("div");
             windowsDiv.id = "tabWindows";
             windowsDiv.className = "tabContent";
+            windowsDiv.style.display = (_state.ui.tabId == "tabWindows" ? "block" : "none");
             for (let windowId = 0; windowId < this.windows.getNumWindows(); windowId++) {
 
                 let select = document.createElement("select");
@@ -4919,17 +4964,22 @@ var nvis = new function () {
                 selectDiv.appendChild(select);
                 windowsDiv.appendChild(selectDiv);
             }
-            this.uiPopup.appendChild(windowsDiv);
 
             //  shaders
             let shadersDiv = document.createElement("div");
             shadersDiv.id = "tabShaders";
             shadersDiv.className = "tabContent";
+            shadersDiv.style.display = (_state.ui.tabId == "tabShaders" ? "block" : "none");
             for (let shaderId = 0; shaderId < this.shaders.shaders.length; shaderId++) {
                 let ui = document.createElement("p");
                 ui.innerHTML = "Shader: " + this.shaders.shaders[shaderId].name;
                 shadersDiv.appendChild(ui);
             }
+
+            this.uiPopup.appendChild(tabs);
+            this.uiPopup.appendChild(settingsDiv);
+            this.uiPopup.appendChild(streamsDiv);
+            this.uiPopup.appendChild(windowsDiv);
             this.uiPopup.appendChild(shadersDiv);
 
             // //  center popup
@@ -4938,14 +4988,12 @@ var nvis = new function () {
             // let x = Math.trunc((this.canvas.width - w.substring(0, w.indexOf('px'))) / 2);
             // let y = Math.trunc((this.canvas.height - h.substring(0, h.indexOf('px'))) / 2);
 
-            document.getElementById(_state.ui.tabId).style.display = "block";
-            this.uiPopup.style.left = (_state.ui.position.x + "px");
-            this.uiPopup.style.top = (_state.ui.position.y + "px");
+            this.updateUiPosition();
         }
 
         updateUiPosition() {
-            this.uiPopup.style.left = (_state.ui.position.x + "px");
-            this.uiPopup.style.top = (_state.ui.position.y + "px");
+            this.uiPopup.style.left = (_state.ui.position.x + 'px');
+            this.uiPopup.style.top = (_state.ui.position.y + 'px');
         }
 
         onKeyDown(event) {
@@ -4954,99 +5002,102 @@ var nvis = new function () {
             let key = event.key;
 
             if (keyCode != 9) {  //  Tab
-                this.uiPopup.style.display = "none";  //  TODO: perhaps improve
+                this.uiPopup.style.display = 'none';  //  TODO: perhaps improve
             }
 
             // if (keyCode != 116)  //  F5
             //     event.preventDefault();
 
-            //  TODO: only rely on 'key', should work
 
-            switch (keyCode) {
-                case 9:  //  Tab
+            switch (key) {
+                case 'Tab':  //  Tab
                     event.preventDefault();
-                    if (this.uiPopup.style.display == "none") {
-                        this.uiPopup.style.display = "block";
+                    if (this.uiPopup.style.display == 'none' || this.uiPopup.style.display == '') {
+                        this.uiPopup.style.display = 'block';
                         this.updateUiPopup();
                     } else {
-                        this.uiPopup.style.display = "none";
+                        this.uiPopup.style.display = 'none';
                     }
                     break;
-                case 16:  //  Shift
+                case 'Shift':  //  Shift
                     _state.input.keyboard.shift = true;
                     break;
-                case 37:  //  ArrowLeft
+                case 'ArrowLeft':  //  ArrowLeft
                     _state.animation.dec();
                     this.popupInfo("Frame: " + _state.animation.frameId);
                     break;
-                case 38:  //  ArrowUp
+                case 'ArrowUp':  //  ArrowUp
                     this.windows.incStream(_state.input.mouse.canvasCoords, this.streams);
                     break;
-                case 39:  //  ArrowRight
+                case 'ArrowRight':  //  ArrowRight
                     _state.animation.inc();
-                    this.popupInfo("Frame: " + _state.animation.frameId);
+                    this.popupInfo('Frame: ' + _state.animation.frameId);
                     break;
-                case 40:  //  ArrowDown
+                case 'ArrowDown':  //  ArrowDown
                     this.windows.decStream(_state.input.mouse.canvasCoords, this.streams);
                     break;
-                default:
-                    switch (key) {
-                        case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
-                            let streamId = parseInt(key) - 1;
-                            if (streamId < this.streams.length) {
-                                this.windows.setWindowStreamId(this.windows.getWindowId(_state.input.mouse.canvasCoords), streamId);
-                            }
-                            break;
-                        case ' ':
-                            _state.animation.toggleActive();
-                            _settings.bAnimate.value = _state.animation.active;
-                            this.popupInfo("Animation: " + (_state.animation.active ? "on" : "off"));
-                            break;
-                        case 'a':
-                            _state.layout.bAutomatic = !_state.layout.bAutomatic;
-                            _settings.bAutomaticLayout.value = _state.layout.bAutomatic;
-                            this.popupInfo("Automatic window placement: " + (_state.layout.bAutomatic ? "on" : "off"));
-                            this.windows.adjust();
-                            break;
-                        case 'p':
-                            _state.animation.togglePingPong();
-                            _settings.bPingPong.value = _state.animation.pingPong;
-                            this.popupInfo("Animation ping-pong: " + (_state.animation.pingPong ? "on" : "off"));
-                            break;
-                        case 'd':
-                            this.windows.delete(_state.input.mouse.canvasCoords);
-                            this.updateUiPopup();
-                            break;
-                        case 'o':
-                            document.getElementById("fileInput").click();
-                            break;
-                        case 'D':
-                            if (this.streams.length > 1) {
-                                _apiShader("glsl/difference.json", [0, 1], true);
-                                //this.renderer.loadShader("glsl/difference.json");
-                            }
-                            break;
-                        case 'w':
-                            this.windows.add();
-                            this.updateUiPopup();
-                            break;
-                        case 'h':
-                            this.helpPopup.style.display = "block";
-                            break;
-                        case '+':
-                            _state.layout.bAutomatic = false;
-                            this.windows.inc();
-                            this.updateUiPopup();
-                            break;
-                        case '-':
-                            _state.layout.bAutomatic = false;
-                            this.windows.dec();
-                            this.updateUiPopup();
-                            break;
-                        default:
-                            console.log("KEYDOWN   key: '" + key + "', keyCode: " + keyCode);
-                            break;
+                case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+                    let streamId = parseInt(key) - 1;
+                    if (streamId < this.streams.length) {
+                        this.windows.setWindowStreamId(this.windows.getWindowId(_state.input.mouse.canvasCoords), streamId);
                     }
+                    break;
+                case ' ':
+                    _state.animation.toggleActive();
+                    _settings.bAnimate.value = _state.animation.active;
+                    this.popupInfo('Animation: ' + (_state.animation.active ? 'on' : 'off'));
+                    break;
+                case 'a':
+                    _state.layout.bAutomatic = !_state.layout.bAutomatic;
+                    _settings.bAutomaticLayout.value = _state.layout.bAutomatic;
+                    this.popupInfo('Automatic window placement: ' + (_state.layout.bAutomatic ? 'on' : 'off'));
+                    this.windows.adjust();
+                    break;
+                case 'g':
+                    _settings.bDrawGrid.value = !_settings.bDrawGrid.value;
+                    this.popupInfo('Draw grid: ' + (_settings.bDrawGrid.value ? 'on' : 'off'));
+                    break;
+                case 'p':
+                    _state.animation.togglePingPong();
+                    _settings.bPingPong.value = _state.animation.pingPong;
+                    this.popupInfo('Animation ping-pong: ' + (_state.animation.pingPong ? 'on' : 'off'));
+                    break;
+                case 'd':
+                    this.windows.delete(_state.input.mouse.canvasCoords);
+                    this.updateUiPopup();
+                    break;
+                case 'o':
+                    document.getElementById('fileInput').click();
+                    break;
+                case 'i':
+                    _state.input.mouse.showInfo = !_state.input.mouse.showInfo;
+                    this.popupInfo("Pixel info overlay: " + (_state.input.mouse.showInfo ? "on" : "off"));
+                    break;
+                case 'D':
+                    if (this.streams.length > 1) {
+                        _apiShader("glsl/difference.json", [0, 1], true);
+                        //this.renderer.loadShader("glsl/difference.json");
+                    }
+                    break;
+                case 'w':
+                    this.windows.add();
+                    this.updateUiPopup();
+                    break;
+                case 'h':
+                    this.helpPopup.style.display = "block";
+                    break;
+                case '+':
+                    _state.layout.bAutomatic = false;
+                    this.windows.inc();
+                    this.updateUiPopup();
+                    break;
+                case '-':
+                    _state.layout.bAutomatic = false;
+                    this.windows.dec();
+                    this.updateUiPopup();
+                    break;
+                default:
+                    console.log("KeyDown not handled, keyCode: " + keyCode + ", key: " + key);
                     break;
             }
         }
@@ -5056,27 +5107,15 @@ var nvis = new function () {
             let keyCode = event.keyCode || event.which;
             let key = event.key;
 
-            switch (keyCode) {
-                case 16:  //  Shift
+            switch (key) {
+                case 'Shift':
                     _state.input.keyboard.shift = false;
                     break;
-                // case 37:  //  ArrowLeft
-                //     break;
-                // case 38:  //  ArrowUp
-                //     break;
-                // case 39:  //  ArrowRight
-                //     break;
-                // case 40:  //  ArrowDown
-                //     break;
+                case 'h':
+                    this.helpPopup.style.display = "none";
+                    break;
                 default:
-                    switch (key) {
-                        case 'h':
-                            this.helpPopup.style.display = "none";
-                            break;
-                        default:
-                            // console.log("KEYUP   key: '" + key + "', keyCode: " + keyCode);
-                            break;
-                    }
+                    // console.log("KeyUp not handled, keyCode: " + keyCode + ", key: " + key);
                     break;
             }
         }
@@ -5104,24 +5143,23 @@ var nvis = new function () {
 
         onClick(event) {
 
-            let cc = _state.input.mouse.canvasCoords;
-            let windowId = this.windows.getWindowId(cc);
+            let cCoord = _state.input.mouse.canvasCoords;
+            let windowId = this.windows.getWindowId(cCoord);
 
             if (windowId === undefined) {
                 return;
             }
 
             let streamId = this.windows.windows[windowId].getStreamId();
-            let pCoord = this.windows.getStreamCoordinates(cc, true);
+            let pCoord = this.windows.getStreamCoordinates(cCoord, true);
 
             if (pCoord === undefined) {
                 return;
             }
 
-            let loc = { x: Math.floor(pCoord.x), y: Math.floor(pCoord.y) };
-            let color = this.streams[streamId].getPixelValue(loc);
-
-            console.log("canvas.onClick(" + JSON.stringify(loc) + "): " + JSON.stringify(color));
+            // let loc = { x: Math.floor(pCoord.x), y: Math.floor(pCoord.y) };
+            // let color = this.streams[streamId].getPixelValue(loc);
+            // console.log("canvas.onClick(" + JSON.stringify(loc) + "): " + JSON.stringify(color));
         }
 
         onMouseDown(event) {
@@ -5145,7 +5183,7 @@ var nvis = new function () {
                     x: _state.input.mouse.previousCanvasCoords.x - _state.input.mouse.canvasCoords.x,
                     y: _state.input.mouse.previousCanvasCoords.y - _state.input.mouse.canvasCoords.y
                 }
-                if (!_state.layout.bLockTranslation) {
+                if (!_settings.bLockTranslation.value) {
                     this.windows.translate(canvasOffset);
                 }
             }
@@ -5438,7 +5476,7 @@ var nvis = new function () {
     }
 
     let _uiUpdateParameter = function (objectId, elementId, rowId, bAllConditionsMet, bUpdateUI) {
-        console.log("uiUpdateParameter(" + objectId + ", " + elementId + ", " + bUpdateUI + ")");
+        //console.log("uiUpdateParameter(" + objectId + ", " + elementId + ", " + bUpdateUI + ")");
 
         let key = elementId.replace(/^.*\-/, "");
         let element = document.getElementById(elementId);
@@ -5462,11 +5500,6 @@ var nvis = new function () {
 
         if (key == "layoutWidth") {
             _state.layout.dimensions.w = Math.min(object.value, _renderer.windows.windows.length);
-            _renderer.windows.adjust();
-        }
-
-        if (key == "bLockTranslation") {
-            _state.layout.bLockTranslation = object.value;
             _renderer.windows.adjust();
         }
 
@@ -5501,13 +5534,13 @@ var nvis = new function () {
         }
 
         if (bUpdateUI) {
-            console.log("Updating UI");
+            //console.log("Updating UI");
             _renderer.updateUiPopup();
         }
     }
 
     let _streamUpdateParameter = function (streamId, elementId, bUpdateUI) {
-        console.log("streamUpdateParamter(" + streamId + ", " + elementId + ")");
+        //console.log("streamUpdateParamter(" + streamId + ", " + elementId + ")");
         _renderer.streams[streamId].uiUpdate(elementId);
         if (bUpdateUI) {
             // console.log("Updating UI");
@@ -5516,7 +5549,7 @@ var nvis = new function () {
     }
 
     let _streamUpdateInput = function (streamId, inputId) {
-        console.log("streamUpdateInput(" + streamId + ", " + inputId + ")");
+        //console.log("streamUpdateInput(" + streamId + ", " + inputId + ")");
         let elementId = ("input-" + streamId + "-" + inputId);
         let inputStreamId = document.getElementById(elementId).selectedIndex;
         _renderer.streams[streamId].setInputStreamId(inputId, inputStreamId);
