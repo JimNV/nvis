@@ -30,7 +30,6 @@
 
 var nvis = new function () {
     let _renderer = undefined;
-    let _streams = [];
 
     let _state = {
         ui: {
@@ -5192,18 +5191,6 @@ var nvis = new function () {
         onMouseUp(event) {
             _state.input.mouse.down = false;
         }
-
-        // let _streamUpdateParameter = function (streamId, elementId) {
-        //     //alert("update: " + streamId + ", " + elementId);
-        //     _streams[streamId].getShader().updateParameter(elementId);
-        // }
-
-        // let _streamUpdateInput = function (streamId, inputId) {
-        //     //alert("update: " + streamId + ", " + inputId);
-        //     let elementId = ("input-" + streamId + "-" + inputId);
-        //     let inputStreamId = document.getElementById(elementId).selectedIndex;
-        //     _streams[streamId].setInputStream(inputId, inputStreamId);
-        // }
 
         setWindowStreamId(windowId) {
             let elementId = ("windowStream-" + windowId);
