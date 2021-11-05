@@ -1,0 +1,41 @@
+{
+    "name": "Pixelization",
+    "fileName": "glsl/pixelate.glsl",
+    "inputs": 1,
+    "UI": {
+        "uFixed": {
+            "name": "Same width and height",
+            "type": "bool",
+            "value": true
+        },
+        "uSize": {
+            "name": "Size",
+            "type": "int",
+            "value": 16,
+            "min": 1,
+            "max": 64,
+            "condition": "uFixed"
+        },
+        "uWidth": {
+            "name": "Width",
+            "type": "int",
+            "value": 16,
+            "min": 1,
+            "max": 64,
+            "condition": "!uFixed"
+        },
+        "uHeight": {
+            "name": "Height",
+            "type": "int",
+            "value": 16,
+            "min": 1,
+            "max": 64,
+            "condition": "!uFixed"
+        },
+        "uAverage": {
+            "name": "Average colors (slower)",
+            "type": "bool",
+            "value": false
+        }
+    }
+}
