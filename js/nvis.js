@@ -210,6 +210,38 @@ var nvis = new function () {
             min: 1,
             max: "#frames",
             step: 1
+        },
+        bGlobalTonemapping: {
+            name: "Global tonemapping",
+            type: "bool",
+            value: false
+        },
+        tonemapper: {
+            name: "Tonemapper",
+            type: "dropdown",
+            value: 0,
+            alternatives: [
+                "Gamma correction"
+            ],
+            condition: "bGlobalTonemapping"
+        },
+        gamma: {
+            name: "Gamma",
+            type: "float",
+            min: 0.1,
+            max: 4.0,
+            value: 2.2,
+            step: 0.1,
+            condition: "bGlobalTonemapping & tonemapper == 0"
+        },
+        exposure: {
+            name: "Exposure",
+            type: "float",
+            min: 0.1,
+            max: 10.0,
+            value: 1.0,
+            step: 0.1,
+            condition: "bGlobalTonemapping & tonemapper == 0"
         }
     };
 
@@ -427,6 +459,45 @@ var nvis = new function () {
         return _apiCommand({ command: "window", argument: streamId });
     }
 
+    let _parseConfig = function (jsonObject) {
+
+        //  convert top-level keys to lowercase
+        let config = {};
+        for (let key of Object.keys(jsonObject)) {
+            config[key.toLowerCase()] = jsonObject[key];
+        }
+
+        //  Zoom
+        let zoom = config.zoom;
+        if (zoom !== undefined) {
+            _apiCommand({ command: "zoom", argument: zoom });
+        }
+
+        //  shaders
+        let shaders = config.shaders;
+        if (shaders !== undefined) {
+            for (let i = 0; i < shaders.length; i++) {
+                _apiCommand({ command: "loadShader", argument: shaders[i] });
+            }
+        }
+
+        //  streams
+        let streams = config.streams;
+        if (streams !== undefined) {
+            for (let i = 0; i < streams.length; i++) {
+                _apiCommand({ command: "stream", argument: streams[i] });
+            }
+        }
+
+        //  windows
+        let streamIds = config.windows;
+        if (streamIds !== undefined) {
+            for (let i = 0; i < streamIds.length; i++) {
+                _apiCommand({ command: "window", argument: streamIds[i] });
+            }
+        }
+    }
+
     let _apiConfig = function (fileName) {
         let xhr = new XMLHttpRequest();
         xhr.open("GET", fileName);
@@ -435,43 +506,7 @@ var nvis = new function () {
             if (this.status == 200 && this.responseText !== null) {
                 let jsonObject = JSON.parse(this.responseText);
                 console.log("=====  Config JSON loaded (" + fileName + ")");
-                //  convert top-level keys to lowercase
-                let config = {};
-                for (let key of Object.keys(jsonObject)) {
-                    config[key.toLowerCase()] = jsonObject[key];
-                }
-
-                //  Zoom
-                let zoom = config.zoom;
-                if (zoom !== undefined) {
-                    _apiCommand({ command: "zoom", argument: zoom });
-                }
-
-                //  shaders
-                let shaders = config.shaders;
-                if (shaders !== undefined) {
-                    for (let i = 0; i < shaders.length; i++) {
-                        _apiCommand({ command: "loadShader", argument: shaders[i] });
-                        //let shaderId = _renderer.loadShader(argument.shader);
-                    }
-                }
-
-                //  streams
-                let streams = config.streams;
-                if (streams !== undefined) {
-                    for (let i = 0; i < streams.length; i++) {
-                        _apiCommand({ command: "stream", argument: streams[i] });
-                    }
-                }
-
-                //  windows
-                let streamIds = config.windows;
-                if (streamIds !== undefined) {
-                    for (let i = 0; i < streamIds.length; i++) {
-                        // _apiWindow(streamIds[i]);
-                        _apiCommand({ command: "window", argument: streamIds[i] });
-                    }
-                }
+                _parseConfig(jsonObject);
             }
         };
         xhr.send();
@@ -1106,6 +1141,29 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
 
+    class NvisSegmentDrawer extends NvisDraw {
+
+        constructor(glContext) {
+            super(glContext, "trianglestrip");
+
+            this.color = { r: 0.8, g: 0.8, b: 0.8, a: 1.0 };
+
+        }
+
+        addVertex(position, color = { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }) {
+            super.addVertex(position, color);
+        }
+
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
     class NvisGridDrawer extends NvisDraw {
 
         constructor(glContext) {
@@ -1224,6 +1282,26 @@ var nvis = new function () {
             }
         }
     }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    class NvisAnnotation extends NvisDraw {
+
+        constructor(glContext) {
+            super(glContext, "lines");
+
+            this.color = { r: 0.8, g: 0.8, b: 0.8, a: 1.0 };
+            this.offset = { x: 0.0, y: 0.0 };  //  pixels
+            this.pixelSize = { w: 0.0, w: 0.0 };
+        }
+
+    }
+
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -1394,6 +1472,8 @@ var nvis = new function () {
                     return;
                 }
 
+                const float GridSize = 16.0;
+
                 vec4 c = texture(uSampler, vTextureCoord);
                 color = vec4(c.r, c.g, c.b, 1.0);
                 
@@ -1401,16 +1481,16 @@ var nvis = new function () {
                 if (uAlphaCheckerboard && c.a < 1.0)
                 {
                     vec2 dimensions = vec2(textureSize(uSampler, 0));
-                    float xx = (vTextureCoord.x * dimensions.x) / 16.0;
-                    float yy = (vTextureCoord.y * dimensions.y) / 16.0;
-                        vec4 gridColor = vec4(0.6, 0.6, 0.6, 1.0);
-                    if (modi(xx, 2.0) == 0.0 ^^ modi(yy, 2.0) == 0.0) {
+                    vec2 pos = (vTextureCoord * dimensions) / GridSize;
+                    float xx = pos.x;
+                    float yy = pos.y;
+                    vec4 gridColor = vec4(0.6, 0.6, 0.6, 1.0);
+                    if (modi(pos.x, 2.0) == 0.0 ^^ modi(pos.y, 2.0) == 0.0) {
                         gridColor = vec4(0.5, 0.5, 0.5, 1.0);
                     }
 
                     color = gridColor + vec4(color.rgb * color.a, 1.0);
                 }
-                //color = texture(uSampler, vTextureCoord);
             }`;
 
             this.streamFragmentSource = `#version 300 es
@@ -1426,11 +1506,9 @@ var nvis = new function () {
             {
                 color = texture(uSampler, vTextureCoord);
 
-                //  TODO: handle tonemapping with UI
-                if (false) {
-                    float invGamma = 1.0 / 2.2;
-                    float exposure = 2.0;
-
+                if (uTonemapper == 0) {
+                    float invGamma = 1.0 / uGamma;
+                    float exposure = uExposure;
                     color.r = exposure * pow(color.r, invGamma);
                     color.g = exposure * pow(color.g, invGamma);
                     color.b = exposure * pow(color.b, invGamma);
@@ -3203,9 +3281,8 @@ var nvis = new function () {
                             conditionVariable = condition.substring(bConditionNegated ? 1 : 0);
                             bConditionMet = (!bConditionNegated && object[conditionVariable].value) || (bConditionNegated && !object[conditionVariable].value);
                         }
+                        bAllConditionsMet &&= bConditionMet;
                     }
-
-                    bAllConditionsMet &&= bConditionMet;
                 }
 
                 let label = document.createElement("label");
@@ -4070,10 +4147,10 @@ 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`;
 
             let welcomeTitle = document.createElement('div');
-            welcomeTitle.innerHTML = 'Welcome to <i>nvis</i> by NVIDIA - an image (stream) visualizer!';
+            welcomeTitle.innerHTML = 'Welcome to <i>nvis</i> by NVIDIA - an image and image stream visualizer!';
 
             let welcomeText1 = document.createElement('div');
-            welcomeText1.innerHTML = 'Drag and drop image files here...';
+            welcomeText1.innerHTML = 'Drag\'n\'drop, or copy-paste, image or video files here...';
 
             let welcomeText2 = document.createElement('div');
             welcomeText2.innerHTML = '...or press L to load files with multiselect using file dialog.';
@@ -4132,6 +4209,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         clear() {
             this.streamPxDimensions = undefined;
             this.windows = [];
+            this.welcome.show();
             this.adjust();
         }
 
@@ -4631,7 +4709,6 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             this.overlay = new NvisOverlay(this.canvas);
             document.body.appendChild(this.overlay.div);
-            //this.canvas.parentNode.insertBefore(this.overlay.getNode(), this.canvas.nextSibling);
 
             this.resize({ x: 0.0, y: 0.0 }, { w: 1.0, h: 1.0 });
 
@@ -4773,6 +4850,20 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     }
                 }
             }
+
+            let uTonemapper = gl.getUniformLocation(shaderProgram, 'uTonemapper');
+            if (_settings.bGlobalTonemapping.value) {
+                gl.uniform1i(uTonemapper, _settings.tonemapper.value);
+                if (_settings.tonemapper.value == 0) {
+                    let uGamma = gl.getUniformLocation(shaderProgram, 'uGamma');
+                    gl.uniform1f(uGamma, _settings.gamma.value);
+                    let uExposure = gl.getUniformLocation(shaderProgram, 'uExposure');
+                    gl.uniform1f(uExposure, _settings.exposure.value);
+                }
+            } else {
+                gl.uniform1i(uTonemapper, -1);
+            }
+
             gl.viewport(0, 0, streamDim.w, streamDim.h);
 
             stream.setUniforms(shader);
@@ -4803,9 +4894,11 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             let uSampler = gl.getUniformLocation(shaderProgram, 'uSampler');
             gl.uniform1i(uSampler, 0);
+
             let uAlphaCheckerboard = gl.getUniformLocation(shaderProgram, 'uAlphaCheckerboard');
             gl.uniform1i(uAlphaCheckerboard, _settings.bAlphaCheckerboard.value);
 
+            //  TODO: this shouldn't be necessary, can get dimensions directly in shader
             gl.uniform2f(gl.getUniformLocation(shaderProgram, "uDimensions"), streamDim.w, streamDim.h);
 
             gl.enable(gl.BLEND);
@@ -4894,6 +4987,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             //  extensions
             this.glContext.getExtension("EXT_color_buffer_float")
+            this.glContext.getExtension('EXT_float_blend');
 
             this.windows = new NvisWindows(this.glContext, this.canvas);
             this.shaders = new NvisShaders(this.glContext);
@@ -5118,6 +5212,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 case 'Tab':  //  Tab
                     event.preventDefault();
                     if (this.uiPopup.style.display == 'none' || this.uiPopup.style.display == '') {
+                        _state.input.mouse.showInfo = false;
                         this.uiPopup.style.display = 'block';
                         this.updateUiPopup();
                     } else {
@@ -5336,7 +5431,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             //     return;
             // }
 
-            //  first try file input
+            //  first, try file input
             let files = Array.from(document.getElementById("fileInput").files);
             if (files.length == 0) {
                 //  next, paste event
@@ -5374,66 +5469,33 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 videoParser.fromBlob(files[0]);
             }
 
+            if (files[0].type.match(/application\/json/)) {
+                let reader = new FileReader();
+                reader.onload = function (event) {
+                    _parseConfig(JSON.parse(event.target.result));
+                }
+                reader.readAsText(files[0]);
+            }
+
             document.getElementById("fileInput").value = "";  //  force onchange event if same files
 
             this.canvas.style.borderColor = "black";
-
-            return;
-            for (let i = 0; i < files.length; i++) {
-                let file = files[i];
-
-                if (file.type.match(/image.*/)) {
-                    let reader = new FileReader();
-
-                    reader.onload = function (event) {
-                        let stream = _addStream(event.target.result);
-                        stream.setFileName(file.name);
-                        _windows.add(stream);
-                    }
-
-                    reader.readAsDataURL(file);
-                }
-                else if (file.type.match(/application\/json/)) {
-                    let reader = new FileReader();
-
-                    reader.onload = function (event) {
-
-                        //console.log("JSON source: " + event.target.result);
-                        let jsonObject = JSON.parse(event.target.result);
-
-                        //  convert top-level keys to lowercase
-                        let config = {};
-                        for (let key of Object.keys(jsonObject)) {
-                            config[key.toLowerCase()] = jsonObject[key];
-                        }
-                        console.log("JSON filename: " + config.filename);
-
-                        let shader = _addShader(config);
-                    }
-
-                    reader.readAsText(file);
-                }
-                else if (file.name.match(/.exr$/)) {
-                    console.log("EXR file...");
-                }
-            }
-
         }
 
         onFileDragEnter(event) {
-            console.log("onFileDragEnter()");
+            // console.log("onFileDragEnter()");
             this.canvas.style.borderColor = "green";
             this.windows.welcome.hide();
             event.preventDefault();
         }
 
         onFileDragOver(event) {
-            console.log("onFileDragOver()");
+            // console.log("onFileDragOver()");
             event.preventDefault();
         }
 
         onFileDragLeave(event) {
-            console.log("onFileDragLeave()");
+            // console.log("onFileDragLeave()");
             this.canvas.style.borderColor = "black";
             this.windows.welcome.show();
             event.preventDefault();

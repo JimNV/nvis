@@ -1,13 +1,13 @@
 {
-    "name": "Test configuration",
-    "zoom": 1.0,
+    "name": "Sponza EXR configuration",
+    "zoom": 2.0,
     "position": { "x": 0, "y": 0 },
     "streams": [
         {
             "name": "Sponza EXR",
             "window": true,
-            "files": [
-                "images/4x4.png"
+            "images": [
+                "images/sponza.exr"
             ]
         }
     ]
