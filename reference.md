@@ -16,16 +16,20 @@ Tab - open user interface, to manipulate settings, streams, and shaders
 
 ```
 nvis.zoom(<value>) - Set zoom level to <value> (default: 1.0)
+    Example:  nvis.zoom(2.0);  //  Set zoom level to 2.0
 
-nvis.config()
+nvis.config(<filename>) - Load config file named <filename>
+    Example:  nvis.config("test.json");  //  Load config file named "test.json"
 
-nvis.stream()
+nvis.stream(<filename> | "[" <filename>+ "]", window = true) - Load stream of single or multiple image files
+    Examples:  nvis.stream("image.png");  //  Load image "image.png" to single stream, and open a window for it
+               nvis.stream([ "ref/img.0000.exr", "ref/img.0001.exr", "ref/img.0002.exr" ], false);  //  Load three EXR images to stream, and do not open a window for it
 
-nvis.shader()
+nvis.shader(<filename>, "[" <input stream id]>+ "]", window = true)
 
-nvis.generator()
+nvis.generator(<filename>, <width>, <height>, window = true)
 
-nvis.video()
+nvis.video(<filename>)
 ```
 
 ## Configuration

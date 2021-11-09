@@ -438,6 +438,10 @@ var nvis = new function () {
         return _apiCommand({ command: "zoom", argument: level })
     }
 
+    let _apiAnnotation = function (windowId, type, parameters) {
+        return _apiCommand({ command: "annotation", argument: { windowId: windowId, type: type, parameters: parameters }});
+    }
+
     let _apiStream = function (images, bWindow = true) {
         images = (Array.isArray(images) ? images : [images]);
         return _apiCommand({ command: "stream", argument: { name: images[0], images: images, window: bWindow } });
@@ -527,6 +531,8 @@ var nvis = new function () {
             _state.zoom.level = Math.min(Math.max(argument, 1.0), 256.0);
             _renderer.windows.updateTextureCoordinates();
             return _state.zoom.level;
+        } else if (command == "annotation") {
+            _renderer.windows.addAnnotation(argument.windowId, argument.type, argument.parameters);
         } else if (command == "video") {
             // let frames = new NvisVideoParser(argument.fileName, (frames) => _renderer.setupVideo(frames));
             let videoParser = new NvisVideoParser((frames) => _renderer.setupVideo(frames));
@@ -992,6 +998,9 @@ var nvis = new function () {
                 case "trianglefan":
                     this.mode = this.glContext.TRIANGLE_FAN;
                     break;
+                case "widelineloop":  //  our own, used for wide lines
+                    this.mode = this.glContext.TRIANGLE_STRIP;
+                    break;
                 case "lines":
                 default:
                     this.mode = this.glContext.LINES;
@@ -1078,6 +1087,9 @@ var nvis = new function () {
             this.numVertices++;
         }
 
+        //  TODO: implement
+        addQuad(position, nextPosition, width, color = { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }) {
+        }
 
         addSegmentLine(v0, v1, segments, colors, bInterpolated = false) {
             let dx = (v1.x - v0.x) / segments;
@@ -1289,19 +1301,160 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-
+    
     class NvisAnnotation extends NvisDraw {
 
-        constructor(glContext) {
-            super(glContext, "lines");
+        constructor(glContext, type, parameters = {}) {
+            if (type == "arrow") {
+                super(glContext, "trianglefan");
+            } else if (type == "circle") {
+                super(glContext, "trianglestrip");
+            }
 
-            this.color = { r: 0.8, g: 0.8, b: 0.8, a: 1.0 };
-            this.offset = { x: 0.0, y: 0.0 };  //  pixels
-            this.pixelSize = { w: 0.0, w: 0.0 };
+            this.type = type;
+
+            this.position = parameters.position;
+            this.color = (parameters.color === undefined ? { r: 1.0, g: 0.0, b: 0.0, a: 1.0 } : parameters.color);
+            this.size = (parameters.size === undefined ? 0.1 : parameters.size);
+            this.rotation = (parameters.rotation === undefined ? 30 : parameters.rotation);
+            this.radius = (parameters.radius === undefined ? 10.0 : parameters.radius);
+            this.width = (parameters.width === undefined ? 3.0 : parameters.width);
+        }
+
+        pixelSize(canvas) {
+            let layout = _state.layout;
+            let z = _state.zoom.level;
+            let layoutDims = layout.getDimensions();
+            let winDim = { w: canvas.width / layoutDims.w, h: canvas.height / layoutDims.h };
+
+            let pixelSize = {
+                w: z / (winDim.w * layoutDims.w),
+                h: z / (winDim.h * layoutDims.h)
+            }
+
+            return pixelSize;
+        }
+
+        streamPxToTextureCoords(pos, windowId, canvas, stream) {
+            let layout = _state.layout;
+            let layoutDims = layout.getDimensions();
+            let winDim = { w: canvas.width / layoutDims.w, h: canvas.height / layoutDims.h };
+
+            let z = _state.zoom.level;
+            let sd = stream.getDimensions();
+            let ww = winDim.w;
+            let wh = winDim.h;
+
+            let so = _state.zoom.streamOffset;
+
+            let pixelSize = {
+                w: z / (ww * layoutDims.w),
+                h: z / (wh * layoutDims.h)
+            }
+
+            let offset = {
+                x: (pos.x - so.x * sd.w - 0.5) * pixelSize.w,
+                y: (pos.y - so.y * sd.h - 0.5) * pixelSize.h,
+            }
+
+            // if (pos.x * pixelSize.w > ) {
+            //     offset = undefined;
+            // }
+
+            return offset;
+        }
+
+        rotate(point, alphaDegrees) {
+            let alpha = -alphaDegrees * (Math.PI / 180);
+            let cosAlpha = Math.cos(alpha);
+            let sinAlpha = Math.sin(alpha);
+            return { x: point.x * cosAlpha - point.y * sinAlpha, y: point.x * sinAlpha + point.y * cosAlpha };
+        }
+
+        update(canvas, stream) {
+            let p = this.streamPxToTextureCoords(this.position, 0, canvas, stream);
+            // console.log(JSON.stringify(p));
+
+            this.clear();
+            if (this.type == "arrow") {
+                let s = this.size;
+                let r0 = this.rotate({ x: s, y: s }, this.rotation);
+                let r1 = this.rotate({ x: s, y: s * 0.5 }, this.rotation);
+                let r2 = this.rotate({ x: s * 3.0, y: s * 0.5 }, this.rotation);
+                let r3 = this.rotate({ x: s * 3.0, y: -s * 0.5 }, this.rotation);
+                let r4 = this.rotate({ x: s, y: -s * 0.5 }, this.rotation);
+                let r5 = this.rotate({ x: s, y: -s }, this.rotation);
+                this.addVertex(p, this.color);
+                // this.addVertex({ x: p.x + s, y: p.y + s }, this.color);
+                // this.addVertex({ x: p.x + s, y: p.y + s * 0.5 }, this.color);
+                // this.addVertex({ x: p.x + s * 3.0, y: p.y + s * 0.5 }, this.color);
+                // this.addVertex({ x: p.x + s * 3.0, y: p.y - s * 0.5 }, this.color);
+                // this.addVertex({ x: p.x + s, y: p.y - s * 0.5 }, this.color);
+                // this.addVertex({ x: p.x + s, y: p.y - s }, this.color);
+                //console.log(JSON.stringify(r0));
+                this.addVertex({ x: p.x + r0.x, y: p.y + r0.y }, this.color);
+                this.addVertex({ x: p.x + r1.x, y: p.y + r1.y }, this.color);
+                this.addVertex({ x: p.x + r2.x, y: p.y + r2.y }, this.color);
+                this.addVertex({ x: p.x + r3.x, y: p.y + r3.y }, this.color);
+                this.addVertex({ x: p.x + r4.x, y: p.y + r4.y }, this.color);
+                this.addVertex({ x: p.x + r5.x, y: p.y + r5.y }, this.color);
+
+            } else if (this.type == "circle") {
+
+                let ps = this.pixelSize(canvas);
+                let r = ps.w * this.radius;
+                let w = ps.w * (this.radius + this.width);
+
+                let steps = 30;
+                let alphaStep = 360 / steps;
+                let ss = { x: 1.0, y: 0 };
+                for (let i = 0; i < steps; i++) {
+                    let rv = this.rotate(ss, i * alphaStep);
+                    let p0 = { x: p.x + r * rv.x, y: p.y + r * rv.y };
+                    let p1 = { x: p.x + w * rv.x, y: p.y + w * rv.y };
+                    // console.log("p0: " + JSON.stringify(p0));
+                    // console.log("p1: " + JSON.stringify(p1));
+                    this.addVertex(p0, this.color);
+                    this.addVertex(p1, this.color);
+                }
+                this.addVertex({ x: p.x + r, y: p.y }, this.color)
+                this.addVertex({ x: p.x + w, y: p.y }, this.color)
+
+            } else if (this.type == "rectangle") {
+
+            }
+
         }
 
     }
 
+    class NvisAnnotations {
+
+        constructor(glContext, canvas) {
+            this.glContext = glContext;
+            this.canvas = canvas;
+            
+            this.annotations = [];
+        }
+
+        add(type, parameters) {
+            let annotation = new NvisAnnotation(this.glContext, type, parameters);
+            this.annotations.push(annotation);
+        }
+
+        update(stream) {
+            for (let annotationId = 0; annotationId < this.annotations.length; annotationId++) {
+                this.annotations[annotationId].update(this.canvas, stream);
+            }
+        }
+
+        render(stream) {
+            this.update(stream);
+            for (let annotationId = 0; annotationId < this.annotations.length; annotationId++) {
+                this.annotations[annotationId].render();
+            }
+        }
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -2998,8 +3151,6 @@ var nvis = new function () {
                 } while (numBits < 15);
             }
 
-            // if ((bitBuffer.bytePointer * 8 + bitBuffer.bitPointer) - 6664 == 9196)
-            //     console.log("Here... " + ((bitBuffer.bytePointer * 8 + bitBuffer.bitPointer) - 6664));
             let lookupIndex = bitBuffer.readBits(TINFL_FAST_LOOKUP_BITS, true);
             let temp = huffmanTable.lookUp[lookupIndex];
             if (temp >= 0) {
@@ -4214,6 +4365,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
 
+        addAnnotation(windowId, type, parameters) {
+            this.windows[windowId].annotations.add(type, parameters);
+        }
+
         insideWindow(canvasPxCoords) {
             return !(canvasPxCoords.x < 0 || canvasPxCoords.x >= this.canvas.width || canvasPxCoords.y < 0 || canvasPxCoords.y >= this.canvas.height);
         }
@@ -4683,6 +4838,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.gridDrawer = new NvisGridDrawer(this.glContext);
             this.pixelDrawer = new NvisPixelDrawer(this.glContext);
 
+            this.annotations = new NvisAnnotations(this.glContext, this.canvas);
+
             this.position = { x: 0, y: 0 };
             this.dimensions = { w: 0, h: 0 };
 
@@ -4907,39 +5064,39 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
 
-            if (!_settings.bDrawGrid.value) {
-                return;
+            if (_settings.bDrawGrid.value) {
+
+                //  TODO: move elsewhere?
+                let layout = _state.layout;
+                let layoutDims = layout.getDimensions();
+                let winDim = { w: this.canvas.width / layoutDims.w, h: this.canvas.height / layoutDims.h };
+
+                let z = _state.zoom.level;
+                let sw = streamDim.w;
+                let sh = streamDim.h;
+                let ww = winDim.w;
+                let wh = winDim.h;
+
+                let pixelSize = {
+                    w: z / (ww * layoutDims.w),
+                    h: z / (wh * layoutDims.h)
+                }
+                let isw = 1.0 / sw;
+                let ish = 1.0 / sh;
+                let offset = {
+                    x: (isw - (_state.zoom.streamOffset.x % isw)) * (sw * pixelSize.w),
+                    y: (ish - (_state.zoom.streamOffset.y % ish)) * (sh * pixelSize.h),
+                }
+
+                if (z > 10.0) {
+                    let alpha = Math.min(1.0, (z - 16.0) / 16.0);
+
+                    this.gridDrawer.update(windowId, offset, pixelSize, alpha);
+                    this.gridDrawer.render();
+                }
             }
 
-            //  TODO: move elsewhere?
-            let layout = _state.layout;
-            let layoutDims = layout.getDimensions();
-            let winDim = { w: this.canvas.width / layoutDims.w, h: this.canvas.height / layoutDims.h };
-
-            let z = _state.zoom.level;
-            let sw = streamDim.w;
-            let sh = streamDim.h;
-            let ww = winDim.w;
-            let wh = winDim.h;
-
-            let pixelSize = {
-                w: z / (ww * layoutDims.w),
-                h: z / (wh * layoutDims.h)
-            }
-            let isw = 1.0 / sw;
-            let ish = 1.0 / sh;
-            let offset = {
-                x: (isw - (_state.zoom.streamOffset.x % isw)) * (sw * pixelSize.w),
-                y: (ish - (_state.zoom.streamOffset.y % ish)) * (sh * pixelSize.h),
-            }
-
-            if (z > 10.0) {
-                let alpha = Math.min(1.0, (z - 16.0) / 16.0);
-
-                this.gridDrawer.update(windowId, offset, pixelSize, alpha);
-                this.gridDrawer.render();
-            }
-
+            this.annotations.render(stream);
         }
 
 
@@ -5735,6 +5892,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
     return {
         clear: _apiClear,
         zoom: _apiZoom,
+        annotation: _apiAnnotation,
         stream: _apiStream,
         shader: _apiShader,
         generator: _apiGenerator,
