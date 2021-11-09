@@ -14,6 +14,7 @@ Tab - open user interface, to manipulate settings, streams, and shaders
 
 ## API
 
+A normal and minimal landing page that invokes *nvis* is the following:
 ```<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -29,6 +30,7 @@ Tab - open user interface, to manipulate settings, streams, and shaders
 </body>
 </html>
 ```
+Each API command is one of the following:
 ```
 nvis.zoom(<value>) - Set zoom level to <value> (default: 1.0)
     Example:  nvis.zoom(2.0);  //  Set zoom level to 2.0
