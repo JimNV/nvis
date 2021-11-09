@@ -14,6 +14,21 @@ Tab - open user interface, to manipulate settings, streams, and shaders
 
 ## API
 
+```<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>nvis</title>
+    <meta charset="utf-8" />
+    <script type="text/javascript" src="js/nvis.js"></script>
+</head>
+<body>
+    <script>
+        [API command]
+        ...
+    </script>
+</body>
+</html>
+```
 ```
 nvis.zoom(<value>) - Set zoom level to <value> (default: 1.0)
     Example:  nvis.zoom(2.0);  //  Set zoom level to 2.0
