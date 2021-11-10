@@ -47,6 +47,11 @@ nvis.shader(<filename>, "[" <input stream id]>+ "]", window = true)
 nvis.generator(<filename>, <width>, <height>, window = true)
 
 nvis.video(<filename>)
+
+nvis.annotation(<window id>, <parameter object>) - Add annotation to a stream window
+    Examples:  nvis.annotation(0, "arrow", { position: { x: 1, y: 1 }, color: { r: 1.0, g: 0.5, b: 0.2 }, size: 10, rotation: 330, zoom: true })
+               nvis.annotation(0, "circle", { position: { x: 10, y: 10 }, radius: 5, width: 1 });
+
 ```
 
 ## Configuration
