@@ -48,6 +48,14 @@ To create a static *nvis* page with streams and shaders, insert API commands wit
 </body>
 ```
 
+## Resources
+
+* [Technical Introduction to OpenEXR](https://openexr.readthedocs.io/en/latest/TechnicalIntroduction.html)
+* [OpenEXR File Layout](https://openexr.readthedocs.io/en/latest/OpenEXRFileLayout.html)
+* [tinyexr](https://github.com/syoyo/tinyexr)
+* [pako - a zlib port to javascript](https://github.com/nodeca/pako)
+* [video-to-frames](https://github.com/bertyhell/video-to-frames)
+
 ## Copyright
 
 **Copyright 2021 NVIDIA Corporation**
