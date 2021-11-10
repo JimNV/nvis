@@ -10,6 +10,20 @@
 Tab - open user interface, to manipulate settings, streams, and shaders
 'h' - hold to show the list of keyboard shortcut commands
 'o' - open file input dialog
+Space - toggle animation
+'p' - toggle ping-pong during animation
+Arrow Left/Right - step one frame forward/backwards
+Arrow Up/Down - step between streams in the current window (under cursor)
+'g' - toggle display of pixel grid when zoomed in
+'d' - delete the window under the cursor
+'w' - add a new window
+'l' - open file load dialog
+'i' - toggle per-pixel information
+'a' - toggle automatic layout of windows
+'+'/'-' - increase/decrease the window layout width
+
+Mouse Scroll - zoom in/out
+Left mouse button - translate stream(s) in window(s)
 ```
 
 ## API
