@@ -20,7 +20,7 @@ Python - a version that supports `http.server`
 
 ## Details
 
-See [Reference Manual](https://github.com/JimNV/nvis/edit/main/reference.md) for all options.
+See [Reference Manual](https://github.com/JimNV/nvis/blob/main/reference.md) for all options.
 
 A minimal HTML file (e.g., `index.html`) to start *nvis* is the following:
 
