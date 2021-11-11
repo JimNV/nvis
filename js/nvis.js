@@ -852,104 +852,108 @@ var nvis = new function () {
             }
         }
 
-        let _getDOM = function (streamId) {
-            _dom = document.createDocumentFragment();
+        // let _getDOM = function (streamId) {
+        //     _dom = document.createDocumentFragment();
 
-            let table = document.createElement("table");
-            table.style.marginLeft = "50px";
+        //     let table = document.createElement("table");
+        //     table.style.marginLeft = "50px";
 
-            for (let key of Object.keys(_object)) {
-                let label = document.createElement("label");
-                label.setAttribute("for", key);
-                label.innerHTML = _object[key].name;
+        //     for (let key of Object.keys(_object)) {
+        //         let label = document.createElement("label");
+        //         label.setAttribute("for", key);
+        //         label.innerHTML = _object[key].name;
 
-                let elementId = (key + "-" + streamId);  //  need uniqueness
+        //         let elementId = (key + "-" + streamId);  //  need uniqueness
 
-                let callbackString = "nvis.streamUpdateParameter(" + streamId + ", \"" + elementId + "\")";
+        //         let callbackString = "nvis.streamUpdateParameter(" + streamId + ", \"" + elementId + "\")";
 
-                let row = document.createElement("tr");
+        //         let row = document.createElement("tr");
 
-                let el = undefined;
-                let type = _object[key].type;
-                if (type == "bool" || type == "int" || type == "float") {
-                    el = document.createElement("input");
-                    el.setAttribute("id", elementId);
+        //         let el = undefined;
+        //         let type = _object[key].type;
+        //         if (type == "bool" || type == "int" || type == "float") {
+        //             el = document.createElement("input");
+        //             el.setAttribute("id", elementId);
 
-                    if (type == "bool") {
-                        el.setAttribute("type", "checkbox");
-                        if (_object[key].value) {
-                            el.setAttribute("checked", true);
-                        }
-                        else {
-                            el.removeAttribute("checked");
-                        }
-                        el.setAttribute("onclick", callbackString);
-                    } else if (type == "int") {
-                        el.setAttribute("type", "range");
-                        el.setAttribute("min", (_object[key].min ? _object[key].min : 0));
-                        el.setAttribute("max", (_object[key].max ? _object[key].max : 1));
-                        el.setAttribute("value", (_object[key].value ? _object[key].value : 0));
-                        el.setAttribute("step", (_object[key].step ? _object[key].step : 1));
-                        el.setAttribute("oninput", callbackString);
-                        let oEl = document.createElement("span");
-                        oEl.id = (elementId + "-value");
-                        oEl.innerHTML = (oEl.innerHTML == "" ? _object[key].value : oEl.innerHTML);
-                        //console.log("oEL: '" + oEl.innerHTML + "'");
-                        label.innerHTML += " (" + oEl.outerHTML + ")";
-                    } else if (type == "float") {
-                        el.setAttribute("type", "range");
-                        el.setAttribute("min", (_object[key].min ? _object[key].min : 0.0));
-                        el.setAttribute("max", (_object[key].max ? _object[key].max : 1.0));
-                        el.setAttribute("value", (_object[key].value ? _object[key].value : 0.0));
-                        el.setAttribute("step", (_object[key].step ? _object[key].step : 0.1));
-                        el.setAttribute("oninput", callbackString);
-                        let oEl = document.createElement("span");
-                        oEl.id = (elementId + "-value");
-                        oEl.innerHTML = (oEl.innerHTML == "" ? _object[key].value : oEl.innerHTML);
-                        //console.log("oEL: '" + oEl.innerHTML + "'");
-                        label.innerHTML += " (" + oEl.outerHTML + ")";
-                    }
-                }
-                else if (type == "dropdown") {
-                    el = document.createElement("select");
-                    el.setAttribute("id", elementId);
-                    el.setAttribute("onchange", callbackString);
-                    for (let optionId = 0; optionId < _object[key].alternatives.length; optionId++) {
-                        let oEl = document.createElement("option");
-                        if (_object[key].value == optionId) {
-                            oEl.setAttribute("selected", true);
-                        }
-                        //oEl.setAttribute("value", _object[key].alternatives[optionId].value);
-                        oEl.innerHTML = _object[key].alternatives[optionId];
-                        el.appendChild(oEl);
-                    }
-                }
+        //             if (type == "bool") {
+        //                 el.setAttribute("type", "checkbox");
+        //                 if (_object[key].value) {
+        //                     el.setAttribute("checked", true);
+        //                 }
+        //                 else {
+        //                     el.removeAttribute("checked");
+        //                 }
+        //                 // el.setAttribute("onclick", callbackString);
+        //                 el.addEventListener('click', () => callbackString);
+        //             } else if (type == "int") {
+        //                 el.setAttribute("type", "range");
+        //                 el.setAttribute("min", (_object[key].min ? _object[key].min : 0));
+        //                 el.setAttribute("max", (_object[key].max ? _object[key].max : 1));
+        //                 el.setAttribute("value", (_object[key].value ? _object[key].value : 0));
+        //                 el.setAttribute("step", (_object[key].step ? _object[key].step : 1));
+        //                 // el.setAttribute("oninput", callbackString);
+        //                 el.addEventListener("input", () => callbackString);
+        //                 let oEl = document.createElement("span");
+        //                 oEl.id = (elementId + "-value");
+        //                 oEl.innerHTML = (oEl.innerHTML == "" ? _object[key].value : oEl.innerHTML);
+        //                 //console.log("oEL: '" + oEl.innerHTML + "'");
+        //                 label.innerHTML += " (" + oEl.outerHTML + ")";
+        //             } else if (type == "float") {
+        //                 el.setAttribute("type", "range");
+        //                 el.setAttribute("min", (_object[key].min ? _object[key].min : 0.0));
+        //                 el.setAttribute("max", (_object[key].max ? _object[key].max : 1.0));
+        //                 el.setAttribute("value", (_object[key].value ? _object[key].value : 0.0));
+        //                 el.setAttribute("step", (_object[key].step ? _object[key].step : 0.1));
+        //                 // el.setAttribute("oninput", callbackString);
+        //                 el.addEventListener('input', () => callbackString);
+        //                 let oEl = document.createElement("span");
+        //                 oEl.id = (elementId + "-value");
+        //                 oEl.innerHTML = (oEl.innerHTML == "" ? _object[key].value : oEl.innerHTML);
+        //                 //console.log("oEL: '" + oEl.innerHTML + "'");
+        //                 label.innerHTML += " (" + oEl.outerHTML + ")";
+        //             }
+        //         }
+        //         else if (type == "dropdown") {
+        //             el = document.createElement("select");
+        //             el.setAttribute("id", elementId);
+        //             // el.setAttribute("onchange", callbackString);
+        //             el.addEventListener('change', () => callbackString);
+        //             for (let optionId = 0; optionId < _object[key].alternatives.length; optionId++) {
+        //                 let oEl = document.createElement("option");
+        //                 if (_object[key].value == optionId) {
+        //                     oEl.setAttribute("selected", true);
+        //                 }
+        //                 //oEl.setAttribute("value", _object[key].alternatives[optionId].value);
+        //                 oEl.innerHTML = _object[key].alternatives[optionId];
+        //                 el.appendChild(oEl);
+        //             }
+        //         }
 
-                if (el !== undefined) {
-                    if (type == "bool") {
-                        let cell = document.createElement("td");
-                        cell.setAttribute("multicolumn", 2);
-                        cell.innerHTML = el.outerHTML + label.outerHTML;
+        //         if (el !== undefined) {
+        //             if (type == "bool") {
+        //                 let cell = document.createElement("td");
+        //                 cell.setAttribute("multicolumn", 2);
+        //                 cell.innerHTML = el.outerHTML + label.outerHTML;
 
-                        row.appendChild(cell);
-                    } else {
-                        let elCell = document.createElement("td");
-                        elCell.innerHTML = el.outerHTML;
-                        let labelCell = document.createElement("td");
-                        labelCell.innerHTML = label.outerHTML;
+        //                 row.appendChild(cell);
+        //             } else {
+        //                 let elCell = document.createElement("td");
+        //                 elCell.innerHTML = el.outerHTML;
+        //                 let labelCell = document.createElement("td");
+        //                 labelCell.innerHTML = label.outerHTML;
 
-                        row.appendChild(elCell);
-                        row.appendChild(labelCell);
-                    }
+        //                 row.appendChild(elCell);
+        //                 row.appendChild(labelCell);
+        //             }
 
-                    table.appendChild(row);
-                }
-            }
+        //             table.appendChild(row);
+        //         }
+        //     }
 
-            _dom.appendChild(table);
+        //     _dom.appendChild(table);
 
-            return _dom;
-        }
+        //     return _dom;
+        // }
 
         let _toFragment = function () {
 
@@ -959,7 +963,7 @@ var nvis = new function () {
             get: _get,
             update: _update,
             setUniforms: _setUniforms,
-            getDOM: _getDOM,
+            // getDOM: _getDOM,
         }
     }
 
@@ -1353,10 +1357,11 @@ var nvis = new function () {
             }
 
             let offset = {
-                x: (pos.x - so.x * sd.w - 0.5) * pixelSize.w,
-                y: (pos.y - so.y * sd.h - 0.5) * pixelSize.h,
+                x: (pos.x - so.x * sd.w + 0.5) * pixelSize.w,
+                y: (pos.y - so.y * sd.h + 0.5) * pixelSize.h,
             }
 
+            //  TODO: check windowId
             // if (pos.x * pixelSize.w > ) {
             //     offset = undefined;
             // }
@@ -1371,13 +1376,16 @@ var nvis = new function () {
             return { x: point.x * cosAlpha - point.y * sinAlpha, y: point.x * sinAlpha + point.y * cosAlpha };
         }
 
-        update(canvas, stream) {
+        update(canvas, stream, bZoom) {
             let p = this.streamPxToTextureCoords(this.position, 0, canvas, stream);
             // console.log(JSON.stringify(p));
+            let ar = (canvas.width / canvas.height);
+            let ps = this.pixelSize(canvas);
 
             this.clear();
             if (this.type == "arrow") {
                 let s = this.size;
+                s *= ps.w;
                 let r0 = this.rotate({ x: s, y: s }, this.rotation);
                 let r1 = this.rotate({ x: s, y: s * 0.5 }, this.rotation);
                 let r2 = this.rotate({ x: s * 3.0, y: s * 0.5 }, this.rotation);
@@ -1385,31 +1393,29 @@ var nvis = new function () {
                 let r4 = this.rotate({ x: s, y: -s * 0.5 }, this.rotation);
                 let r5 = this.rotate({ x: s, y: -s }, this.rotation);
                 this.addVertex(p, this.color);
-                // this.addVertex({ x: p.x + s, y: p.y + s }, this.color);
-                // this.addVertex({ x: p.x + s, y: p.y + s * 0.5 }, this.color);
-                // this.addVertex({ x: p.x + s * 3.0, y: p.y + s * 0.5 }, this.color);
-                // this.addVertex({ x: p.x + s * 3.0, y: p.y - s * 0.5 }, this.color);
-                // this.addVertex({ x: p.x + s, y: p.y - s * 0.5 }, this.color);
-                // this.addVertex({ x: p.x + s, y: p.y - s }, this.color);
-                //console.log(JSON.stringify(r0));
-                this.addVertex({ x: p.x + r0.x, y: p.y + r0.y }, this.color);
-                this.addVertex({ x: p.x + r1.x, y: p.y + r1.y }, this.color);
-                this.addVertex({ x: p.x + r2.x, y: p.y + r2.y }, this.color);
-                this.addVertex({ x: p.x + r3.x, y: p.y + r3.y }, this.color);
-                this.addVertex({ x: p.x + r4.x, y: p.y + r4.y }, this.color);
-                this.addVertex({ x: p.x + r5.x, y: p.y + r5.y }, this.color);
+                this.addVertex({ x: p.x + r0.x, y: p.y + r0.y * ar }, this.color);
+                this.addVertex({ x: p.x + r1.x, y: p.y + r1.y * ar }, this.color);
+                this.addVertex({ x: p.x + r2.x, y: p.y + r2.y * ar }, this.color);
+                this.addVertex({ x: p.x + r3.x, y: p.y + r3.y * ar }, this.color);
+                this.addVertex({ x: p.x + r4.x, y: p.y + r4.y * ar }, this.color);
+                this.addVertex({ x: p.x + r5.x, y: p.y + r5.y * ar }, this.color);
 
             } else if (this.type == "circle") {
 
-                let ps = this.pixelSize(canvas);
-                let r = ps.w * this.radius;
-                let w = ps.w * (this.radius + this.width);
+                let r = this.radius;
+                let w = (this.radius + this.width);
+
+                if (!this.zoom) {
+                    r *= ps.w;
+                    w *= ps.w;
+                }
 
                 let steps = 30;
                 let alphaStep = 360 / steps;
                 let ss = { x: 1.0, y: 0 };
                 for (let i = 0; i < steps; i++) {
                     let rv = this.rotate(ss, i * alphaStep);
+                    rv.y = ar * rv.y;
                     let p0 = { x: p.x + r * rv.x, y: p.y + r * rv.y };
                     let p1 = { x: p.x + w * rv.x, y: p.y + w * rv.y };
                     // console.log("p0: " + JSON.stringify(p0));
@@ -2616,7 +2622,7 @@ var nvis = new function () {
             let numOffsets = dataWindowBox.yMax - dataWindowBox.yMin + 1;
             let compression = this.attributes["compression"].value;
 
-            //  TODO: implement missing compresion methods
+            //  TODO: implement missing compression methods
             if (compression != EXR_NO_COMPRESSION && compression != EXR_ZIP_COMPRESSION) {
                 alert("EXR compression method not implemented!");
                 this.bSuccess = false;
@@ -3079,15 +3085,21 @@ var nvis = new function () {
                 }
 
                 //  EXR postprocess for ZIP and RLE
-                let numChunks = this.dimensions.h / this.scanLinesPerChunk;
-                let chunkSize = this.scanLinesPerChunk * this.dimensions.w * this.pixelSize;
-                let halfChunkSize = Math.floor((chunkSize + 1) / 2);
-                let tmpBuffer = new NvisBitBuffer(new ArrayBuffer(chunkSize));
+                let numChunks = Math.round(this.dimensions.h / this.scanLinesPerChunk);
+                let trailingScanLines = this.dimensions.h % this.scanLinesPerChunk;
+                let trailingChunkSize = trailingScanLines * this.dimensions.w * this.pixelSize;
+                let baseChunkSize = this.scanLinesPerChunk * this.dimensions.w * this.pixelSize;
+                let baseHalfChunkSize = Math.floor((baseChunkSize + 1) / 2);
+                let tmpBuffer = new NvisBitBuffer(new ArrayBuffer(baseChunkSize));
 
                 for (let chunkId = 0; chunkId < numChunks; chunkId++) {
 
                     //  predictor
-                    let chunkIndex = chunkId * chunkSize;
+                    let chunkIndex = chunkId * baseChunkSize;
+
+                    let chunkSize = (chunkId == numChunks - 1 ? trailingChunkSize : baseChunkSize);
+                    let halfChunkSize = Math.floor((chunkSize + 1) / 2);
+
                     for (let i = chunkIndex + 1; i < chunkIndex + chunkSize; i++) {
                         let d = this.outputBuffer.getUint8(i - 1) + this.outputBuffer.getUint8(i) - 128;
                         this.outputBuffer.setUint8(i, d);
@@ -3103,7 +3115,7 @@ var nvis = new function () {
                         srcIndex++;
                     }
 
-                    this.outputBuffer.copy(tmpBuffer, chunkIndex);
+                    this.outputBuffer.copy(tmpBuffer, chunkIndex, chunkSize);
                 }
                 return;
             }
@@ -3221,6 +3233,16 @@ var nvis = new function () {
             }
 
             if (attrib.type == "chromaticities") {
+                attrib.values = {
+                    redX: b.readFloat32(),
+                    redY: b.readFloat32(),
+                    greenX: b.readFloat32(),
+                    greenY: b.readFloat32(),
+                    blueX: b.readFloat32(),
+                    blueY: b.readFloat32(),
+                    whiteX: b.readFloat32(),
+                    whiteY: b.readFloat32(),
+                };
             }
 
             if (attrib.type == "compression") {
@@ -3250,6 +3272,12 @@ var nvis = new function () {
             if (attrib.type == "m33f") {
             }
             if (attrib.type == "m44f") {
+                attrib.values = [];
+                for (let y = 0; y < 4; y++) {
+                    for (let x = 0; x < 4; x++) {
+                        attrib.values.push(b.readFloat32());
+                    }
+                }
             }
             if (attrib.type == "preview") {
             }
@@ -3381,13 +3409,13 @@ var nvis = new function () {
         }
 
         createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI = true) {
-            let callbackString = "nvis.uiUpdateParameter(\"" + uniqueId + "\", \"" + elementId + "\", \"" + rowId + "\", " + bAllConditionsMet + ", " + bUpdateUI + ")";
+            let callbackString = 'nvis.uiUpdateParameter("' + uniqueId + '", "' + elementId + '", "' + rowId + '", ' + bAllConditionsMet + ', ' + bUpdateUI + ')';
             //console.log(callbackString);
             return callbackString;
         }
 
         createConfirmCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI = true) {
-            let callbackString = "if (confirm('Are you sure?')) " + this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI); //"nvis.uiUpdateParameter(\"" + uniqueId + "\", \"" + elementId + "\", \"" + rowId + "\", " + bAllConditionsMet + ", " + bUpdateUI + ")";
+            let callbackString = 'if (confirm("Are you sure?")) ' + this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI); //"nvis.uiUpdateParameter(\"" + uniqueId + "\", \"" + elementId + "\", \"" + rowId + "\", " + bAllConditionsMet + ", " + bUpdateUI + ")";
             //console.log(callbackString);
             return callbackString;
         }
@@ -3398,8 +3426,8 @@ var nvis = new function () {
 
             this.dom = document.createDocumentFragment();
 
-            let table = document.createElement("table");
-            //table.className = "uiTable";
+            let table = document.createElement('table');
+            //table.className = 'uiTable';
 
             for (let key of Object.keys(object)) {
 
@@ -3407,23 +3435,23 @@ var nvis = new function () {
                 let bAllConditionsMet = true;
 
                 let bConditionNegated = false;
-                let conditionVariable = "";
-                let conditionValue = "";
+                let conditionVariable = '';
+                let conditionValue = '';
 
                 let conditionString = object[key].condition;
                 if (conditionString !== undefined) {
                     conditionString = conditionString.replace(/\s+/g, '');
-                    let conditionStrings = conditionString.split("&");
+                    let conditionStrings = conditionString.split('&');
                     for (let i = 0; i < conditionStrings.length; i++) {
                         let condition = conditionStrings[i];
 
-                        let equalPosition = condition.lastIndexOf("=");
+                        let equalPosition = condition.lastIndexOf('=');
                         if (equalPosition != -1) {
                             //  numeric conditional
-                            bConditionNegated = (condition[equalPosition - 1] == "!");
+                            bConditionNegated = (condition[equalPosition - 1] == '!');
                             conditionVariable = condition.substring(0, equalPosition - 1);
                             conditionValue = condition.substring(equalPosition + 1);
-                            let conditionValues = conditionValue.split(",");
+                            let conditionValues = conditionValue.split(',');
                             bConditionMet = conditionValues.includes(object[conditionVariable].value.toString())
                             bConditionMet = (bConditionNegated ? !bConditionMet : bConditionMet);
                         } else {
@@ -3436,95 +3464,101 @@ var nvis = new function () {
                     }
                 }
 
-                let label = document.createElement("label");
-                label.setAttribute("for", key);
+                let label = document.createElement('label');
+                label.setAttribute('for', key);
                 label.innerHTML = object[key].name;
 
-                let elementId = (uniqueId + "-" + key);  //  need uniqueness
-                let rowId = elementId + "-row";
+                let elementId = (uniqueId + '-' + key);  //  need uniqueness
+                let rowId = elementId + '-row';
 
-                let row = document.createElement("tr");
-                row.setAttribute("id", rowId);
-                row.style.display = (bAllConditionsMet ? "" : "none");
+                let row = document.createElement('tr');
+                row.setAttribute('id', rowId);
+                row.style.display = (bAllConditionsMet ? '' : 'none');
 
                 let el = undefined;
                 let type = object[key].type;
-                if (type == "bool" || type == "int" || type == "float") {
-                    el = document.createElement("input");
-                    el.setAttribute("id", elementId);
+                if (type == 'bool' || type == 'int' || type == 'float') {
+                    el = document.createElement('input');
+                    el.setAttribute('id', elementId);
 
-                    if (type == "bool") {
-                        el.setAttribute("type", "checkbox");
+                    if (type == 'bool') {
+                        el.setAttribute('type', 'checkbox');
                         el.checked = object[key].value;
                         if (object[key].value) {
-                            el.setAttribute("checked", true);
+                            el.setAttribute('checked', true);
                         }
-                        el.setAttribute("onclick", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
-                    } else if (type == "int") {
-                        el.setAttribute("type", "range");
-                        el.setAttribute("min", (object[key].min ? object[key].min : 0));
+                        el.setAttribute('onclick', this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
+                        // el.setAttribute('onclick', "console.log('Click!');");
+                        //  TODO: switch to addEventListener
+                        //let callback = this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet);
+                        //console.log('callback: ' + callback);
+                        // el.addEventListener('click', (ev) => function (ev) { console.log('click'); nvis.uiUpdateParameter(ev, uniqueId, elementId, rowId, bAllConditionsMet, true); });
+                        // el.addEventListener('click', function() { alert('Click!') });
+                    } else if (type == 'int') {
+                        el.setAttribute('type', 'range');
+                        el.setAttribute('min', (object[key].min ? object[key].min : 0));
                         if (object[key].max === undefined) {
-                            el.setAttribute("max", 1.0);
+                            el.setAttribute('max', 1.0);
                         } else {
-                            if (object[key].max == "#windows" && this.renderer.windows !== undefined) {
-                                el.setAttribute("max", this.renderer.windows.windows.length);
-                            } else if (object[key].max == "#frames" && this.renderer.windows !== undefined) {
-                                el.setAttribute("max", _state.animation.numFrames);
+                            if (object[key].max == '#windows' && this.renderer.windows !== undefined) {
+                                el.setAttribute('max', this.renderer.windows.windows.length);
+                            } else if (object[key].max == '#frames' && this.renderer.windows !== undefined) {
+                                el.setAttribute('max', _state.animation.numFrames);
                             } else {
-                                el.setAttribute("max", object[key].max);
+                                el.setAttribute('max', object[key].max);
                             }
                         }
-                        el.setAttribute("value", (object[key].value ? object[key].value : 0));
-                        el.setAttribute("step", (object[key].step ? object[key].step : 1));
-                        el.setAttribute("oninput", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, false));
-                        let oEl = document.createElement("span");
-                        oEl.id = (elementId + "-value");
-                        oEl.innerHTML = (oEl.innerHTML == "" ? object[key].value : oEl.innerHTML);
+                        el.setAttribute('value', (object[key].value ? object[key].value : 0));
+                        el.setAttribute('step', (object[key].step ? object[key].step : 1));
+                        el.setAttribute('oninput', this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, false));
+                        let oEl = document.createElement('span');
+                        oEl.id = (elementId + '-value');
+                        oEl.innerHTML = (oEl.innerHTML == '' ? object[key].value : oEl.innerHTML);
 
-                        label.innerHTML += " (" + oEl.outerHTML + ")";
-                    } else if (type == "float") {
-                        el.setAttribute("type", "range");
-                        el.setAttribute("min", (object[key].min ? object[key].min : 0.0));
-                        el.setAttribute("max", (object[key].max ? object[key].max : 1.0));
-                        el.setAttribute("value", (object[key].value ? object[key].value : 0.0));
-                        el.setAttribute("step", (object[key].step ? object[key].step : 0.1));
-                        el.setAttribute("oninput", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, false));
-                        let oEl = document.createElement("span");
-                        oEl.id = (elementId + "-value");
-                        oEl.innerHTML = (oEl.innerHTML == "" ? object[key].value : oEl.innerHTML);
+                        label.innerHTML += ' (' + oEl.outerHTML + ')';
+                    } else if (type == 'float') {
+                        el.setAttribute('type', 'range');
+                        el.setAttribute('min', (object[key].min ? object[key].min : 0.0));
+                        el.setAttribute('max', (object[key].max ? object[key].max : 1.0));
+                        el.setAttribute('value', (object[key].value ? object[key].value : 0.0));
+                        el.setAttribute('step', (object[key].step ? object[key].step : 0.1));
+                        el.setAttribute('oninput', this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, false));
+                        let oEl = document.createElement('span');
+                        oEl.id = (elementId + '-value');
+                        oEl.innerHTML = (oEl.innerHTML == '' ? object[key].value : oEl.innerHTML);
 
-                        label.innerHTML += " (" + oEl.outerHTML + ")";
+                        label.innerHTML += ' (' + oEl.outerHTML + ')';
                     }
-                } else if (type == "dropdown") {
-                    el = document.createElement("select");
-                    el.setAttribute("id", elementId);
-                    el.setAttribute("onchange", this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
+                } else if (type == 'dropdown') {
+                    el = document.createElement('select');
+                    el.setAttribute('id', elementId);
+                    el.setAttribute('onchange', this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
                     for (let optionId = 0; optionId < object[key].alternatives.length; optionId++) {
-                        let oEl = document.createElement("option");
+                        let oEl = document.createElement('option');
                         if (object[key].value == optionId) {
-                            oEl.setAttribute("selected", true);
+                            oEl.setAttribute('selected', true);
                         }
                         oEl.innerHTML = object[key].alternatives[optionId];
                         el.appendChild(oEl);
                     }
-                } else if (type == "button") {
-                    el = document.createElement("button");
-                    el.setAttribute("id", elementId);
+                } else if (type == 'button') {
+                    el = document.createElement('button');
+                    el.setAttribute('id', elementId);
                     el.innerHTML = object[key].value;
-                    el.setAttribute("onclick", this.createConfirmCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
+                    el.setAttribute('onclick', this.createConfirmCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
                 }
 
                 if (el !== undefined) {
-                    if (type == "bool" || type == "button") {
-                        let cell = document.createElement("td");
-                        cell.setAttribute("colspan", 2);
+                    if (type == 'bool' || type == 'button') {
+                        let cell = document.createElement('td');
+                        cell.setAttribute('colspan', 2);
                         cell.innerHTML = el.outerHTML + label.outerHTML;
 
                         row.appendChild(cell);
                     } else {
-                        let elCell = document.createElement("td");
+                        let elCell = document.createElement('td');
                         elCell.innerHTML = el.outerHTML;
-                        let labelCell = document.createElement("td");
+                        let labelCell = document.createElement('td');
                         labelCell.innerHTML = label.outerHTML;
 
                         row.appendChild(elCell);
@@ -5244,22 +5278,22 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             let tabs = document.createElement("div");
             tabs.className = "tabs";
 
-            let tabSettings = document.createElement("button");
-            tabSettings.className = (_state.ui.tabId == "tabSettings" ? "tab active" : "tab");
-            tabSettings.setAttribute("onclick", "nvis.openTab(event, \"tabSettings\")");
-            tabSettings.innerHTML = "Settings";
-            let tabStreams = document.createElement("button");
-            tabStreams.className = (_state.ui.tabId == "tabStreams" ? "tab active" : "tab");
-            tabStreams.setAttribute("onclick", "nvis.openTab(event, \"tabStreams\")");
-            tabStreams.innerHTML = "Streams";
-            let tabWindows = document.createElement("button");
-            tabWindows.className = (_state.ui.tabId == "tabWindows" ? "tab active" : "tab");
-            tabWindows.setAttribute("onclick", "nvis.openTab(event, \"tabWindows\")");
-            tabWindows.innerHTML = "Windows";
-            let tabShaders = document.createElement("button");
-            tabShaders.className = (_state.ui.tabId == "tabShaders" ? "tab active" : "tab")
-            tabShaders.setAttribute("onclick", "nvis.openTab(event, \"tabShaders\")");
-            tabShaders.innerHTML = "Shaders";
+            let tabSettings = document.createElement('button');
+            tabSettings.className = (_state.ui.tabId == 'tabSettings' ? 'tab active' : 'tab');
+            tabSettings.addEventListener('click', (event) => nvis.openTab(event, 'tabSettings'));
+            tabSettings.innerHTML = 'Settings';
+            let tabStreams = document.createElement('button');
+            tabStreams.className = (_state.ui.tabId == 'tabStreams' ? 'tab active' : 'tab');
+            tabStreams.addEventListener('click', (event) => nvis.openTab(event, 'tabStreams'));
+            tabStreams.innerHTML = 'Streams';
+            let tabWindows = document.createElement('button');
+            tabWindows.className = (_state.ui.tabId == 'tabWindows' ? 'tab active' : 'tab');
+            tabWindows.addEventListener('click', (event) => nvis.openTab(event, 'tabWindows'));
+            tabWindows.innerHTML = 'Windows';
+            let tabShaders = document.createElement('button');
+            tabShaders.className = (_state.ui.tabId == 'tabShaders' ? 'tab active' : 'tab')
+            tabShaders.addEventListener('click', (event) => nvis.openTab(event, 'tabShaders'));
+            tabShaders.innerHTML = 'Shaders';
 
             tabs.appendChild(tabSettings);
             tabs.appendChild(tabStreams);
@@ -5268,18 +5302,18 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             //  settings
             this.settingsUI.build();
-            let settingsDiv = document.createElement("div");
-            settingsDiv.id = "tabSettings";
-            settingsDiv.className = "tabContent";
-            settingsDiv.style.display = (_state.ui.tabId == "tabSettings" ? "block" : "none");
+            let settingsDiv = document.createElement('div');
+            settingsDiv.id = 'tabSettings';
+            settingsDiv.className = 'tabContent';
+            settingsDiv.style.display = (_state.ui.tabId == 'tabSettings' ? 'block' : 'none');
             settingsDiv.appendChild(this.settingsUI.dom);
 
 
             //  streams
-            let streamsDiv = document.createElement("div");
-            streamsDiv.id = "tabStreams";
-            streamsDiv.className = "tabContent";
-            streamsDiv.style.display = (_state.ui.tabId == "tabStreams" ? "block" : "none");
+            let streamsDiv = document.createElement('div');
+            streamsDiv.id = 'tabStreams';
+            streamsDiv.className = 'tabContent';
+            streamsDiv.style.display = (_state.ui.tabId == 'tabStreams' ? 'block' : 'none');
             for (let streamId = 0; streamId < this.streams.length; streamId++) {
                 let ui = this.streams[streamId].getUI(streamId, this.streams, this.shaders);
                 streamsDiv.appendChild(ui);
@@ -5287,44 +5321,44 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
 
             //  windows
-            let windowsDiv = document.createElement("div");
-            windowsDiv.id = "tabWindows";
-            windowsDiv.className = "tabContent";
-            windowsDiv.style.display = (_state.ui.tabId == "tabWindows" ? "block" : "none");
+            let windowsDiv = document.createElement('div');
+            windowsDiv.id = 'tabWindows';
+            windowsDiv.className = 'tabContent';
+            windowsDiv.style.display = (_state.ui.tabId == 'tabWindows' ? 'block' : 'none');
             for (let windowId = 0; windowId < this.windows.getNumWindows(); windowId++) {
 
-                let select = document.createElement("select");
-                select.id = "windowStream-" + windowId;
-                select.setAttribute("onchange", "nvis.setWindowStreamId(" + windowId + ")");
+                let select = document.createElement('select');
+                select.id = 'windowStream-' + windowId;
+                select.setAttribute('onchange', 'nvis.setWindowStreamId(' + windowId + ')');
 
                 let windowStreamId = this.windows.getWindow(windowId).getStreamId();
                 for (let streamId = 0; streamId < this.streams.length; streamId++) {
                     let fileName = this.streams[streamId].getFileName();
-                    let option = document.createElement("option");
+                    let option = document.createElement('option');
                     option.innerHTML = fileName;
                     if (streamId == windowStreamId) {
-                        option.setAttribute("selected", true);
+                        option.setAttribute('selected', true);
                     }
                     select.appendChild(option);
                 }
 
-                let label = document.createElement("label");
-                label.innerHTML = "- window " + (windowId + 1) + ": ";
+                let label = document.createElement('label');
+                label.innerHTML = '- window ' + (windowId + 1) + ': ';
 
-                let selectDiv = document.createElement("div");
+                let selectDiv = document.createElement('div');
                 selectDiv.appendChild(label);
                 selectDiv.appendChild(select);
                 windowsDiv.appendChild(selectDiv);
             }
 
             //  shaders
-            let shadersDiv = document.createElement("div");
-            shadersDiv.id = "tabShaders";
-            shadersDiv.className = "tabContent";
-            shadersDiv.style.display = (_state.ui.tabId == "tabShaders" ? "block" : "none");
+            let shadersDiv = document.createElement('div');
+            shadersDiv.id = 'tabShaders';
+            shadersDiv.className = 'tabContent';
+            shadersDiv.style.display = (_state.ui.tabId == 'tabShaders' ? 'block' : 'none');
             for (let shaderId = 0; shaderId < this.shaders.shaders.length; shaderId++) {
-                let ui = document.createElement("p");
-                ui.innerHTML = "Shader: " + this.shaders.shaders[shaderId].name;
+                let ui = document.createElement('p');
+                ui.innerHTML = 'Shader: ' + this.shaders.shaders[shaderId].name;
                 shadersDiv.appendChild(ui);
             }
 
@@ -5335,8 +5369,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.uiPopup.appendChild(shadersDiv);
 
             // //  center popup
-            // let w = window.getComputedStyle(this.uiPopup).getPropertyValue("width");
-            // let h = window.getComputedStyle(this.uiPopup).getPropertyValue("height");
+            // let w = window.getComputedStyle(this.uiPopup).getPropertyValue('width');
+            // let h = window.getComputedStyle(this.uiPopup).getPropertyValue('height');
             // let x = Math.trunc((this.canvas.width - w.substring(0, w.indexOf('px'))) / 2);
             // let y = Math.trunc((this.canvas.height - h.substring(0, h.indexOf('px'))) / 2);
 
@@ -5381,7 +5415,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     break;
                 case 'ArrowLeft':  //  ArrowLeft
                     _state.animation.dec();
-                    this.popupInfo("Frame: " + _state.animation.frameId);
+                    this.popupInfo('Frame: ' + _state.animation.frameId);
                     break;
                 case 'ArrowUp':  //  ArrowUp
                     this.windows.incStream(_state.input.mouse.canvasCoords, this.streams);
@@ -5428,12 +5462,12 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     break;
                 case 'i':
                     _state.input.mouse.showInfo = !_state.input.mouse.showInfo;
-                    this.popupInfo("Pixel info overlay: " + (_state.input.mouse.showInfo ? "on" : "off"));
+                    this.popupInfo('Pixel info overlay: ' + (_state.input.mouse.showInfo ? 'on' : 'off'));
                     break;
                 case 'D':
                     if (this.streams.length > 1) {
-                        _apiShader("glsl/difference.json", [0, 1], true);
-                        //this.renderer.loadShader("glsl/difference.json");
+                        _apiShader('glsl/difference.json', [0, 1], true);
+                        //this.renderer.loadShader('glsl/difference.json');
                     }
                     break;
                 case 'w':
@@ -5441,7 +5475,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     this.updateUiPopup();
                     break;
                 case 'h':
-                    this.helpPopup.style.display = "block";
+                    this.helpPopup.style.display = 'block';
                     break;
                 case '+':
                     _state.layout.bAutomatic = false;
@@ -5454,7 +5488,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     this.updateUiPopup();
                     break;
                 default:
-                    console.log("KeyDown not handled, keyCode: " + keyCode + ", key: " + key);
+                    console.log('KeyDown not handled, keyCode: ' + keyCode + ', key: ' + key);
                     break;
             }
         }
@@ -5469,30 +5503,30 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     _state.input.keyboard.shift = false;
                     break;
                 case 'h':
-                    this.helpPopup.style.display = "none";
+                    this.helpPopup.style.display = 'none';
                     break;
                 default:
-                    // console.log("KeyUp not handled, keyCode: " + keyCode + ", key: " + key);
+                    // console.log('KeyUp not handled, keyCode: ' + keyCode + ', key: ' + key);
                     break;
             }
         }
 
         fadeInfoPopup() {
-            let opacity = parseFloat(document.getElementById("infoPopup").style.opacity);
+            let opacity = parseFloat(document.getElementById('infoPopup').style.opacity);
             if (opacity > 0.0) {
-                document.getElementById("infoPopup").style.opacity = opacity - 0.02;
+                document.getElementById('infoPopup').style.opacity = opacity - 0.02;
                 setTimeout(() => this.fadeInfoPopup(), 25);
             }
             if (opacity == 0.0) {
-                document.getElementById("infoPopup").style.display = "none";
+                document.getElementById('infoPopup').style.display = 'none';
             }
         }
 
         popupInfo(text) {
             this.infoPopup.innerHTML = text;
-            let currentOpacity = document.getElementById("infoPopup").style.opacity;
-            document.getElementById("infoPopup").style.opacity = 1.0;
-            document.getElementById("infoPopup").style.display = "block";
+            let currentOpacity = document.getElementById('infoPopup').style.opacity;
+            document.getElementById('infoPopup').style.opacity = 1.0;
+            document.getElementById('infoPopup').style.display = 'block';
             if (currentOpacity == 0.0) {
                 this.fadeInfoPopup();
             }
@@ -5797,7 +5831,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
     }
 
     let _uiUpdateParameter = function (objectId, elementId, rowId, bAllConditionsMet, bUpdateUI) {
-        //console.log("uiUpdateParameter(" + objectId + ", " + elementId + ", " + bUpdateUI + ")");
+        console.log("uiUpdateParameter(" + objectId + ", " + elementId + ", " + bUpdateUI + ")");
 
         let key = elementId.replace(/^.*\-/, "");
         let element = document.getElementById(elementId);
