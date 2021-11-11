@@ -6,8 +6,9 @@ SERVER=http.server
 #SERVER=RangeHTTPServer
 
 PYTHON_VERSION=`python --version`
-echo [Nvis]  Starting HTTP server on port ${PORT} in ${NVIS_DIR}
+echo [nvis]  Starting HTTP server on port ${PORT} in ${NVIS_DIR}
 PYTHON_MAJOR=${PYTHON_VERSION%%.*}
+PYTHON_MAJOR=${PYTHON_MAJOR//[!0-9]}
 if [[ $PYTHON_MAJOR -lt 3 ]]; then
     cd ${NVIS_DIR}
     python -m SimpleHTTPServer ${PORT}
