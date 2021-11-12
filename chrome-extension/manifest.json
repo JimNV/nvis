@@ -1,0 +1,20 @@
+{
+    "name": "NVIDIA nvis",
+    "description": "A image/stream viewer extension!",
+    "version": "0.1",
+    "manifest_version": 3,
+    "permissions": [
+    ],
+    "background": {
+        "service_worker": "content.js"
+    },
+    "action": {
+        "default_title": "Click to start nvis!"
+    },
+    "icons": {
+        "16": "/images/nvis16.png",
+        "32": "/images/nvis32.png",
+        "48": "/images/nvis48.png",
+        "128": "/images/nvis128.png"
+    }
+}
