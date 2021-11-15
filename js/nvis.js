@@ -2361,13 +2361,22 @@ var nvis = new function () {
 
         readString() {
             let c = '';
-            let s = "";
+            let s = '';
             while ((c = this.readUint8()) != 0) {
                 s += String.fromCharCode(c);
             }
             return s;
         }
 
+        readLine() {
+            let c = String.fromCharCode(this.readUint8());
+            let s = '';
+            while (c != '\n' && c != '\r') {
+                s += c;
+                c = String.fromCharCode(this.readUint8());
+            }
+            return s;
+        }
     }
 
 
@@ -2377,13 +2386,57 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    class NvisDeompress {
 
-        constructor() {
+    class NvisPFMFile {
 
+        //  http://netpbm.sourceforge.net/doc/pfm.html
+
+        constructor(fileName, buffer) {
+            this.fileName = fileName;
+            this.buffer = new NvisBitBuffer(buffer);
+
+            this.bSuccess = true;
+            this.type = this.buffer.readLine();
+            const vDims = this.buffer.readLine().split(' ');
+            this.dimensions = { w: parseInt(vDims[0]), h: parseInt(vDims[1]) }; 
+            this.scaleEndianess = parseFloat(this.buffer.readLine());
+            this.littleEndian = (this.scaleEndianess < 0.0);
+            this.buffer.littleEndian = this.littleEndian;
+
+            const dstChannels = 4;
+            this.data = new Float32Array(new ArrayBuffer(this.dimensions.w * this.dimensions.h * dstChannels * 4));
+
+            if (this.type == 'PF') {
+                //  color
+                for (let y = 0; y < this.dimensions.h; y++) {
+                    for (let x = 0; x < this.dimensions.w; x++) {
+                        let dstLoc = ((this.dimensions.h - y - 1) * this.dimensions.w + x) * dstChannels;
+                        this.data[dstLoc] = this.buffer.readFloat32();
+                        this.data[dstLoc + 1] = this.buffer.readFloat32();
+                        this.data[dstLoc + 2] = this.buffer.readFloat32();
+                        this.data[dstLoc + 3] = 1.0;
+                    }
+                }
+            } else {
+                // grayscale
+                for (let y = 0; y < this.dimensions.h; y++) {
+                    for (let x = 0; x < this.dimensions.w; x++) {
+                        let dstLoc = ((this.dimensions.h - y - 1) * this.dimensions.w + x) * dstChannels;
+                        let color = this.buffer.readFloat32();
+                        this.data[dstLoc] = color;
+                        this.data[dstLoc + 1] = color;
+                        this.data[dstLoc + 2] = color;
+                        this.data[dstLoc + 3] = 1.0;
+                    }
+                }
+            }
         }
 
+        toFloatArray() {
+            return this.data;
+        }
     }
+
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -3661,7 +3714,7 @@ var nvis = new function () {
                 let fileName = fileNames[fileId];
                 this.fileNames.push(fileName);
 
-                if (fileName.match(/.exr$/)) {
+                if (fileName.match(/.exr$/) || fileName.match(/.pfm$/)) {
 
                     let xhr = new XMLHttpRequest();
                     xhr.open("GET", fileName);
@@ -3671,7 +3724,13 @@ var nvis = new function () {
                         if (this.status == 200 && this.response !== null) {
                             numFilesLoaded++;
 
-                            let file = new NvisEXRFile(fileName, this.response);
+                            let file = undefined;
+
+                            if (fileName.match(/.exr$/)) {
+                                file = new NvisEXRFile(fileName, this.response);
+                            } else if (fileName.match(/.pfm$/)) {
+                                file = new NvisPFMFile(fileName, this.response);
+                            }
 
                             if (file.bSuccess) {
                                 self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
@@ -3725,7 +3784,7 @@ var nvis = new function () {
             let self = this;
 
             for (let fileId = 0; fileId < files.length; fileId++) {
-                if (!files[fileId].type.match(/image.*/) && !files[fileId].type.match(/video.*/) && !files[0].name.match(/.exr$/)) {
+                if (!files[fileId].type.match(/image.*/) && !files[fileId].type.match(/video.*/) && !files[0].name.match(/.exr$/) && !files[0].name.match(/.pfm$/)) {
                     continue;
                 }
 
@@ -3794,10 +3853,31 @@ var nvis = new function () {
 
                     reader.readAsArrayBuffer(file);
                 }
-                
-                if (file.type.match(/video.*/)) {
 
-                }                
+                if (files[0].name.match(/.pfm$/)) {
+                    let reader = new FileReader();
+
+                    reader.onload = function (event) {
+
+                        //  TODO: allow streams of EXRs
+                        let file = new NvisPFMFile(files[0].name, reader.result);
+
+                        if (file.bSuccess) {
+                            self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
+                            numFilesLoaded++;
+
+                            if (numFilesLoaded == files.length) {
+                                self.setDimensions(file.dimensions, true);
+                                windows.setStreamPxDimensions(file.dimensions);
+                                windows.adjust();
+                            }
+                        }
+
+                    }
+
+                    reader.readAsArrayBuffer(file);
+                }
+
             }
         }
 
@@ -5049,7 +5129,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.fileInput.id = "fileInput";
             this.fileInput.setAttribute("type", "file");
             this.fileInput.setAttribute("multiple", true);
-            this.fileInput.setAttribute("accept", "image/*|.exr")
+            this.fileInput.setAttribute("accept", "image/*|.exr|.pfm");
             //this.fileInput.onchange = this.onFileDrop;
             this.fileInput.addEventListener("change", (event) => this.onFileDrop(event));
 
@@ -5482,7 +5562,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 return;
             }
 
-            if (files[0].type.match(/image.*/) || files[0].name.match(/.exr$/)) {
+            if (files[0].type.match(/image.*/) || files[0].name.match(/.exr$/) || files[0].name.match(/.pfm$/)) {
                 files.sort(function (a, b) {
                     return a.name.localeCompare(b.name);
                 });
