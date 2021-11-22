@@ -2,37 +2,40 @@
     "name": "Test configuration",
     "shaders": [
         "glsl/difference.json",
-        "glsl/mixer.json"
+        "glsl/mixer.json",
+        "glsl/pixelate.json",
+        "glsl/ssim.json",
+        "glsl/tiling.json"
     ],
     "streams": [
         {
             "name": "Reference stream",
             "window": false,
             "images": [
-                "images/triangle.0000.png",
-                "images/triangle.0001.png",
-                "images/triangle.0002.png",
-                "images/triangle.0003.png",
-                "images/triangle.0004.png",
-                "images/triangle.0005.png",
-                "images/triangle.0006.png",
-                "images/triangle.0007.png",
-                "images/triangle.0008.png"
+                "images/png/triangle.0000.png",
+                "images/png/triangle.0001.png",
+                "images/png/triangle.0002.png",
+                "images/png/triangle.0003.png",
+                "images/png/triangle.0004.png",
+                "images/png/triangle.0005.png",
+                "images/png/triangle.0006.png",
+                "images/png/triangle.0007.png",
+                "images/png/triangle.0008.png"
             ]
         },
         {
             "name": "Test stream",
             "window": false,
             "images": [
-                "images/triangle.0001.png",
-                "images/triangle.0002.png",
-                "images/triangle.0003.png",
-                "images/triangle.0004.png",
-                "images/triangle.0005.png",
-                "images/triangle.0006.png",
-                "images/triangle.0007.png",
-                "images/triangle.0008.png",
-                "images/triangle.0009.png"
+                "images/png/triangle.0001.png",
+                "images/png/triangle.0002.png",
+                "images/png/triangle.0003.png",
+                "images/png/triangle.0004.png",
+                "images/png/triangle.0005.png",
+                "images/png/triangle.0006.png",
+                "images/png/triangle.0007.png",
+                "images/png/triangle.0008.png",
+                "images/png/triangle.0009.png"
             ]
         },
         {

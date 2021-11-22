@@ -33,11 +33,12 @@ var nvis = new function () {
 
     let _state = {
         ui: {
-            tabId: "tabSettings",
+            tabId: 'tabSettings',
             position: { x: 50, y: 50 },
             clickPosition: undefined,
             mouseDown: false,
-            previousPosition: { x: 50, y: 50 }
+            previousPosition: { x: 50, y: 50 },
+            selectedStreamId: -1
         },
         layout: {
             border: 50,
@@ -102,12 +103,12 @@ var nvis = new function () {
 
             inc: function () {
                 this.frameId = (this.frameId + 1) % this.numFrames;
-                //console.log("frameId: " + this.frameId);
+                //console.log('frameId: ' + this.frameId);
             },
 
             dec: function () {
                 this.frameId = (this.frameId + this.numFrames - 1) % this.numFrames;
-                //console.log("frameId: " + this.frameId);
+                //console.log('frameId: ' + this.frameId);
             },
 
             update: function () {
@@ -129,119 +130,135 @@ var nvis = new function () {
     }
 
     let _settings = {
-        title: "Settings",
+        title: 'Settings',
         bAutomaticLayout: {
-            name: "Automatic layout",
-            type: "bool",
+            name: 'Automatic layout',
+            type: 'bool',
             value: _state.layout.bAutomatic
         },
         layoutWidth: {
-            name: "Layout width",
-            type: "int",
+            name: 'Layout width',
+            type: 'int',
             value: _state.layout.dimensions.w,
             min: 1,
-            max: "#windows",
-            condition: "!bAutomaticLayout"
+            max: '#windows',
+            condition: '!bAutomaticLayout'
         },
         bLockTranslation: {
-            name: "Lock translation",
-            type: "bool",
+            name: 'Lock translation',
+            type: 'bool',
             value: false
         },
         bDrawGrid: {
-            name: "Draw grid when zooming",
-            type: "bool",
+            name: 'Draw grid when zooming',
+            type: 'bool',
             value: true
         },
         bDrawPixel: {
-            name: "Draw pixel marker when zooming",
-            type: "bool",
+            name: 'Draw pixel marker when zooming',
+            type: 'bool',
             value: true
         },
         bAlphaCheckerboard: {
-            name: "Show alpha with checkboard",
-            type: "bool",
+            name: 'Show alpha with checkboard',
+            type: 'bool',
             value: true
         },
         canvasBorder: {
-            name: "Border width",
-            type: "int",
+            name: 'Border width',
+            type: 'int',
             value: _state.layout.border,
             min: 0,
             max: 200,
             step: 1
         },
         pixelValueDecimals: {
-            name: "Pixel value decimals",
-            type: "int",
+            name: 'Pixel value decimals',
+            type: 'int',
             value: 3,
             min: 0,
             max: 16,
             step: 1
         },
         clearAll: {
-            name: "Clear all streams and windows",
-            type: "button",
-            value: "Clear all"
+            name: 'Clear all streams and windows',
+            type: 'button',
+            value: 'Clear all'
         },
         bAnimate: {
-            name: "Animate",
-            type: "bool",
+            name: 'Animate',
+            type: 'bool',
             value: _state.animation.active
         },
         bPingPong: {
-            name: "Ping-pong",
-            type: "bool",
+            name: 'Ping-pong',
+            type: 'bool',
             value: _state.animation.pingPong,
-            condition: "bAnimate"
+            condition: 'bAnimate'
         },
         fps: {
-            name: "Frames per second",
-            type: "int",
+            name: 'Frames per second',
+            type: 'int',
             value: _state.animation.fps,
             min: 1,
             max: 60,  //  TODO: maximize according to browser and screen capability
             step: 1
         },
         frameId: {
-            name: "Frame",
-            type: "int",
+            name: 'Frame',
+            type: 'int',
             value: _state.animation.frameId + 1,
             min: 1,
-            max: "#frames",
+            max: '#frames',
             step: 1
         },
         bGlobalTonemapping: {
-            name: "Global tonemapping",
-            type: "bool",
+            name: 'Global tonemapping',
+            type: 'bool',
             value: false
         },
         tonemapper: {
-            name: "Tonemapper",
-            type: "dropdown",
+            name: 'Tonemapper',
+            type: 'dropdown',
             value: 0,
             alternatives: [
-                "Gamma correction"
+                'Gamma correction'
             ],
-            condition: "bGlobalTonemapping"
+            condition: 'bGlobalTonemapping'
         },
         gamma: {
-            name: "Gamma",
-            type: "float",
+            name: 'Gamma',
+            type: 'float',
             min: 0.1,
             max: 4.0,
             value: 2.2,
             step: 0.1,
-            condition: "bGlobalTonemapping & tonemapper == 0"
+            condition: 'bGlobalTonemapping & tonemapper == 0'
         },
         exposure: {
-            name: "Exposure",
-            type: "float",
+            name: 'Exposure',
+            type: 'float',
             min: 0.1,
             max: 10.0,
             value: 1.0,
             step: 0.1,
-            condition: "bGlobalTonemapping & tonemapper == 0"
+            condition: 'bGlobalTonemapping & tonemapper == 0'
+        },
+        videoFPS: {
+            name: 'Video decoding FPS',
+            type: 'int',
+            value: 30,
+            min: 1,
+            max: 240,
+            step: 1
+        },
+        videoMaxFrames: {
+            name: 'Video decoding max frames',
+            type: 'int',
+            value: 30,
+            min: 1,
+            max: 300,
+            step: 1
         }
     };
 
@@ -310,12 +327,13 @@ var nvis = new function () {
             top: 20px;
         }`);
 
+        //  UI popup
         addStylesheetRules(`.uiPopup {
             user-select: false;
             color: black;
-            background-color: #f0f0f0;
-            border: 3px solid #808080;
-            border-radius: 15px;
+            background-color: white;
+            border: 5px solid #808080;
+            border-radius: 10px;
             position: absolute;
             display: none;
             margin: 0px;
@@ -334,42 +352,40 @@ var nvis = new function () {
             flex-grow: 1;
             background: repeating-linear-gradient(
                 135deg,
-                #b0b0b0,
-                #b0b0b0 10px,
-                #a0a0a0 10px,
-                #a0a0a0 20px
+                white,
+                white 10px,
+                #808080 10px,
+                #808080 20px
             );
         }`);
-        addStylesheetRules(`.uiPopup table {
+        addStylesheetRules(`.uiPopup div.uiTitle:hover{
+            color: blue;
+        }`);
+        addStylesheetRules(`.uiPopup div.uiBody {
             margin-left: 50px;
         }`);
+        // addStylesheetRules(`.uiPopup table {
+        //     margin-left: 50px;
+        // }`);
         addStylesheetRules(`.uiPopup select {
             font: 20px Arial;
         }`);
         addStylesheetRules(`.uiPopup label {
             margin-left: 5px;
         }`);
+        addStylesheetRules(`.uiPopup button#buttonCreate {
+            margin-left: 5px;
+            font: 20px Arial;
+        }`);
         addStylesheetRules(`.uiPopup input[type=range] {
             width: 300px;
-        }`);
-
-        addStylesheetRules(`.infoPopup {
-            width: 100%;
-            text-align: right;
-            font: 42px Arial;
-            color: white;
-            opacity: 0.0;
-            position: absolute;
-            left: -50px;
-            top: 5px;
-            text-shadow: 5px 5px 10px black;
         }`);
 
         //  UI tabs
         addStylesheetRules(`div.tabs {
             overflow: hidden;
-            border: 0px solid #c0c0c0;
-            background-color: #f0f0f0;
+            border: 0px solid #808080;
+            background-color: white;
         }`);
         addStylesheetRules(`div.tabs button {
             background-color: inherit;
@@ -403,6 +419,19 @@ var nvis = new function () {
             border-top: none;
         }`);
 
+        //  info popup
+        addStylesheetRules(`.infoPopup {
+            width: 100%;
+            text-align: right;
+            font: 42px Arial;
+            color: white;
+            opacity: 0.0;
+            position: absolute;
+            left: -50px;
+            top: 5px;
+            text-shadow: 5px 5px 10px black;
+        }`);
+
         //  pixel info overlay
         addStylesheetRules(`div.overlay {
             display: none;
@@ -431,36 +460,44 @@ var nvis = new function () {
     //  API handling
 
     let _apiClear = function () {
-        return _apiCommand({ command: "clear", argument: undefined });
+        return _apiCommand({ command: 'clear', argument: undefined });
     }
 
-    let _apiZoom = function (level, position = undefined) {
-        return _apiCommand({ command: "zoom", argument: level })
+    let _apiZoom = function (level) {
+        return _apiCommand({ command: 'zoom', argument: level })
+    }
+
+    let _apiPosition = function (x, y) {
+        return _apiCommand({ command: 'position', argument: { x: x, y: y }})
+    }
+
+    let _apiTranslate = function (x, y) {
+        return _apiCommand({ command: 'translate', argument: { x: x, y: y }})
     }
 
     let _apiAnnotation = function (windowId, type, parameters) {
-        return _apiCommand({ command: "annotation", argument: { windowId: windowId, type: type, parameters: parameters }});
+        return _apiCommand({ command: 'annotation', argument: { windowId: windowId, type: type, parameters: parameters }});
     }
 
     let _apiStream = function (images, bWindow = true) {
         images = (Array.isArray(images) ? images : [images]);
-        return _apiCommand({ command: "stream", argument: { name: images[0], images: images, window: bWindow } });
+        return _apiCommand({ command: 'stream', argument: { name: images[0], images: images, window: bWindow } });
     }
 
     let _apiVideo = function (fileName, bWindow = true) {
-        return _apiCommand({ command: "video", argument: { name: fileName, fileName: fileName, window: bWindow } });
+        return _apiCommand({ command: 'video', argument: { name: fileName, fileName: fileName, window: bWindow } });
     }
 
     let _apiShader = function (fileName, inputs = undefined, bWindow = true) {
-        return _apiCommand({ command: "shader", argument: { fileName: fileName, inputs: inputs, window: bWindow } });
+        return _apiCommand({ command: 'shader', argument: { fileName: fileName, inputs: inputs, window: bWindow } });
     }
 
     let _apiGenerator = function (fileName, width, height, bWindow = true) {
-        return _apiCommand({ command: "generator", argument: { fileName: fileName, width: width, height: height, window: bWindow } });
+        return _apiCommand({ command: 'generator', argument: { fileName: fileName, width: width, height: height, window: bWindow } });
     }
 
     let _apiWindow = function (streamId = 0) {
-        return _apiCommand({ command: "window", argument: streamId });
+        return _apiCommand({ command: 'window', argument: streamId });
     }
 
     let _parseConfig = function (jsonObject) {
@@ -474,14 +511,14 @@ var nvis = new function () {
         //  Zoom
         let zoom = config.zoom;
         if (zoom !== undefined) {
-            _apiCommand({ command: "zoom", argument: zoom });
+            _apiCommand({ command: 'zoom', argument: zoom });
         }
 
         //  shaders
         let shaders = config.shaders;
         if (shaders !== undefined) {
             for (let i = 0; i < shaders.length; i++) {
-                _apiCommand({ command: "loadShader", argument: shaders[i] });
+                _apiCommand({ command: 'loadShader', argument: shaders[i] });
             }
         }
 
@@ -489,7 +526,7 @@ var nvis = new function () {
         let streams = config.streams;
         if (streams !== undefined) {
             for (let i = 0; i < streams.length; i++) {
-                _apiCommand({ command: "stream", argument: streams[i] });
+                _apiCommand({ command: 'stream', argument: streams[i] });
             }
         }
 
@@ -497,19 +534,19 @@ var nvis = new function () {
         let streamIds = config.windows;
         if (streamIds !== undefined) {
             for (let i = 0; i < streamIds.length; i++) {
-                _apiCommand({ command: "window", argument: streamIds[i] });
+                _apiCommand({ command: 'window', argument: streamIds[i] });
             }
         }
     }
 
     let _apiConfig = function (fileName) {
         let xhr = new XMLHttpRequest();
-        xhr.open("GET", fileName);
-        xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+        xhr.open('GET', fileName);
+        xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, max-age=0');
         xhr.onload = function () {
             if (this.status == 200 && this.responseText !== null) {
                 let jsonObject = JSON.parse(this.responseText);
-                console.log("=====  Config JSON loaded (" + fileName + ")");
+                console.log('=====  Config JSON loaded (' + fileName + ')');
                 _parseConfig(jsonObject);
             }
         };
@@ -521,24 +558,33 @@ var nvis = new function () {
         let command = apiCommand.command;
         let argument = apiCommand.argument;
 
-        if (command == "clear") {
+        if (command == 'clear') {
             _state.zoom.level = 1.0;
             _renderer.streams = [];
             _renderer.shaders.clear();
             _renderer.windows.clear();
             return true;
-        } else if (command == "zoom") {
+        } else if (command == 'zoom') {
             _state.zoom.level = Math.min(Math.max(argument, 1.0), 256.0);
             _renderer.windows.updateTextureCoordinates();
             return _state.zoom.level;
-        } else if (command == "annotation") {
+        } else if (command == 'position') {
+            if (_renderer.windows !== undefined) {
+                _renderer.windows.position({ x: argument.x * _state.zoom.level, y: argument.y * _state.zoom.level });
+            }
+            return true;
+        } else if (command == 'translate') {
+            if (_renderer.windows !== undefined) {
+                _renderer.windows.translate({ x: argument.x * _state.zoom.level, y: argument.y * _state.zoom.level });
+            }
+            return true;
+        } else if (command == 'annotation') {
             _renderer.windows.addAnnotation(argument.windowId, argument.type, argument.parameters);
-        } else if (command == "video") {
-            // let frames = new NvisVideoParser(argument.fileName, (frames) => _renderer.setupVideo(frames));
-            let videoParser = new NvisVideoParser((frames) => _renderer.setupVideo(frames));
+        } else if (command == 'video') {
+            let videoParser = new NvisVideoParser((fileName, frames) => _renderer.setupVideo(fileName, frames));
             videoParser.fromFile(argument.fileName);
-            // console.log("#frames: " + frames.length);
-        } else if (command == "stream") {
+            // console.log('#frames: ' + frames.length);
+        } else if (command == 'stream') {
             let streamId = undefined;
             if (argument.images !== undefined) {
                 streamId = _renderer.loadStream(Array.isArray(argument.images) ? argument.images : [argument.images]);
@@ -570,10 +616,10 @@ var nvis = new function () {
                 _renderer.addWindow(_renderer.streams.length - 1);
             }
             return streamId;
-        } else if (command == "loadShader") {
+        } else if (command == 'loadShader') {
             let shaderId = _renderer.loadShader(argument);
             return shaderId;
-        } else if (command == "shader") {
+        } else if (command == 'shader') {
             let shaderId = _renderer.loadShader(argument.fileName);
             if (argument.inputs !== undefined) {
                 let newStream = _renderer.addShaderStream(shaderId);
@@ -586,7 +632,7 @@ var nvis = new function () {
                 }
             }
             return shaderId;
-        } else if (command == "generator") {
+        } else if (command == 'generator') {
             let shaderId = _renderer.loadShader(argument.fileName);
             let newStream = _renderer.addShaderStream(shaderId);
             let dimensions = { w: argument.width, h: argument.height };
@@ -598,7 +644,7 @@ var nvis = new function () {
                 _renderer.addWindow(_renderer.streams.length - 1);
             }
             return shaderId;
-        } else if (command == "window") {
+        } else if (command == 'window') {
             let streamId = argument;
             if (streamId >= 0 && streamId < _renderer.streams.length) {
                 _renderer.addWindow(streamId);
@@ -616,7 +662,7 @@ var nvis = new function () {
     }
 
     let _apiCommand = function (apiCommand) {
-        console.log("API: " + JSON.stringify(apiCommand));
+        console.log('API: ' + JSON.stringify(apiCommand));
         if (_renderer === undefined) {
             _APIQueue.push(apiCommand);
         } else {
@@ -658,8 +704,8 @@ var nvis = new function () {
       
     class NvisVideoParser {
 
-        static canvas = document.createElement("canvas");
-        static context = NvisVideoParser.canvas.getContext("2d");
+        static canvas = document.createElement('canvas');
+        static context = NvisVideoParser.canvas.getContext('2d');
 
         constructor(callback, amount = 10, type = VideoToFramesMethod.fps) {
             this.frames = [];
@@ -669,8 +715,8 @@ var nvis = new function () {
             this.dimensions = undefined;
             this.callback = callback;
 
-            this.video = document.createElement("video");
-            this.video.preload = "auto";
+            this.video = document.createElement('video');
+            this.video.preload = 'auto';
         }
 
         getVideoFrame(video, context, time) {
@@ -682,7 +728,7 @@ var nvis = new function () {
                 };
                 video.addEventListener('seeked', eventCallback);
                 video.currentTime = time.toString();
-                _renderer.popupInfo("Decoding video: " + self.frames.length + " frames (" + video.currentTime.toFixed(1) + "s)")
+                _renderer.popupInfo('Decoding video: ' + (self.frames.length + 1) + ' frames (' + video.currentTime.toFixed(1) + 's)')
             });
         }
         
@@ -697,9 +743,9 @@ var nvis = new function () {
             this.fileName = fileName;
 
             let xhr = new XMLHttpRequest();
-            xhr.open("GET", fileName);
+            xhr.open('GET', fileName);
             xhr.responseType = 'blob';
-            xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+            xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, max-age=0');
             xhr.onload = function () {
                 if (this.status == 200 && this.response !== null) {
                     self.fromBlob(this.response);
@@ -712,7 +758,7 @@ var nvis = new function () {
         //     let self = this;
         //     this.fileName = fileName;
 
-        //     this.video.addEventListener("loadeddata", async function() {
+        //     this.video.addEventListener('loadeddata', async function() {
         //         self.dimensions = {
         //             w: self.video.videoWidth,
         //             h: self.video.videoHeight
@@ -729,7 +775,7 @@ var nvis = new function () {
         //             let frame = await self.getVideoFrame(self.video, NvisVideoParser.context, time);
         //             self.frames.push(frame);
         //         }
-        //         console.log("#frames: " + self.frames.length);
+        //         console.log('#frames: ' + self.frames.length);
 
         //         self.callback(self.frames);
         //         //resolve(frames);
@@ -760,7 +806,7 @@ var nvis = new function () {
                 URL.revokeObjectURL(oldObjectUrl);
             }
 
-            this.video.addEventListener("loadeddata", async function() {
+            this.video.addEventListener('loadeddata', async function() {
                 self.dimensions = {
                     w: self.video.videoWidth,
                     h: self.video.videoHeight
@@ -773,17 +819,18 @@ var nvis = new function () {
                 if (self.type === VideoToFramesMethod.fps) {
                     totalFrames = self.duration * self.amount;
                 }
-                let frameRate = 30.0;
+                let frameRate = _settings.videoFPS.value;
                 totalFrames = self.duration * frameRate;  //  TODO: figure out frame rate of video (assuming 30 FPS for now)
                 let frameTime = 1.0 / frameRate;
-                //for (let time = 0; time < self.duration; time += self.duration / totalFrames) {
-                for (let time = 0; time < self.duration; time += frameTime) {
+                let numFrames = 0;
+                for (let time = 0; time < self.duration && numFrames < _settings.videoMaxFrames.value; time += frameTime) {
                     let frame = await self.getVideoFrame(self.video, NvisVideoParser.context, time);
                     self.frames.push(frame);
+                    numFrames++;
                 }
-                console.log("#frames: " + self.frames.length);
+                // console.log('#frames: ' + self.frames.length);
 
-                self.callback(self.frames);
+                self.callback(videoFile.name, self.frames);
                 //resolve(frames);
             });
 
@@ -805,7 +852,7 @@ var nvis = new function () {
 
     class NvisDraw {
 
-        constructor(glContext, mode = "lines") {
+        constructor(glContext, mode = 'lines') {
             this.glContext = glContext;
 
             //  TODO: make dynamic, or as input to constructor
@@ -814,28 +861,28 @@ var nvis = new function () {
             this.mode = this.glContext.LINES;
 
             switch (mode) {
-                case "points":
+                case 'points':
                     this.mode = this.glContext.POINTS;
                     break;
-                case "linestrip":
+                case 'linestrip':
                     this.mode = this.glContext.LINE_STRIP;
                     break;
-                case "lineloop":
+                case 'lineloop':
                     this.mode = this.glContext.LINE_LOOP;
                     break;
-                case "triangles":
+                case 'triangles':
                     this.mode = this.glContext.TRIANGLES;
                     break;
-                case "trianglestrip":
+                case 'trianglestrip':
                     this.mode = this.glContext.TRIANGLE_STRIP;
                     break;
-                case "trianglefan":
+                case 'trianglefan':
                     this.mode = this.glContext.TRIANGLE_FAN;
                     break;
-                case "widelineloop":  //  our own, used for wide lines
+                case 'widelineloop':  //  our own, used for wide lines
                     this.mode = this.glContext.TRIANGLE_STRIP;
                     break;
-                case "lines":
+                case 'lines':
                 default:
                     this.mode = this.glContext.LINES;
                     break;
@@ -881,12 +928,12 @@ var nvis = new function () {
             this.glContext.shaderSource(this.vertexShader, this.vertexSource);
             this.glContext.compileShader(this.vertexShader);
             if (!this.glContext.getShaderParameter(this.vertexShader, this.glContext.COMPILE_STATUS)) {
-                alert("WebGL: " + this.glContext.getShaderInfoLog(this.vertexShader));
+                alert('WebGL: ' + this.glContext.getShaderInfoLog(this.vertexShader));
             }
             this.glContext.shaderSource(this.fragmentShader, this.fragmentSource);
             this.glContext.compileShader(this.fragmentShader);
             if (!this.glContext.getShaderParameter(this.fragmentShader, this.glContext.COMPILE_STATUS)) {
-                alert("WebGL: " + this.glContext.getShaderInfoLog(this.fragmentShader));
+                alert('WebGL: ' + this.glContext.getShaderInfoLog(this.fragmentShader));
             }
 
             this.glContext.attachShader(this.shaderProgram, this.vertexShader);
@@ -894,7 +941,7 @@ var nvis = new function () {
             this.glContext.linkProgram(this.shaderProgram);
 
             if (!this.glContext.getProgramParameter(this.shaderProgram, this.glContext.LINK_STATUS)) {
-                alert("Could not initialize shader!");
+                alert('Could not initialize shader!');
             }
         }
 
@@ -969,7 +1016,7 @@ var nvis = new function () {
             gl.enableVertexAttribArray(aVertexColor);
 
             if (this.mode == gl.POINTS) {
-                gl.uniform1f(gl.getUniformLocation(this.shaderProgram, "uPointSize"), this.pointSize);
+                gl.uniform1f(gl.getUniformLocation(this.shaderProgram, 'uPointSize'), this.pointSize);
             }
 
             gl.enable(gl.BLEND);
@@ -990,7 +1037,7 @@ var nvis = new function () {
     class NvisSegmentDrawer extends NvisDraw {
 
         constructor(glContext) {
-            super(glContext, "trianglestrip");
+            super(glContext, 'trianglestrip');
 
             this.color = { r: 0.8, g: 0.8, b: 0.8, a: 1.0 };
 
@@ -1013,7 +1060,7 @@ var nvis = new function () {
     class NvisGridDrawer extends NvisDraw {
 
         constructor(glContext) {
-            super(glContext, "lines");
+            super(glContext, 'lines');
 
             this.color = { r: 0.8, g: 0.8, b: 0.8, a: 1.0 };
             this.offset = { x: 0.0, y: 0.0 };  //  pixels
@@ -1030,8 +1077,8 @@ var nvis = new function () {
             let dim = { w: 1.0 / layoutDims.w, h: 1.0 / layoutDims.h };
             let winOffset = { x: (windowId % layoutDims.w) * dim.w, y: Math.floor(windowId / layoutDims.w) * dim.h };
 
-            // console.log("NvisGridDrawer():  offset = " + JSON.stringify(offset) + ", pixelSize = " + JSON.stringify(pixelSize));
-            // console.log("NvisGridDrawer():  dim = " + JSON.stringify(dim) + ", alpha = " + alpha);
+            // console.log('NvisGridDrawer():  offset = ' + JSON.stringify(offset) + ', pixelSize = ' + JSON.stringify(pixelSize));
+            // console.log('NvisGridDrawer():  dim = ' + JSON.stringify(dim) + ', alpha = ' + alpha);
 
             this.offset = offset;
             this.pixelSize = pixelSize;
@@ -1069,8 +1116,8 @@ var nvis = new function () {
     class NvisPixelDrawer {
 
         constructor(glContext) {
-            this.area = new NvisDraw(glContext, "trianglestrip");
-            this.border = new NvisDraw(glContext, "lines");
+            this.area = new NvisDraw(glContext, 'trianglestrip');
+            this.border = new NvisDraw(glContext, 'lines');
 
             this.areaColor = { r: 0.8, g: 0.8, b: 0.0, a: 0.5 };
             this.activeAreaColor = { r: 0.8, g: 0.8, b: 0.0, a: 0.1 };
@@ -1139,10 +1186,10 @@ var nvis = new function () {
     class NvisAnnotation extends NvisDraw {
 
         constructor(glContext, type, parameters = {}) {
-            if (type == "arrow") {
-                super(glContext, "trianglefan");
-            } else if (type == "circle") {
-                super(glContext, "trianglestrip");
+            if (type == 'arrow') {
+                super(glContext, 'trianglefan');
+            } else if (type == 'circle') {
+                super(glContext, 'trianglestrip');
             }
 
             this.type = type;
@@ -1213,7 +1260,7 @@ var nvis = new function () {
             let ps = this.pixelSize(canvas);
 
             this.clear();
-            if (this.type == "arrow") {
+            if (this.type == 'arrow') {
                 let s = this.size;
                 s *= ps.w;
                 let r0 = this.rotate({ x: s, y: s }, this.rotation);
@@ -1230,7 +1277,7 @@ var nvis = new function () {
                 this.addVertex({ x: p.x + r4.x, y: p.y + r4.y * ar }, this.color);
                 this.addVertex({ x: p.x + r5.x, y: p.y + r5.y * ar }, this.color);
 
-            } else if (this.type == "circle") {
+            } else if (this.type == 'circle') {
 
                 let r = this.radius;
                 let w = (this.radius + this.width);
@@ -1248,15 +1295,15 @@ var nvis = new function () {
                     rv.y = ar * rv.y;
                     let p0 = { x: p.x + r * rv.x, y: p.y + r * rv.y };
                     let p1 = { x: p.x + w * rv.x, y: p.y + w * rv.y };
-                    // console.log("p0: " + JSON.stringify(p0));
-                    // console.log("p1: " + JSON.stringify(p1));
+                    // console.log('p0: ' + JSON.stringify(p0));
+                    // console.log('p1: ' + JSON.stringify(p1));
                     this.addVertex(p0, this.color);
                     this.addVertex(p1, this.color);
                 }
                 this.addVertex({ x: p.x + r, y: p.y }, this.color)
                 this.addVertex({ x: p.x + w, y: p.y }, this.color)
 
-            } else if (this.type == "rectangle") {
+            } else if (this.type == 'rectangle') {
 
             }
 
@@ -1345,9 +1392,9 @@ var nvis = new function () {
 
                 this.name = config.name;
                 this.fileName = config.filename;
-                this.numInputs = config.inputs;
+                this.numInputs = (config.inputs === undefined ? 0 : config.inputs);
 
-                // this.name = (config === undefined ? "Stream" : config.name);
+                // this.name = (config === undefined ? 'Stream' : config.name);
                 // this.fileName = (config === undefined ? undefined : config.filename);
                 // this.numInputs = (config === undefined ? undefined : config.inputs);
 
@@ -1367,7 +1414,7 @@ var nvis = new function () {
             gl.compileShader(shader);
 
             if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                alert("WebGL: " + gl.getShaderInfoLog(shader));
+                alert('WebGL: ' + gl.getShaderInfoLog(shader));
                 return false;
             }
 
@@ -1382,7 +1429,7 @@ var nvis = new function () {
             gl.linkProgram(this.shaderProgram);
 
             if (!gl.getProgramParameter(this.shaderProgram, gl.LINK_STATUS)) {
-                alert("Could not initialize shader!");
+                alert('Could not initialize shader!');
             }
             if (this.callback !== undefined) {
                 this.callback();
@@ -1395,11 +1442,11 @@ var nvis = new function () {
             this.bFragmentReady = false;
 
             let xhr = new XMLHttpRequest();
-            xhr.open("GET", fileName);
-            xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+            xhr.open('GET', fileName);
+            xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, max-age=0');
             xhr.onload = function (event) {
                 if (this.status == 200 && this.responseText !== null) {
-                    console.log("=====  Shader loaded (" + fileName + ")");
+                    console.log('=====  Shader loaded (' + fileName + ')');
                     self.fragmentSource = this.responseText;
                     self.bFragmentReady = self.compile(self.fragmentShader, self.fragmentSource);
                     self.attach();
@@ -1510,7 +1557,7 @@ var nvis = new function () {
         }
 
 
-        new(json = "{}") {
+        new(json = '{}') {
             this.shaders.push(new NvisShader(this.glContext, { json: json }));
         }
 
@@ -1527,8 +1574,8 @@ var nvis = new function () {
             let shaderId = this.shaders.length;
             this.shaders.push(undefined);
 
-            xhr.open("GET", jsonFileName);
-            xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+            xhr.open('GET', jsonFileName);
+            xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, max-age=0');
             xhr.onload = function () {
                 if (this.status == 200 && this.responseText !== null) {
                     //  set position of shader, filled in later
@@ -1795,7 +1842,7 @@ var nvis = new function () {
     //                 for (; i <= 287; ++i) * p++ = 8;
     //             } else {
     //                 for (counter = 0; counter < 3; counter++) {
-    //                     TINFL_GET_BITS(11, r->m_table_sizes[counter], "\05\05\04"[counter]);
+    //                     TINFL_GET_BITS(11, r->m_table_sizes[counter], '\05\05\04'[counter]);
     //                     r->m_table_sizes[counter] += s_min_table_sizes[counter];
     //                 }
     //                 MZ_CLEAR_OBJ(r->m_tables[2].m_code_size);
@@ -1869,9 +1916,9 @@ var nvis = new function () {
     //                         if ((dist == 16) && (!counter)) {
     //                             TINFL_CR_RETURN_FOREVER(17, TINFL_STATUS_FAILED);
     //                         }
-    //                         num_extra = "\02\03\07"[dist - 16];
+    //                         num_extra = '\02\03\07'[dist - 16];
     //                         TINFL_GET_BITS(18, s, num_extra);
-    //                         s += "\03\03\013"[dist - 16];
+    //                         s += '\03\03\013'[dist - 16];
     //                         TINFL_MEMSET(r->m_len_codes + counter, (dist == 16) ? r->m_len_codes[counter - 1] : 0, s);
     //                         counter += s;
     //                     }
@@ -2476,6 +2523,8 @@ var nvis = new function () {
             this.bSuccess = true;
             let b = this.buffer;
 
+            const bDebug = false;
+
             let magicNumber = b.readInt32();  //  should be decimal 20000630
             let versionField = b.readInt32();
             let version = {
@@ -2485,8 +2534,10 @@ var nvis = new function () {
                 nonImage: (((versionField >> (11 - 1)) & 1) == 1),
                 multiPart: (((versionField >> (12 - 1)) & 1) == 1),
             }
-            console.log("Magic number: " + magicNumber);
-            console.log("Version field: " + JSON.stringify(version));
+            if (bDebug) {
+                console.log('Magic number: ' + magicNumber);
+                console.log('Version field: ' + JSON.stringify(version));
+            }
 
             //  attributes
             this.attributes = {};
@@ -2496,18 +2547,20 @@ var nvis = new function () {
             }
             b.skip();
 
-            console.log(JSON.stringify(this.attributes));
+            if (bDebug) {
+                console.log(JSON.stringify(this.attributes));
+            }
 
             //  offset table
             this.scanLinesPerChunk = EXR_NO_COMPRESSION_SCANLINES;
             this.offsetTable = [];
             let dataWindowBox = this.attributes.dataWindow.values;
             let numOffsets = dataWindowBox.yMax - dataWindowBox.yMin + 1;
-            let compression = this.attributes["compression"].value;
+            let compression = this.attributes['compression'].value;
 
             //  TODO: implement missing compression methods
             if (compression != EXR_NO_COMPRESSION && compression != EXR_ZIP_COMPRESSION) {
-                alert("EXR compression method not implemented!");
+                alert('EXR compression method not implemented!');
                 this.bSuccess = false;
                 return;
             }
@@ -2573,7 +2626,7 @@ var nvis = new function () {
             let outputSize = this.dimensions.w * this.dimensions.h * this.pixelSize;
 
             this.outputBuffer = new NvisBitBuffer(new ArrayBuffer(outputSize));
-            // console.log("Total output buffer size: " + outputSize);
+            // console.log('Total output buffer size: ' + outputSize);
 
             let channelValues = this.attributes.channels.values;
 
@@ -2635,18 +2688,18 @@ var nvis = new function () {
                     let storedScanLine = b.readUint32();
                     let storedDataSize = b.readUint32();
 
-                    //console.log("   scanLine: " + scanLine + ", dataSize: " + dataSize);
+                    //console.log('   scanLine: ' + scanLine + ', dataSize: ' + dataSize);
 
                     let z = {};
 
                     //  https://datatracker.ietf.org/doc/html/rfc1950
 
                     // let atBit = (b.bytePointer * 8 + b.bitPointer);
-                    // console.log("at bit: " + atBit);
+                    // console.log('at bit: ' + atBit);
 
                     let CMF = b.readUint8();
                     let FLG = b.readUint8();
-                    //console.log("CMF: " + CMF + ", FLG: " + FLG + ", next: 0x" + b.peekUint8().toString(16));
+                    //console.log('CMF: ' + CMF + ', FLG: ' + FLG + ', next: 0x' + b.peekUint8().toString(16));
                     z.cmf = {};
                     z.cmf.cm = NvisBitBuffer.bits(CMF, 3, 0);  //  compression method, should be = 8
                     z.cmf.info = NvisBitBuffer.bits(CMF, 7, 4);  //   base-2 logarithm of the LZ77 window size, minus eight (CINFO=7 indicates a 32K window size)
@@ -2656,7 +2709,9 @@ var nvis = new function () {
                     z.flg.flevel = NvisBitBuffer.bits(FLG, 7, 6);  //  0: fastest, 1: fast, 2: default, 3: maximum/slowest
                     z.dictId = (z.flg.fdict == 1 ? b.readUint32() : undefined);
 
-                    console.log(JSON.stringify(z));
+                    if (bDebug) {
+                        console.log(JSON.stringify(z));
+                    }
 
                     //  https://datatracker.ietf.org/doc/html/rfc1951
 
@@ -2674,7 +2729,7 @@ var nvis = new function () {
                             let nlen = (0xFFFF ^ (b.readBits(8) | (b.readBits(8) << 8)));
                             if (len != nlen) {
                                 //  error
-                                console.log("ERROR: Raw block header LEN/NLEN mismatch!");
+                                console.log('ERROR: Raw block header LEN/NLEN mismatch!');
                             }
 
                             this.outputBuffer.consume(b, len);
@@ -2683,7 +2738,7 @@ var nvis = new function () {
 
                         if (blockType == 3) {
                             //  reserved (error)
-                            console.log("ERROR: Reserved block type (3)");
+                            console.log('ERROR: Reserved block type (3)');
                         }
 
                         let counter = 0;
@@ -2700,7 +2755,7 @@ var nvis = new function () {
                             if (blockType == 1) {
                                 //  compression with fixed Huffman codes
                                 //  TODO: this
-                                console.log("TODO: handle blocks compressed with fixed Huffman codes");
+                                console.log('TODO: handle blocks compressed with fixed Huffman codes');
                             } else {
                                 //  compression with dynamic Huffman codes
                                 this.huffman.tableSizes = [
@@ -2737,7 +2792,7 @@ var nvis = new function () {
 
                                 if ((total != 65536) && (usedSymbols > 1)) {
                                     //  error
-                                    console.log("ERROR: Huffman table generation (1)");
+                                    console.log('ERROR: Huffman table generation (1)');
                                 }
 
                                 let treeNext = -1;
@@ -2801,7 +2856,7 @@ var nvis = new function () {
                                         }
                                         if ((distance == 16) && (!counter)) {
                                             //  Error, TODO: handle
-                                            console.log("ERROR: Huffman table generation (2)")
+                                            console.log('ERROR: Huffman table generation (2)')
                                         }
 
                                         let numExtra = [2, 3, 7][distance - 16];
@@ -2816,7 +2871,7 @@ var nvis = new function () {
                                     if ((this.huffman.tableSizes[0] + this.huffman.tableSizes[1]) != counter) {
                                         //TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
                                         //  Error, TODO: handle
-                                        console.log("ERROR: Huffman table generation (3)")
+                                        console.log('ERROR: Huffman table generation (3)')
                                     }
 
                                     this.huffman.tables[0].codeSize = this.huffman.lengthCodes.slice(0, this.huffman.tableSizes[0]);
@@ -2836,7 +2891,7 @@ var nvis = new function () {
                                         break;
                                     if (this.outputBuffer.bytePointer >= this.outputBuffer.buffer.byteLength) {
                                         //  error: TODO: handle
-                                        console.log("Attempting to write outside output buffer!");
+                                        console.log('Attempting to write outside output buffer!');
                                     }
                                     this.outputBuffer.writeUint8(counter);
                                 } else {
@@ -2896,7 +2951,9 @@ var nvis = new function () {
                             }
 
                             if (b.remainingBits() == 0) {
-                                console.log("DONE!");
+                                if (bDebug) {
+                                    console.log('DONE!');
+                                }
                             }
                             //                         if ((MZ_MAX(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
                             //                             while (counter--) {
@@ -2955,13 +3012,13 @@ var nvis = new function () {
                         }
 
 
-                        // let s = "";
-                        // s += scanLine + ", " + dataSize;
-                        // s += ", z: " + JSON.stringify(z);
+                        // let s = '';
+                        // s += scanLine + ', ' + dataSize;
+                        // s += ', z: ' + JSON.stringify(z);
                         // // for (let i = 0; i < 10; i++)
-                        // //     s += ", 0x" + b.readUint8().toString(16);
+                        // //     s += ', 0x' + b.readUint8().toString(16);
                         // console.log(s);
-                        // console.log("bFinalBlock: " + bFinalBlock + ", blockType: " + blockType);
+                        // console.log('bFinalBlock: ' + bFinalBlock + ', blockType: ' + blockType);
 
                     } while (!bFinalBlock);
 
@@ -2980,7 +3037,7 @@ var nvis = new function () {
                     //  predictor
                     let chunkIndex = chunkId * baseChunkSize;
 
-                    let chunkSize = (chunkId == numChunks - 1 ? trailingChunkSize : baseChunkSize);
+                    let chunkSize = (chunkId == numChunks - 1 && trailingChunkSize > 0 ? trailingChunkSize : baseChunkSize);
                     let halfChunkSize = Math.floor((chunkSize + 1) / 2);
 
                     for (let i = chunkIndex + 1; i < chunkIndex + chunkSize; i++) {
@@ -3076,7 +3133,7 @@ var nvis = new function () {
 
             //  https://openexr.readthedocs.io/en/latest/OpenEXRFileLayout.html
 
-            if (attrib.type == "box2i") {
+            if (attrib.type == 'box2i') {
                 attrib.values = {
                     xMin: b.readInt32(),
                     yMin: b.readInt32(),
@@ -3085,7 +3142,7 @@ var nvis = new function () {
                 }
             }
 
-            if (attrib.type == "box2f") {
+            if (attrib.type == 'box2f') {
                 attrib.values = {
                     xMin: b.readFloat32(),
                     yMin: b.readFloat32(),
@@ -3094,7 +3151,7 @@ var nvis = new function () {
                 }
             }
 
-            if (attrib.type == "chlist") {
+            if (attrib.type == 'chlist') {
                 attrib.values = [];
                 while (b.peekUint8() != 0) {
                     let name = b.readString();
@@ -3115,7 +3172,7 @@ var nvis = new function () {
                 b.skip();
             }
 
-            if (attrib.type == "chromaticities") {
+            if (attrib.type == 'chromaticities') {
                 attrib.values = {
                     redX: b.readFloat32(),
                     redY: b.readFloat32(),
@@ -3128,33 +3185,33 @@ var nvis = new function () {
                 };
             }
 
-            if (attrib.type == "compression") {
+            if (attrib.type == 'compression') {
                 attrib.value = b.readUint8();
             }
 
-            if (attrib.type == "double") {
+            if (attrib.type == 'double') {
             }
-            if (attrib.type == "envmap") {
+            if (attrib.type == 'envmap') {
             }
 
-            if (attrib.type == "float") {
+            if (attrib.type == 'float') {
                 attrib.value = b.readFloat32();
             }
 
-            if (attrib.type == "int") {
+            if (attrib.type == 'int') {
                 attrib.value = b.readUint32();
             }
 
-            if (attrib.type == "keycode") {
+            if (attrib.type == 'keycode') {
             }
 
-            if (attrib.type == "lineOrder") {
+            if (attrib.type == 'lineOrder') {
                 attrib.value = b.readUint8();
             }
 
-            if (attrib.type == "m33f") {
+            if (attrib.type == 'm33f') {
             }
-            if (attrib.type == "m44f") {
+            if (attrib.type == 'm44f') {
                 attrib.values = [];
                 for (let y = 0; y < 4; y++) {
                     for (let x = 0; x < 4; x++) {
@@ -3162,36 +3219,36 @@ var nvis = new function () {
                     }
                 }
             }
-            if (attrib.type == "preview") {
+            if (attrib.type == 'preview') {
             }
-            if (attrib.type == "rational") {
+            if (attrib.type == 'rational') {
             }
-            if (attrib.type == "string") {
+            if (attrib.type == 'string') {
             }
-            if (attrib.type == "stringvector") {
+            if (attrib.type == 'stringvector') {
             }
-            if (attrib.type == "tiledesc") {
+            if (attrib.type == 'tiledesc') {
             }
-            if (attrib.type == "timecode") {
+            if (attrib.type == 'timecode') {
             }
 
-            if (attrib.type == "v2i") {
+            if (attrib.type == 'v2i') {
                 attrib.values = {
                     x: b.readInt32(),
                     y: b.readInt32()
                 }
             }
 
-            if (attrib.type == "v2f") {
+            if (attrib.type == 'v2f') {
                 attrib.values = {
                     x: b.readFloat32(),
                     y: b.readFloat32()
                 }
             }
 
-            if (attrib.type == "v3i") {
+            if (attrib.type == 'v3i') {
             }
-            if (attrib.type == "v3f") {
+            if (attrib.type == 'v3f') {
             }
 
             return attrib;
@@ -3200,7 +3257,7 @@ var nvis = new function () {
         toFloatArray() {
             let data = new Float32Array(new ArrayBuffer(this.dimensions.w * this.dimensions.h * 4 * 4));  //  w x h x RGBA x float
 
-            const ChannelMap = { "R": 0, "G": 1, "B": 2, "A": 3 };
+            const ChannelMap = { 'R': 0, 'G': 1, 'B': 2, 'A': 3 };
             let channels = this.attributes.channels.values;
 
             const dstChannels = 4;
@@ -3223,7 +3280,7 @@ var nvis = new function () {
                         }
                         data[dstLoc + ChannelMap[channel.name]] = value;
                     }
-                    data[dstLoc + ChannelMap["A"]] = 1.0;  //  alpha
+                    data[dstLoc + ChannelMap['A']] = 1.0;  //  alpha
                 }
             }
 
@@ -3240,9 +3297,9 @@ var nvis = new function () {
 
     function NvisFileName(fileName) {
         let _fileName = fileName;
-        let _directory = "";
-        let _name = "";
-        let _extension = "";
+        let _directory = '';
+        let _name = '';
+        let _extension = '';
 
         let _isNumbered = false;
         let _number = 0;
@@ -3253,16 +3310,16 @@ var nvis = new function () {
         }
 
         let _zeroPad = function (value, width) {
-            let pad = "000000000000000";
+            let pad = '000000000000000';
             return (pad + value).slice(-width);
         }
 
         let _toString = function () {
-            let string = _directory + "/" + _name;
+            let string = _directory + '/' + _name;
             if (_isNumbered) {
-                string += ("." + _zeroPad(_number, _numberWidth));
+                string += ('.' + _zeroPad(_number, _numberWidth));
             }
-            string += ("." + _extension);
+            string += ('.' + _extension);
 
             return string;
         }
@@ -3293,13 +3350,11 @@ var nvis = new function () {
 
         createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI = true) {
             let callbackString = 'nvis.uiUpdateParameter("' + uniqueId + '", "' + elementId + '", "' + rowId + '", ' + bAllConditionsMet + ', ' + bUpdateUI + ')';
-            //console.log(callbackString);
             return callbackString;
         }
 
         createConfirmCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI = true) {
-            let callbackString = 'if (confirm("Are you sure?")) ' + this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI); //"nvis.uiUpdateParameter(\"" + uniqueId + "\", \"" + elementId + "\", \"" + rowId + "\", " + bAllConditionsMet + ", " + bUpdateUI + ")";
-            //console.log(callbackString);
+            let callbackString = 'if (confirm("Are you sure?")) ' + this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, bUpdateUI);
             return callbackString;
         }
 
@@ -3478,7 +3533,7 @@ var nvis = new function () {
 
             this.textures = [];
 
-            this.bFloat = undefined;
+            this.bFloat = false;
 
             this.shaderId = shaderId;  //  = -1 for file streams
             this.inputStreamIds = [];
@@ -3494,47 +3549,48 @@ var nvis = new function () {
 
             this.startTime = Date.now();
 
+            //  TODO: implement this
             this.defaultUI = `{
-                "uTonemapper": {
-                    "type": "dropdown",
-                    "value": 0,
-                    "alternatives" : [
-                        "None",
-                        "Gamma Correction",
-                        "Clamp",
-                        "Log",
-                        "Reinhard",
-                        John Hable",
-                        "Uncharted2",
-                        "ACES"
+                'uTonemapper': {
+                    'type': 'dropdown',
+                    'value': 0,
+                    'alternatives' : [
+                        'None',
+                        'Gamma Correction',
+                        'Clamp',
+                        'Log',
+                        'Reinhard',
+                        John Hable',
+                        'Uncharted2',
+                        'ACES'
                     ]
                 },
-                "uGamma" : {
-                    "type": "float",
-                    "type": "float",
-                    "value": 2.2,
-                    "min": 1.0,
-                    "max": 5.0,
-                    "step": 0.01,
-                    "condition": "uToneMapper==1"
+                'uGamma' : {
+                    'type': 'float',
+                    'type': 'float',
+                    'value': 2.2,
+                    'min': 1.0,
+                    'max': 5.0,
+                    'step': 0.01,
+                    'condition': 'uToneMapper==1'
                 },
-                "uExposure" : {
-                    "type": "float",
-                    "type": "float",
-                    "value": 1.0,
-                    "min": 0.0,
-                    "max": 100.0,
-                    "step": 0.1,
-                    "condition": "uToneMapper==1"
+                'uExposure' : {
+                    'type': 'float',
+                    'type': 'float',
+                    'value': 1.0,
+                    'min': 0.0,
+                    'max': 100.0,
+                    'step': 0.1,
+                    'condition': 'uToneMapper==1'
                 },
-                "uWhiteScale": {
-                    "name": "Linear White",
-                    "type": "float",
-                    "value": 11.2,
-                    "min": 0.001,
-                    "max": 100.0,
-                    "step": 0.01,
-                    "condition": "uToneMapper==6"
+                'uWhiteScale': {
+                    'name': 'Linear White',
+                    'type': 'float',
+                    'value': 11.2,
+                    'min': 0.001,
+                    'max': 100.0,
+                    'step': 0.01,
+                    'condition': 'uToneMapper==6'
                 }
             }`;
         }
@@ -3578,15 +3634,15 @@ var nvis = new function () {
             }
 
             //  common uniforms
-            let uniform = gl.getUniformLocation(shader.getProgram(), "uDimensions");  //  TODO: not needed
+            let uniform = gl.getUniformLocation(shader.getProgram(), 'uDimensions');  //  TODO: not needed
             if (uniform !== undefined) {
                 gl.uniform2f(uniform, this.dimensions.w, this.dimensions.h);
             }
-            uniform = gl.getUniformLocation(shader.getProgram(), "uTime");
+            uniform = gl.getUniformLocation(shader.getProgram(), 'uTime');
             if (uniform !== undefined) {
                 gl.uniform1f(uniform, (Date.now() - this.startTime) / 1000.0);
             }
-            uniform = gl.getUniformLocation(shader.getProgram(), "uMouse");
+            uniform = gl.getUniformLocation(shader.getProgram(), 'uMouse');
             if (uniform !== undefined && _state.input.mouse.streamCoords !== undefined) {
                 gl.uniform4f(uniform, _state.input.mouse.streamCoords.x, _state.input.mouse.streamCoords.y,
                     (_state.input.mouse.down ? 1.0 : 0.0), 0.0);
@@ -3605,19 +3661,19 @@ var nvis = new function () {
                     continue;
                 }
 
-                if (type == "bool") {
+                if (type == 'bool') {
                     gl.uniform1i(uniform, (uiObject[key].value ? 1 : 0));
                 }
 
-                if (type == "int") {
+                if (type == 'int') {
                     gl.uniform1i(uniform, uiObject[key].value);
                 }
 
-                if (type == "float") {
+                if (type == 'float') {
                     gl.uniform1f(uniform, uiObject[key].value);
                 }
 
-                if (type == "dropdown") {
+                if (type == 'dropdown') {
                     gl.uniform1i(uniform, uiObject[key].value);
                 }
             }
@@ -3626,18 +3682,18 @@ var nvis = new function () {
 
         uiUpdate(elementId) {
             //_object[key].value = value;
-            let key = elementId.replace(/\-.*$/, "");
+            let key = elementId.replace(/\-.*$/, '');
             let element = document.getElementById(elementId);
             let object = this.shaderJSONObject.UI[key];
             let type = object.type;
-            object.value = (type == "bool" ? element.checked : (type == "dropdown" ? element.selectedIndex : element.value));
+            object.value = (type == 'bool' ? element.checked : (type == 'dropdown' ? element.selectedIndex : element.value));
 
-            let elementValue = document.getElementById(elementId + "-value");
+            let elementValue = document.getElementById(elementId + '-value');
             if (elementValue !== null) {
                 elementValue.innerHTML = element.value;
             }
 
-            // console.log(key + ": " + object.value);
+            // console.log(key + ': ' + object.value);
         }
 
 
@@ -3670,6 +3726,7 @@ var nvis = new function () {
 
             let gl = this.glContext;
 
+            this.bFloat = bFloat;
             this.dimensions = dimensions;
 
             this.outputTexture = gl.createTexture();
@@ -3717,9 +3774,9 @@ var nvis = new function () {
                 if (fileName.match(/.exr$/) || fileName.match(/.pfm$/)) {
 
                     let xhr = new XMLHttpRequest();
-                    xhr.open("GET", fileName);
-                    xhr.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
-                    xhr.responseType = "arraybuffer";
+                    xhr.open('GET', fileName);
+                    xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, max-age=0');
+                    xhr.responseType = 'arraybuffer';
                     xhr.onload = function () {
                         if (this.status == 200 && this.response !== null) {
                             numFilesLoaded++;
@@ -3745,13 +3802,7 @@ var nvis = new function () {
                         }
                     };
                     xhr.send();
-                // } else if (fileName.match(/.mp4$/)) {
-                //     let reader = new FileReader();
-                //     reader.onload = function (event) {
-                //         let v = event.target.result;
-                //         console.log("Video loaded");
-                //     }
-                //     reader.readAsDataURL(fileName);XXXXXXXXXXXXXXXXX
+
                 } else {
 
                     const image = new Image();
@@ -3825,7 +3876,7 @@ var nvis = new function () {
                     let reader = new FileReader();
                     reader.onload = function (event) {
                         let v = event.target.result;
-                        console.log("Video loaded: " + JSON.stringify(v));
+                        console.log('Video loaded: ' + JSON.stringify(v));
                     }
                     reader.readAsDataURL(file);
                 }
@@ -3924,15 +3975,15 @@ var nvis = new function () {
 
         getFileName() {
             //  TODO: fix
-            //  TODO: remove bFileStream, use shaderId instead
-            let fileName = "";
+            let fileName = '';
             if (this.fileNames.length > 0) {
                 fileName += this.fileNames[0];
                 if (this.fileNames.length > 1) {
-                    fileName += (" (" + this.fileNames.length + ")");
+                    fileName += (' (' + this.fileNames.length + ')');
                 }
             } else {
-                fileName = "Shader TODO: fix!";
+                // fileName = 'Shader TODO: fix!';
+                fileName = this.shaderJSONObject.name;
             }
             return fileName;
         }
@@ -3949,8 +4000,8 @@ var nvis = new function () {
 
 
         createCallbackString(streamId, elementId, rowId, bAllConditionsMet, bUpdateUI = true) {
-            let callbackString = "document.getElementById(\"" + rowId + "\").style.display=\"" + (bAllConditionsMet ? "" : "none") + "\"";
-            callbackString += "; nvis.streamUpdateParameter(" + streamId + ", \"" + elementId + "\", " + bUpdateUI + ")";
+            let callbackString = 'document.getElementById("' + rowId + '").style.display="' + (bAllConditionsMet ? '' : 'none') + '"';
+            callbackString += '; nvis.streamUpdateParameter(' + streamId + ', "' + elementId + '", ' + bUpdateUI + ')';
             //console.log(callbackString);
             return callbackString;
         }
@@ -3958,8 +4009,10 @@ var nvis = new function () {
         buildShaderUI(object, streamId) {
             let dom = document.createDocumentFragment();
 
-            let table = document.createElement("table");
-            table.className = "uiTable";
+            let table = document.createElement('table');
+            // table.id = 'streamUI-' + streamId;
+            table.className = 'uiTable';
+            // table.style.display = (streamId == _state.ui.selectedStreamId ? 'block' : 'none');
 
             for (let key of Object.keys(object)) {
 
@@ -3967,23 +4020,23 @@ var nvis = new function () {
                 let bAllConditionsMet = true;
 
                 let bConditionNegated = false;
-                let conditionVariable = "";
-                let conditionValue = "";
+                let conditionVariable = '';
+                let conditionValue = '';
 
                 let conditionString = object[key].condition;
                 if (conditionString !== undefined) {
                     conditionString = conditionString.replace(/\s+/g, '');
-                    let conditionStrings = conditionString.split("&");
+                    let conditionStrings = conditionString.split('&');
                     for (let i = 0; i < conditionStrings.length; i++) {
                         let condition = conditionStrings[i];
 
-                        let equalPosition = condition.lastIndexOf("=");
+                        let equalPosition = condition.lastIndexOf('=');
                         if (equalPosition != -1) {
                             //  numeric conditional
-                            bConditionNegated = (condition[equalPosition - 1] == "!");
+                            bConditionNegated = (condition[equalPosition - 1] == '!');
                             conditionVariable = condition.substring(0, equalPosition - 1);
                             conditionValue = condition.substring(equalPosition + 1);
-                            let conditionValues = conditionValue.split(",");
+                            let conditionValues = conditionValue.split(',');
                             bConditionMet = conditionValues.includes(object[conditionVariable].value.toString())
                             bConditionMet = (bConditionNegated ? !bConditionMet : bConditionMet);
                         } else {
@@ -3998,69 +4051,66 @@ var nvis = new function () {
                 }
 
 
-                let label = document.createElement("label");
-                label.setAttribute("for", key);
+                let label = document.createElement('label');
+                label.setAttribute('for', key);
                 label.innerHTML = object[key].name;
 
-                let elementId = (key + "-" + streamId);  //  need uniqueness
-                let rowId = elementId + "-row";
+                let elementId = (key + '-' + streamId);  //  need uniqueness
+                let rowId = elementId + '-row';
 
-                let row = document.createElement("tr");
-                row.setAttribute("id", rowId);
-                row.style.display = (bAllConditionsMet ? "" : "none");
+                let row = document.createElement('tr');
+                row.setAttribute('id', rowId);
+                row.style.display = (bAllConditionsMet ? '' : 'none');
 
                 let el = undefined;
                 let type = object[key].type;
-                if (type == "bool" || type == "int" || type == "float") {
-                    el = document.createElement("input");
-                    el.setAttribute("id", elementId);
+                if (type == 'bool' || type == 'int' || type == 'float') {
+                    el = document.createElement('input');
+                    el.setAttribute('id', elementId);
 
-                    if (type == "bool") {
-                        el.setAttribute("type", "checkbox");
+                    if (type == 'bool') {
+                        el.setAttribute('type', 'checkbox');
                         el.addEventListener('change', (ev) => { nvis.streamUpdateParameter(streamId, elementId, true); }, true);
                         if (object[key].value) {
-                            el.setAttribute("checked", true);
+                            el.setAttribute('checked', true);
                         } else {
-                            el.removeAttribute("checked");
+                            el.removeAttribute('checked');
                         }
-                        // el.setAttribute("onclick", this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet));
-                    } else if (type == "int") {
-                        el.setAttribute("type", "range");
-                        el.setAttribute("min", (object[key].min ? object[key].min : 0));
-                        el.setAttribute("max", (object[key].max ? object[key].max : 1));
-                        el.setAttribute("value", (object[key].value ? object[key].value : 0));
-                        el.setAttribute("step", (object[key].step ? object[key].step : 1));
-                        //el.setAttribute("oninput", this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet, false));
+                        // el.setAttribute('onclick', this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet));
+                    } else if (type == 'int') {
+                        el.setAttribute('type', 'range');
+                        el.setAttribute('min', (object[key].min ? object[key].min : 0));
+                        el.setAttribute('max', (object[key].max ? object[key].max : 1));
+                        el.setAttribute('value', (object[key].value ? object[key].value : 0));
+                        el.setAttribute('step', (object[key].step ? object[key].step : 1));
                         el.addEventListener('input', (ev) => { nvis.streamUpdateParameter(streamId, elementId, false); }, true);
-                        let oEl = document.createElement("span");
-                        oEl.id = (elementId + "-value");
-                        oEl.innerHTML = (oEl.innerHTML == "" ? object[key].value : oEl.innerHTML);
+                        let oEl = document.createElement('span');
+                        oEl.id = (elementId + '-value');
+                        oEl.innerHTML = (oEl.innerHTML == '' ? object[key].value : oEl.innerHTML);
 
-                        label.innerHTML += " (" + oEl.outerHTML + ")";
-                    } else if (type == "float") {
-                        el.setAttribute("type", "range");
-                        el.setAttribute("min", (object[key].min ? object[key].min : 0.0));
-                        el.setAttribute("max", (object[key].max ? object[key].max : 1.0));
-                        el.setAttribute("value", (object[key].value ? object[key].value : 0.0));
-                        el.setAttribute("step", (object[key].step ? object[key].step : 0.1));
-                        //el.setAttribute("oninput", this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet, false));
+                        label.innerHTML += ' (' + oEl.outerHTML + ')';
+                    } else if (type == 'float') {
+                        el.setAttribute('type', 'range');
+                        el.setAttribute('min', (object[key].min ? object[key].min : 0.0));
+                        el.setAttribute('max', (object[key].max ? object[key].max : 1.0));
+                        el.setAttribute('value', (object[key].value ? object[key].value : 0.0));
+                        el.setAttribute('step', (object[key].step ? object[key].step : 0.1));
                         el.addEventListener('input', (ev) => { nvis.streamUpdateParameter(streamId, elementId, false); }, true);
-                        let oEl = document.createElement("span");
-                        oEl.id = (elementId + "-value");
-                        oEl.innerHTML = (oEl.innerHTML == "" ? object[key].value : oEl.innerHTML);
+                        let oEl = document.createElement('span');
+                        oEl.id = (elementId + '-value');
+                        oEl.innerHTML = (oEl.innerHTML == '' ? object[key].value : oEl.innerHTML);
 
-                        label.innerHTML += " (" + oEl.outerHTML + ")";
+                        label.innerHTML += ' (' + oEl.outerHTML + ')';
                     }
                 }
-                else if (type == "dropdown") {
-                    el = document.createElement("select");
-                    el.setAttribute("id", elementId);
-                    //el.setAttribute("onchange", this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet));
+                else if (type == 'dropdown') {
+                    el = document.createElement('select');
+                    el.setAttribute('id', elementId);
                     el.addEventListener('change', (ev) => { nvis.streamUpdateParameter(streamId, elementId, true); }, true);
                     for (let optionId = 0; optionId < object[key].alternatives.length; optionId++) {
-                        let oEl = document.createElement("option");
+                        let oEl = document.createElement('option');
                         if (object[key].value == optionId) {
-                            oEl.setAttribute("selected", true);
+                            oEl.setAttribute('selected', true);
                         }
                         oEl.innerHTML = object[key].alternatives[optionId];
                         el.appendChild(oEl);
@@ -4068,15 +4118,15 @@ var nvis = new function () {
                 }
 
                 if (el !== undefined) {
-                    if (type == "bool") {
-                        let cell = document.createElement("td");
-                        cell.setAttribute("multicolumn", 2);
+                    if (type == 'bool') {
+                        let cell = document.createElement('td');
+                        cell.setAttribute('multicolumn', 2);
                         cell.appendChild(el);
                         cell.appendChild(label);
                         row.appendChild(cell);
                     } else {
-                        let elCell = document.createElement("td");
-                        let labelCell = document.createElement("td");
+                        let elCell = document.createElement('td');
+                        let labelCell = document.createElement('td');
                         elCell.appendChild(el);
                         labelCell.appendChild(label);
                         row.appendChild(elCell);
@@ -4096,45 +4146,96 @@ var nvis = new function () {
         getUI(streamId, streams, shaders) {
 
             //  streamId is needed since the stream itself does not know its id
-            let ui = document.createDocumentFragment();
+            // let ui = document.createDocumentFragment();
+            let ui = document.createElement('div');
+            ui.id = 'ui';
+            
+            let fileName = streams[streamId].getFileName();
+            let arrowRight = '&#9658;';
+            let arrowDown = '&#9660;';
 
-            let span = document.createElement("span");
-            span.innerHTML = ("- stream " + (streamId + 1) + ": " + this.getFileName());
-            ui.appendChild(span);
-            ui.appendChild(document.createElement("br"));
+            let uiTitle = document.createElement('div');
+            uiTitle.className = 'uiTitle';
+            uiTitle.id = 'streamTitleUI-' + streamId;
+            uiTitle.innerHTML = (_state.ui.selectedStreamId == streamId ? arrowDown : arrowRight)
+            uiTitle.innerHTML += (' stream ' + (streamId + 1) + ': ' + fileName);
+            if (_state.ui.selectedStreamId == streamId)
+            {
+                uiTitle.innerHTML = uiTitle.innerHTML.bold();
+            }
+
+            uiTitle.addEventListener('click', () => {
+
+                // console.log('selected stream id: ' + streamId);
+                // console.log('state stream id: ' + _state.ui.selectedStreamId);
+
+                if (streamId == _state.ui.selectedStreamId) {
+                    _state.ui.selectedStreamId = -1;
+                }
+                else
+                    _state.ui.selectedStreamId = streamId;
+
+                for (let id = 0; id < streams.length; id++) {
+
+                    let streamTitle = document.getElementById('streamTitleUI-' + id);
+                    streamTitle.innerHTML = (_state.ui.selectedStreamId == id ? arrowDown : arrowRight)
+                    streamTitle.innerHTML += (' stream ' + (id + 1) + ': ' + streams[id].getFileName());    
+                    if (_state.ui.selectedStreamId == id)
+                    {
+                        streamTitle.innerHTML = streamTitle.innerHTML.bold();
+                    }
+
+                    let streamBody = document.getElementById('streamBodyUI-' + id);
+                    if (streamBody !== null) {
+                        streamBody.style.display = (_state.ui.selectedStreamId == id ? 'block' : 'none');
+                    }
+                }
+            })
+
+            ui.appendChild(uiTitle);
 
             if (this.shaderId != -1) {
+
+                let uiBody = document.createElement('div');
+                uiBody.id = 'streamBodyUI-' + streamId;
+                uiBody.className = 'uiBody';
 
                 let shader = shaders.shaders[this.shaderId];
 
                 for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
-                    let eId = ("input-" + streamId + "-" + inputId);
-                    let label = document.createElement("label");
-                    label.setAttribute("for", eId);
-                    label.innerHTML = ("Input " + (inputId + 1) + ":");
+                    let eId = ('input-' + streamId + '-' + inputId);
+                    let label = document.createElement('label');
+                    label.setAttribute('for', eId);
+                    label.innerHTML = ('Input ' + (inputId + 1) + ':');
 
-                    let sEl = document.createElement("select");
+                    let sEl = document.createElement('select');
                     sEl.id = eId;
-                    // sEl.setAttribute("onchange", "nvis.streamUpdateInput(" + streamId + ", " + inputId + ")");
                     sEl.addEventListener('change', () => { nvis.streamUpdateInput(streamId, inputId); });
                     for (let otherStreamId = 0; otherStreamId < streams.length; otherStreamId++) {
                         if (otherStreamId != streamId) {
-                            let sOp = document.createElement("option");
+                            let sOp = document.createElement('option');
                             sOp.innerHTML = streams[otherStreamId].getFileName();
                             if (this.inputStreamIds[inputId] == otherStreamId) {
-                                sOp.setAttribute("selected", true);
+                                sOp.setAttribute('selected', true);
                             }
                             sEl.appendChild(sOp);
                         }
                     }
-                    ui.appendChild(label);
-                    ui.appendChild(sEl);
-                    ui.appendChild(document.createElement("br"));
+                    let inputDiv = document.createElement('div');
+                    inputDiv.appendChild(label);
+                    inputDiv.appendChild(sEl);
+                    
+                    uiBody.style.display = (streamId == _state.ui.selectedStreamId ? 'block' : 'none');
+
+                    uiBody.appendChild(inputDiv);
                 }
                 if (shader !== undefined && shader.isReady()) {
-                    //ui.appendChild(shader.getUI(streamId));
-                    ui.appendChild(this.buildShaderUI(this.shaderJSONObject.UI, streamId));
+                    let shaderUI = this.buildShaderUI(this.shaderJSONObject.UI, streamId);
+                    
+                    uiBody.appendChild(shaderUI);
                 }
+
+                ui.appendChild(uiBody);
             }
 
             return ui;
@@ -4155,22 +4256,22 @@ var nvis = new function () {
             this.canvas = canvas;
             this.position = { x: 10, y: 10 };
             this.size = { w: 0, h: 0 };
-            this.text = "";
-            this.div = document.createElement("div");
-            this.div.className = "overlay";
+            this.text = '';
+            this.div = document.createElement('div');
+            this.div.className = 'overlay';
 
-            // this.div.style.left = this.position.x + "px";
-            // this.div.style.top = this.position.y + "px";
-            // this.div.style.width = this.size.w + "px";
-            // this.div.style.height = this.size.h + "px";
+            // this.div.style.left = this.position.x + 'px';
+            // this.div.style.top = this.position.y + 'px';
+            // this.div.style.width = this.size.w + 'px';
+            // this.div.style.height = this.size.h + 'px';
         }
 
         show() {
-            this.div.style.display = "block";
+            this.div.style.display = 'block';
         }
 
         hide() {
-            this.div.style.display = "none";
+            this.div.style.display = 'none';
         }
 
         update(windowId, coordinates, color, bFloat) {
@@ -4178,15 +4279,15 @@ var nvis = new function () {
                  return;
             }
             
-            // console.log("windowId: " + windowId + ", coords: " + JSON.stringify(coordinates) + ", color: " + JSON.stringify(color));
+            // console.log('windowId: ' + windowId + ', coords: ' + JSON.stringify(coordinates) + ', color: ' + JSON.stringify(color));
 
             this.windowId = windowId;
             this.coordinates = coordinates;
             this.color = color;
 
-            this.text = "";
+            this.text = '';
             if (coordinates === undefined) {
-                this.text += "N/A";  //  TODO: should not happen, checked before call
+                this.text += 'N/A';  //  TODO: should not happen, checked before call
             } else {
                 let factor = (bFloat ? 255.0 : 1.0);
                 let r = color.r * factor;
@@ -4194,17 +4295,17 @@ var nvis = new function () {
                 let b = color.b * factor;;
                 let a = color.a * factor;
                 let decimals = _settings.pixelValueDecimals.value;
-                this.text += "position: " + Math.floor(coordinates.x) + ", " + Math.floor(coordinates.y) + "<br/>";
-                this.text += "<span style=\"background-color: rgb(" + r + ",0,0)\"></span>R: " + (bFloat ? color.r.toFixed(decimals) : color.r) + "<br/>";
-                this.text += "<span style=\"background-color: rgb(0," + g + ",0)\"></span>G: " + (bFloat ? color.g.toFixed(decimals) : color.g) + "<br/>";
-                this.text += "<span style=\"background-color: rgb(0,0," + b + ")\"></span>B: " + (bFloat ? color.b.toFixed(decimals) : color.b) + "<br/>";
-                this.text += "<span style=\"background-color: rgb(" + a + "," + a + "," + a + ")\"></span>A: " + (bFloat ? color.a.toFixed(decimals) : color.a);
+                this.text += 'position: ' + Math.floor(coordinates.x) + ', ' + Math.floor(coordinates.y) + '<br/>';
+                this.text += '<span style=\'background-color: rgb(' + r + ',0,0)\'></span>R: ' + (bFloat ? color.r.toFixed(decimals) : color.r) + '<br/>';
+                this.text += '<span style=\'background-color: rgb(0,' + g + ',0)\'></span>G: ' + (bFloat ? color.g.toFixed(decimals) : color.g) + '<br/>';
+                this.text += '<span style=\'background-color: rgb(0,0,' + b + ')\'></span>B: ' + (bFloat ? color.b.toFixed(decimals) : color.b) + '<br/>';
+                this.text += '<span style=\'background-color: rgb(' + a + ',' + a + ',' + a + ')\'></span>A: ' + (bFloat ? color.a.toFixed(decimals) : color.a);
             }
             this.div.innerHTML = this.text;
 
             //  TODO: below can be used for fixed placement
-            // let w = window.getComputedStyle(this.div).getPropertyValue("width");
-            // let h = window.getComputedStyle(this.div).getPropertyValue("height");
+            // let w = window.getComputedStyle(this.div).getPropertyValue('width');
+            // let h = window.getComputedStyle(this.div).getPropertyValue('height');
             // this.size = { w: Math.floor(w.substring(0, w.indexOf('px'))), h: Math.floor(h.substring(0, h.indexOf('px'))) };
 
             let cCoords = _state.input.mouse.canvasCoords;
@@ -4217,8 +4318,8 @@ var nvis = new function () {
             let left = _state.layout.border + winCoords.x;
             let top = _state.layout.border + winCoords.y;
             this.position = { x: left, y: top };
-            this.div.style.left = left + "px";
-            this.div.style.top = top + "px";
+            this.div.style.left = left + 'px';
+            this.div.style.top = top + 'px';
         }
     }
 
@@ -4259,8 +4360,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             welcomeText2.innerHTML = '...or press L to load files with multiselect using file dialog.';
             welcomeText3.innerHTML = 'Hold H for keyboard shortcuts, press Tab to toggle UI.';
 
-            this.welcome = document.createElement("div");
-            this.welcome.id = "welcome";
+            this.welcome = document.createElement('div');
+            this.welcome.id = 'welcome';
             this.welcome.appendChild(logo);
             this.welcome.appendChild(welcomeTitle);
             this.welcome.appendChild(welcomeText1);
@@ -4330,7 +4431,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         setStreamPxDimensions(pxDimensions) {
             if (this.streamPxDimensions !== undefined && pxDimensions.w != this.streamPxDimensions.w && pxDimensions.h != this.streamPxDimensions.h) {
-                alert("New stream size mismatch!");
+                alert('New stream size mismatch!');
             }
             this.streamPxDimensions = pxDimensions;
         }
@@ -4435,7 +4536,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             } else if (!bToPixels) {
                 coords.y = coords.y / sh;
             }
-            // console.log("NvisWindows.getStreamPixelCoordinates(): " + JSON.stringify(coords));
+            // console.log('NvisWindows.getStreamPixelCoordinates(): ' + JSON.stringify(coords));
 
             return coords;
         }
@@ -4499,13 +4600,13 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
 
         debugZoom(title) {
-            console.log("---------------------  " + title + "  ---------------------");
-            console.log("     zoom level: " + _state.zoom.level);
-            console.log("     win aspect ratio: " + _state.zoom.winAspectRatio);
-            console.log("     stream rel offset: " + JSON.stringify(_state.zoom.streamOffset));
-            console.log("     mouseWinCoords: " + JSON.stringify(_state.zoom.mouseWinCoords));
-            console.log("     win dim (px): " + JSON.stringify(this.winPxDimensions));
-            console.log("     stream dim (px): " + JSON.stringify(this.streamPxDimensions));
+            console.log('---------------------  ' + title + '  ---------------------');
+            console.log('     zoom level: ' + _state.zoom.level);
+            console.log('     win aspect ratio: ' + _state.zoom.winAspectRatio);
+            console.log('     stream rel offset: ' + JSON.stringify(_state.zoom.streamOffset));
+            console.log('     mouseWinCoords: ' + JSON.stringify(_state.zoom.mouseWinCoords));
+            console.log('     win dim (px): ' + JSON.stringify(this.winPxDimensions));
+            console.log('     stream dim (px): ' + JSON.stringify(this.streamPxDimensions));
         }
 
 
@@ -4555,7 +4656,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 this.textureCoordinates[i + 1] += _state.zoom.streamOffset.y;
             }
 
-            // this.debugZoom("updateTextureCoordinates()");
+            // this.debugZoom('updateTextureCoordinates()');
 
             //  update windows with new coordinates
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
@@ -4569,9 +4670,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             let layout = _state.layout;
 
             //  determine canvas dimensions and border
-            this.canvas.style.borderWidth = layout.border + "px";
-            this.canvas.style.borderStyle = "solid";
-            this.canvas.style.borderColor = "black";
+            this.canvas.style.borderWidth = layout.border + 'px';
+            this.canvas.style.borderStyle = 'solid';
+            this.canvas.style.borderColor = 'black';
             let pageWidth = (window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth);
             let pageHeight = (window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight);
             let width = pageWidth - 2 * layout.border;
@@ -4606,8 +4707,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             let dh = (height % h);
             this.canvas.width = (width - dw);
             this.canvas.height = (height - dh);
-            this.canvas.style.borderRightWidth = (layout.border + dw) + "px";
-            this.canvas.style.borderBottomWidth = (layout.border + dh) + "px";
+            this.canvas.style.borderRightWidth = (layout.border + dw) + 'px';
+            this.canvas.style.borderBottomWidth = (layout.border + dh) + 'px';
 
             //  set viewport to match canvas size
             this.glContext.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -4630,6 +4731,26 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             }
 
             //  update texture coordinates to reflect changes
+            this.updateTextureCoordinates();
+        }
+
+
+        position(canvasOffset, bPixels = true) {
+            if (this.windows.length == 0) {
+                return;
+            }
+
+            //  bPixels: x and y are in pixels
+            if (bPixels) {
+                canvasOffset = {
+                    x: canvasOffset.x / (this.streamPxDimensions.w * _state.zoom.level),
+                    y: canvasOffset.y / (this.streamPxDimensions.h * _state.zoom.level)
+                }
+            }
+
+            _state.zoom.streamOffset.x = canvasOffset.x;
+            _state.zoom.streamOffset.y = canvasOffset.y;
+
             this.updateTextureCoordinates();
         }
 
@@ -4936,7 +5057,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             gl.useProgram(shaderProgram);
 
-            let aVertexPosition = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+            let aVertexPosition = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
             gl.bindBuffer(gl.ARRAY_BUFFER, this.fullVertexPositionBuffer);
             gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(aVertexPosition);
@@ -4990,7 +5111,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             shaderProgram = shaders.textureShader.getProgram();
             gl.useProgram(shaderProgram);
 
-            aVertexPosition = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+            aVertexPosition = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
             gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
             gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(aVertexPosition);
@@ -5010,7 +5131,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             gl.uniform1i(uAlphaCheckerboard, _settings.bAlphaCheckerboard.value);
 
             //  TODO: this shouldn't be necessary, can get dimensions directly in shader
-            gl.uniform2f(gl.getUniformLocation(shaderProgram, "uDimensions"), streamDim.w, streamDim.h);
+            gl.uniform2f(gl.getUniformLocation(shaderProgram, 'uDimensions'), streamDim.w, streamDim.h);
 
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -5220,11 +5341,16 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             tabShaders.className = (_state.ui.tabId == 'tabShaders' ? 'tab active' : 'tab')
             tabShaders.addEventListener('click', (event) => nvis.openTab(event, 'tabShaders'));
             tabShaders.innerHTML = 'Shaders';
+            let tabAnnotations = document.createElement('button');
+            tabAnnotations.className = (_state.ui.tabId == 'tabAnnotations' ? 'tab active' : 'tab')
+            tabAnnotations.addEventListener('click', (event) => nvis.openTab(event, 'tabAnnotations'));
+            tabAnnotations.innerHTML = 'Annotations';
 
             tabs.appendChild(tabSettings);
             tabs.appendChild(tabStreams);
             tabs.appendChild(tabWindows);
             tabs.appendChild(tabShaders);
+            tabs.appendChild(tabAnnotations);
 
             //  settings
             this.settingsUI.build();
@@ -5255,7 +5381,6 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
                 let select = document.createElement('select');
                 select.id = 'windowStream-' + windowId;
-                // select.setAttribute('onchange', 'nvis.setWindowStreamId(' + windowId + ')');
                 select.addEventListener('change', () => { nvis.setWindowStreamId(windowId); });
 
                 let windowStreamId = this.windows.getWindow(windowId).getStreamId();
@@ -5279,21 +5404,81 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             }
 
             //  shaders
+            let validShaders = [];
+            for (let shaderId = 0; shaderId < this.shaders.shaders.length; shaderId++) {
+                if (this.shaders.shaders[shaderId].numInputs <= this.streams.length) {
+                    validShaders.push(shaderId);
+                }
+            }
+
             let shadersDiv = document.createElement('div');
             shadersDiv.id = 'tabShaders';
             shadersDiv.className = 'tabContent';
             shadersDiv.style.display = (_state.ui.tabId == 'tabShaders' ? 'block' : 'none');
+
+            let label = document.createElement('label');
+            label.innerHTML = 'Shader: ';
+            let select = document.createElement('select');
+            select.id = 'shaderStream';
+            select.addEventListener('change', (event) => {
+                let shaderId = document.getElementById('shaderStream').selectedIndex - 1;
+                document.getElementById('buttonCreate').disabled = !validShaders.includes(shaderId);                    
+            });
+
+            let button = document.createElement('button');
+            button.id = 'buttonCreate';
+            button.innerHTML = 'Create';
+            button.disabled = true;
+            button.addEventListener('click', () => {
+                let shaderId = document.getElementById('shaderStream').selectedIndex - 1;
+                console.log('Click: ' + shaderId);
+                let newStream = this.addShaderStream(shaderId);
+                let numInputs = this.shaders.shaders[shaderId].numInputs;
+                let inputStreams = [];
+                if (numInputs > 0) {
+                    for (let i = 0; i < numInputs; i++) {
+                        inputStreams.push(i);
+                    }
+                    newStream.setInputStreamIds(inputStreams);
+                } else {
+                    //  generator, need to set size
+                    newStream.setDimensions(_renderer.windows.streamPxDimensions);
+                }
+                this.addWindow(this.streams.length - 1);
+            });
+
+            let option = document.createElement('option');
+            option.innerHTML = '--- Select shader stream ---';
+            select.appendChild(option);
             for (let shaderId = 0; shaderId < this.shaders.shaders.length; shaderId++) {
-                let ui = document.createElement('p');
-                ui.innerHTML = 'Shader: ' + this.shaders.shaders[shaderId].name;
-                shadersDiv.appendChild(ui);
+                let numInputs = this.shaders.shaders[shaderId].numInputs;
+                option = document.createElement('option');
+                option.innerHTML = this.shaders.shaders[shaderId].name;
+                if (numInputs > this.streams.length) {
+                    option.disabled = true;
+                    option.innerHTML += ' (requires ' + numInputs + ' input' + (numInputs == 1 ? '' : 's') + ')';
+                }
+                select.appendChild(option);
             }
+            let selectDiv = document.createElement('div');
+            selectDiv.appendChild(label);
+            selectDiv.appendChild(select);
+            selectDiv.appendChild(button);
+            shadersDiv.appendChild(selectDiv);
+
+            //  annotations
+            let annotationsDiv = document.createElement('div');
+            annotationsDiv.id = 'tabAnnotations';
+            annotationsDiv.className = 'tabContent';
+            annotationsDiv.style.display = (_state.ui.tabId == 'tabAnnotations' ? 'block' : 'none');
+
 
             this.uiPopup.appendChild(tabs);
             this.uiPopup.appendChild(settingsDiv);
             this.uiPopup.appendChild(streamsDiv);
             this.uiPopup.appendChild(windowsDiv);
             this.uiPopup.appendChild(shadersDiv);
+            this.uiPopup.appendChild(annotationsDiv);
 
             // //  center popup
             // let w = window.getComputedStyle(this.uiPopup).getPropertyValue('width');
@@ -5309,6 +5494,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.uiPopup.style.top = (_state.ui.position.y + 'px');
         }
 
+        closeUIPopup() {
+            this.uiPopup.style.display = 'none';
+        }
+
         onKeyDown(event) {
             event = event || window.event;
             let keyCode = event.keyCode || event.which;
@@ -5318,13 +5507,12 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 return;
             }
 
-            if (keyCode != 9) {  //  Tab
-                this.uiPopup.style.display = 'none';  //  TODO: perhaps improve
+            if (key != 'Tab') {
+                this.closeUIPopup();
             }
 
             // if (keyCode != 116)  //  F5
             //     event.preventDefault();
-
 
             switch (key) {
                 case 'Tab':  //  Tab
@@ -5342,14 +5530,14 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     break;
                 case 'ArrowLeft':  //  ArrowLeft
                     _state.animation.dec();
-                    this.popupInfo('Frame: ' + _state.animation.frameId + ' / ' + _state.animation.numFrames);
+                    this.popupInfo('Frame: ' + (_state.animation.frameId + 1) + ' / ' + _state.animation.numFrames);
                     break;
                 case 'ArrowUp':  //  ArrowUp
                     this.windows.incStream(_state.input.mouse.canvasCoords, this.streams);
                     break;
                 case 'ArrowRight':  //  ArrowRight
                     _state.animation.inc();
-                    this.popupInfo('Frame: ' + _state.animation.frameId + ' / ' + _state.animation.numFrames);
+                    this.popupInfo('Frame: ' + (_state.animation.frameId + 1) + ' / ' + _state.animation.numFrames);
                     break;
                 case 'ArrowDown':  //  ArrowDown
                     this.windows.decStream(_state.input.mouse.canvasCoords, this.streams);
@@ -5517,11 +5705,12 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.windows.getWindow(windowId).setStreamId(newStreamId);
         }
 
-        setupVideo(frames) {
+        setupVideo(fileName, frames) {
             let gl = this.glContext;
-            console.log('Here...');
+
             let newStream = new NvisStream(this.glContext);
-            //newStream.drop(frames, this.windows);
+            newStream.fileNames[0] = fileName;
+
             let dimensions = { w: frames[0].width, h: frames[0].height };
             for (let frameId = 0; frameId < frames.length; frameId++) {
                 let frame = frames[frameId];
@@ -5540,6 +5729,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         onFileDrop(event) {
             event.stopPropagation();
             event.preventDefault();
+
+            this.closeUIPopup();
 
             // if (event.clipboardData !== undefined)
             // {
@@ -5583,7 +5774,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             }
 
             if (files[0].type.match(/video.*/)) {
-                let videoParser = new NvisVideoParser((frames) => _renderer.setupVideo(frames));
+                let videoParser = new NvisVideoParser((fileName, frames) => _renderer.setupVideo(fileName, frames));
                 videoParser.fromBlob(files[0]);
             }
 
@@ -5758,7 +5949,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
     }
 
     let _uiUpdateParameter = function (objectId, elementId, rowId, bAllConditionsMet, bUpdateUI) {
-        console.log('uiUpdateParameter(' + objectId + ', ' + elementId + ', ' + bUpdateUI + ')');
+        // console.log('uiUpdateParameter(' + objectId + ', ' + elementId + ', ' + bUpdateUI + ')');
 
         let key = elementId.replace(/^.*\-/, '');
         let element = document.getElementById(elementId);
@@ -5853,6 +6044,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
     return {
         clear: _apiClear,
         zoom: _apiZoom,
+        position: _apiPosition,
+        translate: _apiTranslate,
         annotation: _apiAnnotation,
         stream: _apiStream,
         shader: _apiShader,

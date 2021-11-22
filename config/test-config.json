@@ -13,17 +13,17 @@
         {
             "name": "Lena",
             "window": true,
-            "images": "images/lena.png"
+            "images": "images/png/lena.png"
         },
         {
             "name": "Texture",
             "window": false,
-            "images": "images/texture.png"
+            "images": "images/png/texture.png"
         },
         {
             "name": "Plane",
             "window": true,
-            "images": "images/plane.png"
+            "images": "images/png/plane.png"
         },
         {
             "name": "Lena/Texture difference",

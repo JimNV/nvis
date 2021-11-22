@@ -7,7 +7,7 @@
             "name": "Uncompressed EXR",
             "window": true,
             "files": [
-                "images/uncompressed.exr"
+                "images/exr/uncompressed.exr"
             ]
         }
     ]

@@ -2,12 +2,19 @@
     "name": "Sponza EXR configuration",
     "zoom": 2.0,
     "position": { "x": 0, "y": 0 },
+    "shaders": [
+        "glsl/difference.json",
+        "glsl/mixer.json",
+        "glsl/pixelate.json",
+        "glsl/ssim.json",
+        "glsl/tiling.json"
+    ],
     "streams": [
         {
             "name": "Sponza EXR",
             "window": true,
             "images": [
-                "images/sponza.exr"
+                "images/exr/sponza.exr"
             ]
         }
     ]
