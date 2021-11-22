@@ -5999,6 +5999,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         if (key == 'clearAll') {
             _apiClear();
+            _renderer.closeUIPopup();
         }
 
         let elementValue = document.getElementById(elementId + '-value');
