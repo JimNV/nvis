@@ -29,7 +29,6 @@
 'use strict';
 
 browser.browserAction.onClicked.addListener(() => {
-    alert('Here...');
     browser.tabs.create({
         url: '/index.html'
     });
