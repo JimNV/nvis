@@ -373,9 +373,11 @@ var nvis = new function () {
         addStylesheetRules(`.uiPopup label {
             margin-left: 5px;
         }`);
+        addStylesheetRules(`.uiPopup button {
+            font: 20px Arial;
+        }`);
         addStylesheetRules(`.uiPopup button#buttonCreate {
             margin-left: 5px;
-            font: 20px Arial;
         }`);
         addStylesheetRules(`.uiPopup input[type=range] {
             width: 300px;
@@ -568,7 +570,7 @@ var nvis = new function () {
         if (command == 'clear') {
             _state.zoom.level = 1.0;
             _renderer.streams = [];
-            _renderer.shaders.clear();
+            // _renderer.shaders.clear();  //  TODO: should shaders be cleared? optionally?
             _renderer.windows.clear();
             return true;
         } else if (command == 'zoom') {
