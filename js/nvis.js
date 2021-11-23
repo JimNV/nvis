@@ -492,6 +492,13 @@ var nvis = new function () {
         return _apiCommand({ command: 'shader', argument: { fileName: fileName, inputs: inputs, window: bWindow } });
     }
 
+    let _apiShaders = function (fileNames) {
+        fileNames = (Array.isArray(fileNames) ? fileNames : [fileNames]);
+        for (let i = 0; i < fileNames.length; i++) {
+            _apiCommand({ command: 'loadShader', argument: fileNames[i] });
+        }
+    }
+
     let _apiGenerator = function (fileName, width, height, bWindow = true) {
         return _apiCommand({ command: 'generator', argument: { fileName: fileName, width: width, height: height, window: bWindow } });
     }
@@ -589,7 +596,6 @@ var nvis = new function () {
             if (argument.images !== undefined) {
                 streamId = _renderer.loadStream(Array.isArray(argument.images) ? argument.images : [argument.images]);
             } else if (argument.shader !== undefined) {
-                //let shaderId = _renderer.loadShader(argument.shader);
                 let shaderId = argument.shader;
                 let newStream = _renderer.addShaderStream(shaderId);
                 let inputStreamIds = argument.inputs;
@@ -5431,7 +5437,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             button.disabled = true;
             button.addEventListener('click', () => {
                 let shaderId = document.getElementById('shaderStream').selectedIndex - 1;
-                console.log('Click: ' + shaderId);
+                // console.log('Click: ' + shaderId);
                 let newStream = this.addShaderStream(shaderId);
                 let numInputs = this.shaders.shaders[shaderId].numInputs;
                 let inputStreams = [];
@@ -5457,6 +5463,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 if (numInputs > this.streams.length) {
                     option.disabled = true;
                     option.innerHTML += ' (requires ' + numInputs + ' input' + (numInputs == 1 ? '' : 's') + ')';
+                } else if (numInputs == 0 && this.streams.length == 0) {
+                    option.disabled = true;
+                    option.innerHTML += ' (requires known dimensions)';
                 }
                 select.appendChild(option);
             }
@@ -6050,6 +6059,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         annotation: _apiAnnotation,
         stream: _apiStream,
         shader: _apiShader,
+        shaders: _apiShaders,
         generator: _apiGenerator,
         config: _apiConfig,
         window: _apiWindow,

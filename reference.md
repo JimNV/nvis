@@ -57,6 +57,10 @@ nvis.stream(<filename> | "[" <filename>+ "]", window = true) - Load stream of si
                nvis.stream([ "ref/img.0000.exr", "ref/img.0001.exr", "ref/img.0002.exr" ], false);  //  Load three EXR images to stream, and do not open a window for it
 
 nvis.shader(<filename>, "[" <input stream id]>+ "]", window = true)
+    Example:  nvis.shader("glsl/difference.json", [ 0, 1], false);  //  Load difference shader, create stream, and connect streams 0 and 1 as inputs, do not open a window
+
+nvis.shaders(<filename> | "[" <filename>+ "]")  -  Load shaders for later usage, i.e., to create shader streams
+    Example:  nvis.shaders([ "glsl/difference.json", "glsl/ssim.json" ]);  //  Load difference and SSIM shaders, making them available for new shader streams
 
 nvis.generator(<filename>, <width>, <height>, window = true)
 
