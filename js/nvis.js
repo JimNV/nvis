@@ -3433,7 +3433,6 @@ var nvis = new function () {
                         if (object[key].value) {
                             el.setAttribute('checked', true);
                         }
-                        //el.setAttribute('onclick', this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
                         el.addEventListener('change', (ev) => { nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, true); }, true);
                     } else if (type == 'int') {
                         el.setAttribute('type', 'range');
@@ -3451,7 +3450,6 @@ var nvis = new function () {
                         }
                         el.setAttribute('value', (object[key].value ? object[key].value : 0));
                         el.setAttribute('step', (object[key].step ? object[key].step : 1));
-                        //el.setAttribute('oninput', this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, false));
                         el.addEventListener('input', (ev) => { nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false); }, true);
                         let oEl = document.createElement('span');
                         oEl.id = (elementId + '-value');
@@ -3464,7 +3462,6 @@ var nvis = new function () {
                         el.setAttribute('max', (object[key].max ? object[key].max : 1.0));
                         el.setAttribute('value', (object[key].value ? object[key].value : 0.0));
                         el.setAttribute('step', (object[key].step ? object[key].step : 0.1));
-                        //el.setAttribute('oninput', this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet, false));
                         el.addEventListener('input', (ev) => { nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false); }, true);
                         let oEl = document.createElement('span');
                         oEl.id = (elementId + '-value');
@@ -3475,7 +3472,6 @@ var nvis = new function () {
                 } else if (type == 'dropdown') {
                     el = document.createElement('select');
                     el.setAttribute('id', elementId);
-                    //el.setAttribute('onchange', this.createCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
                     el.addEventListener('change', (ev) => { nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false); }, true);
                     for (let optionId = 0; optionId < object[key].alternatives.length; optionId++) {
                         let oEl = document.createElement('option');
@@ -3489,7 +3485,6 @@ var nvis = new function () {
                     el = document.createElement('button');
                     el.setAttribute('id', elementId);
                     el.innerHTML = object[key].value;
-                    //el.setAttribute('onclick', this.createConfirmCallbackString(uniqueId, elementId, rowId, bAllConditionsMet));
                     el.addEventListener('click', (ev) => { if (confirm('Are you sure?')) nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false); }, true);
                 }
 
@@ -3504,10 +3499,8 @@ var nvis = new function () {
                         row.appendChild(cell);
                     } else {
                         let elCell = document.createElement('td');
-                        //elCell.innerHTML = el.outerHTML;
                         elCell.appendChild(el);
                         let labelCell = document.createElement('td');
-                        //labelCell.innerHTML = label.outerHTML;
                         labelCell.appendChild(label);
 
                         row.appendChild(elCell);
@@ -4009,7 +4002,7 @@ var nvis = new function () {
 
         createCallbackString(streamId, elementId, rowId, bAllConditionsMet, bUpdateUI = true) {
             let callbackString = 'document.getElementById("' + rowId + '").style.display="' + (bAllConditionsMet ? '' : 'none') + '"';
-            callbackString += '; nvis.streamUpdateParameter(' + streamId + ', "' + elementId + '", ' + bUpdateUI + ')';
+            callbackString += '; nvis.uiStreamUpdateParameter(' + streamId + ', "' + elementId + '", ' + bUpdateUI + ')';
             //console.log(callbackString);
             return callbackString;
         }
@@ -4078,7 +4071,7 @@ var nvis = new function () {
 
                     if (type == 'bool') {
                         el.setAttribute('type', 'checkbox');
-                        el.addEventListener('change', (ev) => { nvis.streamUpdateParameter(streamId, elementId, true); }, true);
+                        el.addEventListener('change', (ev) => { nvis.uiStreamUpdateParameter(streamId, elementId, true); }, true);
                         if (object[key].value) {
                             el.setAttribute('checked', true);
                         } else {
@@ -4091,7 +4084,7 @@ var nvis = new function () {
                         el.setAttribute('max', (object[key].max ? object[key].max : 1));
                         el.setAttribute('value', (object[key].value ? object[key].value : 0));
                         el.setAttribute('step', (object[key].step ? object[key].step : 1));
-                        el.addEventListener('input', (ev) => { nvis.streamUpdateParameter(streamId, elementId, false); }, true);
+                        el.addEventListener('input', (ev) => { nvis.uiStreamUpdateParameter(streamId, elementId, false); }, true);
                         let oEl = document.createElement('span');
                         oEl.id = (elementId + '-value');
                         oEl.innerHTML = (oEl.innerHTML == '' ? object[key].value : oEl.innerHTML);
@@ -4103,7 +4096,7 @@ var nvis = new function () {
                         el.setAttribute('max', (object[key].max ? object[key].max : 1.0));
                         el.setAttribute('value', (object[key].value ? object[key].value : 0.0));
                         el.setAttribute('step', (object[key].step ? object[key].step : 0.1));
-                        el.addEventListener('input', (ev) => { nvis.streamUpdateParameter(streamId, elementId, false); }, true);
+                        el.addEventListener('input', (ev) => { nvis.uiStreamUpdateParameter(streamId, elementId, false); }, true);
                         let oEl = document.createElement('span');
                         oEl.id = (elementId + '-value');
                         oEl.innerHTML = (oEl.innerHTML == '' ? object[key].value : oEl.innerHTML);
@@ -4114,7 +4107,7 @@ var nvis = new function () {
                 else if (type == 'dropdown') {
                     el = document.createElement('select');
                     el.setAttribute('id', elementId);
-                    el.addEventListener('change', (ev) => { nvis.streamUpdateParameter(streamId, elementId, true); }, true);
+                    el.addEventListener('change', (ev) => { nvis.uiStreamUpdateParameter(streamId, elementId, true); }, true);
                     for (let optionId = 0; optionId < object[key].alternatives.length; optionId++) {
                         let oEl = document.createElement('option');
                         if (object[key].value == optionId) {
@@ -4174,14 +4167,7 @@ var nvis = new function () {
 
             uiTitle.addEventListener('click', () => {
 
-                // console.log('selected stream id: ' + streamId);
-                // console.log('state stream id: ' + _state.ui.selectedStreamId);
-
-                if (streamId == _state.ui.selectedStreamId) {
-                    _state.ui.selectedStreamId = -1;
-                }
-                else
-                    _state.ui.selectedStreamId = streamId;
+                _state.ui.selectedStreamId = (streamId == _state.ui.selectedStreamId ? -1 : streamId);
 
                 for (let id = 0; id < streams.length; id++) {
 
@@ -4218,7 +4204,7 @@ var nvis = new function () {
 
                     let sEl = document.createElement('select');
                     sEl.id = eId;
-                    sEl.addEventListener('change', () => { nvis.streamUpdateInput(streamId, inputId); });
+                    sEl.addEventListener('change', () => { nvis.uiStreamUpdateInput(streamId, inputId); });
                     for (let otherStreamId = 0; otherStreamId < streams.length; otherStreamId++) {
                         if (otherStreamId != streamId) {
                             let sOp = document.createElement('option');
@@ -4565,16 +4551,19 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
 
-        delete(canvasPxCoords) {
+        deleteAtMouse(canvasPxCoords) {
             let windowId = this.getWindowId(canvasPxCoords);
-            if (this.windows.length > 1 && windowId !== undefined) {
+            this.delete(windowId);
+        }
+
+        delete(windowId) {
+            if (this.windows.length > 1 && windowId !== undefined && windowId < this.windows.length) {
                 let overlayDiv = this.windows[windowId].overlay.div;
                 overlayDiv.parentElement.removeChild(overlayDiv);
                 this.windows.splice(windowId, 1);
                 this.adjust();
             }
         }
-
 
         resize() {
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
@@ -5260,7 +5249,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.uiPopup = document.createElement('div');
             this.uiPopup.id = 'uiPopup';
             this.uiPopup.className = 'uiPopup';
-            this.updateUiPopup();
+            this.updateUIPopup();
 
             this.fileInput = document.createElement('input');
             this.fileInput.id = 'fileInput';
@@ -5306,7 +5295,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.popupInfo('zoom = ' + level.toFixed(1) + 'x');
         }
 
-        updateUiPopup() {
+        updateUIPopup() {
 
             this.uiPopup.innerHTML = '';
 
@@ -5335,23 +5324,23 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             let tabSettings = document.createElement('button');
             tabSettings.className = (_state.ui.tabId == 'tabSettings' ? 'tab active' : 'tab');
-            tabSettings.addEventListener('click', (event) => nvis.openTab(event, 'tabSettings'));
+            tabSettings.addEventListener('click', (event) => nvis.uiOpenTab(event, 'tabSettings'));
             tabSettings.innerHTML = 'Settings';
             let tabStreams = document.createElement('button');
             tabStreams.className = (_state.ui.tabId == 'tabStreams' ? 'tab active' : 'tab');
-            tabStreams.addEventListener('click', (event) => nvis.openTab(event, 'tabStreams'));
+            tabStreams.addEventListener('click', (event) => nvis.uiOpenTab(event, 'tabStreams'));
             tabStreams.innerHTML = 'Streams';
             let tabWindows = document.createElement('button');
             tabWindows.className = (_state.ui.tabId == 'tabWindows' ? 'tab active' : 'tab');
-            tabWindows.addEventListener('click', (event) => nvis.openTab(event, 'tabWindows'));
+            tabWindows.addEventListener('click', (event) => nvis.uiOpenTab(event, 'tabWindows'));
             tabWindows.innerHTML = 'Windows';
             let tabShaders = document.createElement('button');
             tabShaders.className = (_state.ui.tabId == 'tabShaders' ? 'tab active' : 'tab')
-            tabShaders.addEventListener('click', (event) => nvis.openTab(event, 'tabShaders'));
+            tabShaders.addEventListener('click', (event) => nvis.uiOpenTab(event, 'tabShaders'));
             tabShaders.innerHTML = 'Shaders';
             let tabAnnotations = document.createElement('button');
             tabAnnotations.className = (_state.ui.tabId == 'tabAnnotations' ? 'tab active' : 'tab')
-            tabAnnotations.addEventListener('click', (event) => nvis.openTab(event, 'tabAnnotations'));
+            tabAnnotations.addEventListener('click', (event) => nvis.uiOpenTab(event, 'tabAnnotations'));
             tabAnnotations.innerHTML = 'Annotations';
 
             tabs.appendChild(tabSettings);
@@ -5389,7 +5378,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
                 let select = document.createElement('select');
                 select.id = 'windowStream-' + windowId;
-                select.addEventListener('change', () => { nvis.setWindowStreamId(windowId); });
+                select.addEventListener('change', () => { nvis.uiSetWindowStreamId(windowId); });
 
                 let windowStreamId = this.windows.getWindow(windowId).getStreamId();
                 for (let streamId = 0; streamId < this.streams.length; streamId++) {
@@ -5403,13 +5392,29 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 }
 
                 let label = document.createElement('label');
-                label.innerHTML = '- window ' + (windowId + 1) + ': ';
+                label.innerHTML = 'window ' + (windowId + 1) + ': ';
 
                 let selectDiv = document.createElement('div');
                 selectDiv.appendChild(label);
                 selectDiv.appendChild(select);
+
+                if (this.windows.windows.length > 1) {
+                    let deleteButton = document.createElement('button');
+                    deleteButton.innerHTML = 'Delete';
+                    deleteButton.addEventListener('click', () => {
+                        nvis.uiDeleteWindow(windowId);
+                    })
+                    selectDiv.appendChild(deleteButton);
+                }
+
                 windowsDiv.appendChild(selectDiv);
             }
+            let newButton = document.createElement('button');
+            newButton.innerHTML = 'Add window';
+            newButton.addEventListener('click', () => {
+                nvis.uiAddWindow();
+            });
+            windowsDiv.appendChild(newButton);
 
             //  shaders
             let validShaders = [];
@@ -5531,7 +5536,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     if (this.uiPopup.style.display == 'none' || this.uiPopup.style.display == '') {
                         _state.input.mouse.showInfo = false;
                         this.uiPopup.style.display = 'block';
-                        this.updateUiPopup();
+                        this.updateUIPopup();
                     } else {
                         this.uiPopup.style.display = 'none';
                     }
@@ -5580,8 +5585,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     this.popupInfo('Animation ping-pong: ' + (_state.animation.pingPong ? 'on' : 'off'));
                     break;
                 case 'd':
-                    this.windows.delete(_state.input.mouse.canvasCoords);
-                    this.updateUiPopup();
+                    this.windows.deleteAtMouse(_state.input.mouse.canvasCoords);
+                    this.updateUIPopup();
                     break;
                 case 'l':
                     document.getElementById('fileInput').click();
@@ -5914,7 +5919,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
     //  Global callbacks
 
-    let _openTab = function (event, tabId) {
+    let _uiOpenTab = function (event, tabId) {
         let oldTabId = _state.ui.tabId;
 
         // let tabContents = document.getElementsByClassName('tabContent');
@@ -6010,7 +6015,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         if (key == 'clearAll') {
             _apiClear();
-            _renderer.closeUIPopup();
+            _renderer.updateUIPopup();
         }
 
         let elementValue = document.getElementById(elementId + '-value');
@@ -6020,21 +6025,20 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         if (bUpdateUI) {
             //console.log('Updating UI');
-            _renderer.updateUiPopup();
+            _renderer.updateUIPopup();
         }
     }
 
-    let _streamUpdateParameter = function (streamId, elementId, bUpdateUI) {
-        //console.log('streamUpdateParamter(' + streamId + ', ' + elementId + ')');
+    let _uiStreamUpdateParameter = function (streamId, elementId, bUpdateUI) {
+        //console.log('uiStreamUpdateParamter(' + streamId + ', ' + elementId + ')');
         _renderer.streams[streamId].uiUpdate(elementId);
         if (bUpdateUI) {
-            // console.log('Updating UI');
-            _renderer.updateUiPopup();
+            _renderer.updateUIPopup();
         }
     }
 
-    let _streamUpdateInput = function (streamId, inputId) {
-        //console.log('streamUpdateInput(' + streamId + ', ' + inputId + ')');
+    let _uiStreamUpdateInput = function (streamId, inputId) {
+        //console.log('uiStreamUpdateInput(' + streamId + ', ' + inputId + ')');
         let elementId = ('input-' + streamId + '-' + inputId);
         let inputStreamId = document.getElementById(elementId).selectedIndex;
         //  we have to account for 'unselectable' streams, i.e., feedback loops
@@ -6048,12 +6052,23 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         _renderer.streams[streamId].setInputStreamId(inputId, correctStreamId);
     }
 
-    let _setWindowStreamId = function (windowId) {
+    let _uiSetWindowStreamId = function (windowId) {
         _renderer.setWindowStreamId(windowId);
+    }
+
+    let _uiAddWindow = function () {
+        _renderer.windows.add();
+        _renderer.updateUIPopup();
+    }
+
+    let _uiDeleteWindow = function (windowId) {
+        _renderer.windows.delete(windowId);
+        _renderer.updateUIPopup();
     }
 
 
     return {
+        //  API
         clear: _apiClear,
         zoom: _apiZoom,
         position: _apiPosition,
@@ -6066,11 +6081,13 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         config: _apiConfig,
         window: _apiWindow,
         video: _apiVideo,
-        //  below need to be visible to handle UI events
-        streamUpdateParameter: _streamUpdateParameter,
-        streamUpdateInput: _streamUpdateInput,
-        setWindowStreamId: _setWindowStreamId,
-        openTab: _openTab,
+        //  UI events
+        uiStreamUpdateParameter: _uiStreamUpdateParameter,
+        uiStreamUpdateInput: _uiStreamUpdateInput,
+        uiSetWindowStreamId: _uiSetWindowStreamId,
+        uiAddWindow: _uiAddWindow,
+        uiDeleteWindow: _uiDeleteWindow,
+        uiOpenTab: _uiOpenTab,
         uiOnMouseDown: _uiOnMouseDown,
         uiOnMouseUp: _uiOnMouseUp,
         uiOnMouseMove: _uiOnMouseMove,
