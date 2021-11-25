@@ -27,49 +27,80 @@
 
 precision highp float;
 
-//  common uniforms
-uniform vec4 uMouse;
-
-//  shader-specific uniforms
-uniform int uDirection;
-uniform bool uUseMouse;
-uniform float uLevel;
-uniform vec3 uLineColor;
-uniform float uLineThickness;
-uniform float uLineSharpness;
+uniform bool uSymmetric;
+uniform int uRadius;
+uniform int uRadiusX;
+uniform int uRadiusY;
+uniform bool uHalfRadiusSigma;
+uniform float uSigma;
+uniform float uSigmaX;
+uniform float uSigmaY;
+uniform float uAngle;
 
 // Texture uniforms
 uniform sampler2D uTexture0;
-uniform sampler2D uTexture1;
 
 // Texture
 in vec2 vTextureCoord;
 
 out vec4 outColor;
 
-// #define M_PI 3.1415926535897932384626433832795
 
 void main()
 {
-    vec2 loc2d = vTextureCoord;
+    ivec2 dimensions = textureSize(uTexture0, 0);
+    ivec2 loc2d = ivec2(vTextureCoord * vec2(dimensions));
 
-    vec2 dimensions = vec2(textureSize(uTexture0, 0));
-    vec2 position = loc2d * dimensions;
+    vec4 colorSum = vec4(0.0, 0.0, 0.0, 1.0);
+    float kernelSum = 0.0;
 
-    vec4 colorA = texture(uTexture0, vTextureCoord);
-    vec4 colorB = texture(uTexture1, vTextureCoord);
+    int radiusX = uRadiusX;
+    int radiusY = uRadiusY;
+    float sigmaX = uSigmaX;
+    float sigmaY = uSigmaY;
 
-    //  TODO: allow for abitrary angle
-    // float direction = uDirection * M_PI / 180.0;
-    // vec2 directionVector = vec2(cos(direction), sin(direction));
-    // float value = dot(directionVector, position);
-    // float midValue = (uUseMouse && uMouse.z > 0.0 ? (uDirection == 0 ? uMouse.x / dimensions.x : uMouse.y / dimensions.y) : uLevel);
+    if (uSymmetric)
+    {
+        radiusX = uRadius;
+        radiusY = uRadius;
+        if (uHalfRadiusSigma)
+        {
+            sigmaX = float(radiusX) / 2.0;
+            sigmaY = float(radiusY) / 2.0;
+        }
+        else
+        {
+            sigmaX = uSigma;
+            sigmaY = uSigma;
+        }
+    }
+    
+    float invSX = 1.0 / (2.0 * sigmaX * sigmaX);
+    float invSY = 1.0 / (2.0 * sigmaY * sigmaY);
 
-    float value = (uDirection == 0 ? position.x : position.y);
-    float midValue = (uUseMouse && uMouse.z > 0.0 ? (uDirection == 0 ? uMouse.x / dimensions.x : uMouse.y / dimensions.y) : uLevel / 100.0);
-    midValue *= (uDirection == 0 ? dimensions.x : dimensions.y);
+    float theta = radians(uAngle);
+    float sinTheta = sin(theta);
+    float cosTheta = cos(theta);
 
-    outColor = (value < midValue ? colorA : colorB);
-    float alpha = clamp(1.0 - pow(2.0 * abs(midValue - value) / uLineThickness, uLineSharpness), 0.0, 1.0);
-    outColor = outColor * (1.0 - alpha) + vec4(uLineColor, 1.0) * alpha;
+    for (int y = -radiusY; y <= radiusY; y++)
+    {
+        for (int x = -radiusX; x <= radiusX; x++)
+        {
+            float xp = float(x);
+            float yp = float(y);
+            if (!uSymmetric)
+            {
+                xp = xp * cosTheta - yp * sinTheta;
+                yp = xp * sinTheta + yp * cosTheta;
+            }
+
+            float weight = exp(-(xp * xp * invSX + yp * yp * invSY));
+
+            kernelSum += weight;
+            // colorSum += uInput[uint3(loc2d + int2(x, y), gFrameId)] * weight;
+            colorSum += texelFetch(uTexture0, loc2d + ivec2(x, y), 0) * weight;
+        }
+    }
+
+    outColor = vec4(colorSum / kernelSum);
 }

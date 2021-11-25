@@ -2,6 +2,7 @@
     "name": "Test configuration",
     "shaders": [
         "glsl/difference.json",
+        "glsl/gaussian.json",
         "glsl/mixer.json",
         "glsl/pixelate.json",
         "glsl/ssim.json",
@@ -50,11 +51,17 @@
         {
             "window": true,
             "name": "Mixer stream",
-            "shader": 1,
+            "shader": 2,
             "inputs": [
                 0,
                 1
             ]
+        },
+        {
+            "window": true,
+            "name": "Gaussian stream",
+            "shader": 1,
+            "inputs": [ 0 ]
         }
     ]
 }

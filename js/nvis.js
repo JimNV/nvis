@@ -3523,6 +3523,73 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
 
+    class NvisColor {
+        
+        constructor(r = 0, g = 0, b = 0, a = 255) {
+            this.r = r;
+            this.g = g;
+            this.b = b;
+            this.a = a;
+            this.bAlpha = true;
+        }
+
+        getChannel(c) {
+            if (c == 0) {
+                return this.r;
+            } else if (c == 1) {
+                return this.g;
+            } else if (c == 2) {
+                return this.b;
+            } else if (c == 3) {
+                return this.a;
+            }
+            return undefined;
+        }
+
+        setChannel(c, v) {
+            if (c == 0) {
+                this.r = v;
+            } else if (c == 1) {
+                this.g = v;
+            } else if (c == 2) {
+                this.b = v;
+            } else if (c == 3) {
+                this.a = v;
+            }
+        }
+
+        toUniform() {
+            let uniform = [ this.r / 255.0, this.g / 255.0, this.b / 255.0 ];
+            if (this.bAlpha) {
+                uniform.push(this.a / 255.0);
+            }
+            return uniform;
+        }
+
+        fromCSS(cssColor) {
+            let pPos = cssColor.indexOf("(");
+            let type = cssColor.substr(0, pPos);
+            let values = cssColor.slice(pPos + 1, -1).split(',').map(Number);
+            this.bAlpha = (type == 'rgba');
+            this.r = values[0];
+            this.g = values[1];
+            this.b = values[2];
+            this.a = (this.bAlpha ? values[3] : undefined);
+        }
+
+        toCSS() {
+            return 'rgb' + (this.bAlpha ? 'a' : '') + '(' + this.r + ',' + this.g + ',' + this.b + (this.bAlpha ? (',' + this.a) : '') + ')';
+        }
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
     class NvisStream {
 
         constructor(glContext, shaderId = -1) {
@@ -3541,7 +3608,6 @@ var nvis = new function () {
             this.shaderJSONObject = undefined;
             this.bUIReady = false;
 
-            //  TODO: to be used for shader streams, plus to read back stream data
             this.outputTexture = undefined;
             this.frameBuffer = undefined;
 
@@ -3634,6 +3700,11 @@ var nvis = new function () {
                 this.bUIReady = true;
             }
 
+            let uiObject = this.shaderJSONObject.UI;
+            if (uiObject === undefined) {
+                return;
+            }
+
             //  common uniforms
             let uniform = gl.getUniformLocation(shader.getProgram(), 'uDimensions');  //  TODO: not needed
             if (uniform !== undefined) {
@@ -3645,13 +3716,7 @@ var nvis = new function () {
             }
             uniform = gl.getUniformLocation(shader.getProgram(), 'uMouse');
             if (uniform !== undefined && _state.input.mouse.streamCoords !== undefined) {
-                gl.uniform4f(uniform, _state.input.mouse.streamCoords.x, _state.input.mouse.streamCoords.y,
-                    (_state.input.mouse.down ? 1.0 : 0.0), 0.0);
-            }
-
-            let uiObject = this.shaderJSONObject.UI;
-            if (uiObject === undefined) {
-                return;
+                gl.uniform4f(uniform, _state.input.mouse.streamCoords.x, _state.input.mouse.streamCoords.y, (_state.input.mouse.down ? 1.0 : 0.0), 0.0);
             }
 
             for (let key of Object.keys(uiObject)) {
@@ -3677,6 +3742,16 @@ var nvis = new function () {
                 if (type == 'dropdown') {
                     gl.uniform1i(uniform, uiObject[key].value);
                 }
+
+                if (type == 'color') {
+                    let color = new NvisColor();
+                    color.fromCSS(uiObject[key].value);
+                    if (color.bAlpha) {
+                        gl.uniform4fv(uniform, color.toUniform());
+                    } else {
+                        gl.uniform3fv(uniform, color.toUniform());
+                    }
+                }
             }
         }
 
@@ -3687,14 +3762,32 @@ var nvis = new function () {
             let element = document.getElementById(elementId);
             let object = this.shaderJSONObject.UI[key];
             let type = object.type;
-            object.value = (type == 'bool' ? element.checked : (type == 'dropdown' ? element.selectedIndex : element.value));
+
+            if (type == 'bool') {
+                object.value = element.checked;
+            } else if (type == 'dropdown') {
+                object.value = element.selectedIndex;
+            } else if (type == 'color') {
+                let color = new NvisColor();
+                color.fromCSS(object.value);
+                
+                color.setChannel(parseInt(elementId.substr(-1)), element.value);
+                object.value = color.toCSS();
+
+                let colorValue = document.getElementById(elementId.substr(0, elementId.length - 2) + '-color');
+                if (colorValue !== null) {
+                    colorValue.style.backgroundColor = object.value;
+                }
+            } else {
+                object.value = element.value;
+            }
 
             let elementValue = document.getElementById(elementId + '-value');
             if (elementValue !== null) {
                 elementValue.innerHTML = element.value;
             }
 
-            // console.log(key + ': ' + object.value);
+            // console.log('uiUpdate(' + elementId + '): ' + key + ': ' + object.value);
         }
 
 
@@ -3747,8 +3840,7 @@ var nvis = new function () {
             this.frameBuffer = gl.createFramebuffer();
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
 
-            let attachmentPoint = gl.COLOR_ATTACHMENT0;
-            gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, this.outputTexture, 0);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.outputTexture, 0);
 
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }
@@ -4011,9 +4103,7 @@ var nvis = new function () {
             let dom = document.createDocumentFragment();
 
             let table = document.createElement('table');
-            // table.id = 'streamUI-' + streamId;
             table.className = 'uiTable';
-            // table.style.display = (streamId == _state.ui.selectedStreamId ? 'block' : 'none');
 
             for (let key of Object.keys(object)) {
 
@@ -4046,9 +4136,9 @@ var nvis = new function () {
                             conditionVariable = condition.substring(bConditionNegated ? 1 : 0);
                             bConditionMet = (!bConditionNegated && object[conditionVariable].value) || (bConditionNegated && !object[conditionVariable].value);
                         }
-                    }
 
-                    bAllConditionsMet &&= bConditionMet;
+                        bAllConditionsMet &&= bConditionMet;
+                    }
                 }
 
 
@@ -4071,20 +4161,23 @@ var nvis = new function () {
 
                     if (type == 'bool') {
                         el.setAttribute('type', 'checkbox');
-                        el.addEventListener('change', (ev) => { nvis.uiStreamUpdateParameter(streamId, elementId, true); }, true);
+                        el.addEventListener('change', (ev) => {
+                            nvis.uiStreamUpdateParameter(streamId, elementId, true);
+                        }, true);
                         if (object[key].value) {
                             el.setAttribute('checked', true);
                         } else {
                             el.removeAttribute('checked');
                         }
-                        // el.setAttribute('onclick', this.createCallbackString(streamId, elementId, rowId, bAllConditionsMet));
                     } else if (type == 'int') {
                         el.setAttribute('type', 'range');
                         el.setAttribute('min', (object[key].min ? object[key].min : 0));
                         el.setAttribute('max', (object[key].max ? object[key].max : 1));
                         el.setAttribute('value', (object[key].value ? object[key].value : 0));
                         el.setAttribute('step', (object[key].step ? object[key].step : 1));
-                        el.addEventListener('input', (ev) => { nvis.uiStreamUpdateParameter(streamId, elementId, false); }, true);
+                        el.addEventListener('input', (ev) => {
+                            nvis.uiStreamUpdateParameter(streamId, elementId, false);
+                        }, true);
                         let oEl = document.createElement('span');
                         oEl.id = (elementId + '-value');
                         oEl.innerHTML = (oEl.innerHTML == '' ? object[key].value : oEl.innerHTML);
@@ -4095,19 +4188,22 @@ var nvis = new function () {
                         el.setAttribute('min', (object[key].min ? object[key].min : 0.0));
                         el.setAttribute('max', (object[key].max ? object[key].max : 1.0));
                         el.setAttribute('value', (object[key].value ? object[key].value : 0.0));
-                        el.setAttribute('step', (object[key].step ? object[key].step : 0.1));
-                        el.addEventListener('input', (ev) => { nvis.uiStreamUpdateParameter(streamId, elementId, false); }, true);
+                        el.setAttribute('step', (object[key].step ? object[key].step : 'any'));
+                        el.addEventListener('input', (ev) => {
+                            nvis.uiStreamUpdateParameter(streamId, elementId, false);
+                        }, true);
                         let oEl = document.createElement('span');
                         oEl.id = (elementId + '-value');
                         oEl.innerHTML = (oEl.innerHTML == '' ? object[key].value : oEl.innerHTML);
 
                         label.innerHTML += ' (' + oEl.outerHTML + ')';
                     }
-                }
-                else if (type == 'dropdown') {
+                } else if (type == 'dropdown') {
                     el = document.createElement('select');
                     el.setAttribute('id', elementId);
-                    el.addEventListener('change', (ev) => { nvis.uiStreamUpdateParameter(streamId, elementId, true); }, true);
+                    el.addEventListener('change', (ev) => {
+                        nvis.uiStreamUpdateParameter(streamId, elementId, false);
+                    }, true);
                     for (let optionId = 0; optionId < object[key].alternatives.length; optionId++) {
                         let oEl = document.createElement('option');
                         if (object[key].value == optionId) {
@@ -4115,6 +4211,56 @@ var nvis = new function () {
                         }
                         oEl.innerHTML = object[key].alternatives[optionId];
                         el.appendChild(oEl);
+                    }
+                } else if (type == 'color') {
+                    el = document.createElement('div');
+                    el.setAttribute('id', elementId);
+
+                    const channels = [ 'R', 'G', 'B', 'A' ];
+                    let color = new NvisColor();
+                    color.fromCSS(object[key].value);
+
+                    let labelDiv = document.createElement('div');
+
+                    let cSpan = document.createElement('span');
+                    cSpan.id = elementId + '-color';
+                    cSpan.style.backgroundColor = color.toCSS();
+                    cSpan.style.padding = '20px';
+
+                    labelDiv.appendChild(cSpan);
+                    labelDiv.appendChild(label);
+                    label = labelDiv;
+
+                    for (let c = 0; c < (color.bAlpha ? 4 : 3); c++) {
+
+                        let value = color.getChannel(c);
+                        let channelId = elementId + '-' + c;
+
+                        let cLabel = document.createElement('label');
+                        cLabel.innerHTML = channels[c] + ': ';
+                        cLabel.setAttribute('for', channelId);
+                        let cInput = document.createElement('input');
+                        cInput.id = channelId;
+                        cInput.setAttribute('type', 'range');
+                        cInput.setAttribute('min', 0);
+                        cInput.setAttribute('max', 255);
+                        cInput.setAttribute('value', value);
+                        cInput.setAttribute('step', 1);
+                        cInput.addEventListener('input', () => {
+                            // console.log(channels[c] + ' = ' + document.getElementById(channelId).value);
+                            nvis.uiStreamUpdateParameter(streamId, channelId, false);
+                        }, true);
+
+                        let cValue = document.createElement('span');
+                        cValue.id = (channelId + '-value');
+                        cValue.innerHTML = value;
+
+                        let cDiv = document.createElement('div');
+                        cDiv.appendChild(cLabel);
+                        cDiv.appendChild(cInput);
+                        cDiv.appendChild(cValue);
+
+                        el.appendChild(cDiv);
                     }
                 }
 
@@ -4125,6 +4271,20 @@ var nvis = new function () {
                         cell.appendChild(el);
                         cell.appendChild(label);
                         row.appendChild(cell);
+                    } else if (type == 'dropdown') {
+                        label.innerHTML += ': ';
+                        let cell = document.createElement('td');
+                        cell.setAttribute('multicolumn', 2);
+                        cell.appendChild(label);
+                        cell.appendChild(el);
+                        row.appendChild(cell);
+                    } else if (type == 'color') {
+                        let elCell = document.createElement('td');
+                        let labelCell = document.createElement('td');
+                        elCell.appendChild(el);
+                        labelCell.appendChild(label);
+                        row.appendChild(elCell);
+                        row.appendChild(labelCell);
                     } else {
                         let elCell = document.createElement('td');
                         let labelCell = document.createElement('td');
@@ -4200,11 +4360,13 @@ var nvis = new function () {
                     let eId = ('input-' + streamId + '-' + inputId);
                     let label = document.createElement('label');
                     label.setAttribute('for', eId);
-                    label.innerHTML = ('Input ' + (inputId + 1) + ':');
+                    label.innerHTML = ('Input ' + (inputId + 1) + ': ');
 
                     let sEl = document.createElement('select');
                     sEl.id = eId;
-                    sEl.addEventListener('change', () => { nvis.uiStreamUpdateInput(streamId, inputId); });
+                    sEl.addEventListener('change', () => {
+                        nvis.uiStreamUpdateInput(streamId, inputId);
+                    });
                     for (let otherStreamId = 0; otherStreamId < streams.length; otherStreamId++) {
                         if (otherStreamId != streamId) {
                             let sOp = document.createElement('option');
@@ -5101,10 +5263,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
 
-            //  next, render windows
+            //  next, render windows to canvas
             gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
-            //let shaderProgram = shaders[0].getProgram();
             shaderProgram = shaders.textureShader.getProgram();
             gl.useProgram(shaderProgram);
 
@@ -5311,8 +5472,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             bar.style.flexGrow = '1';
 
             let titleBar = document.createElement('div');
-            //titleBar.setAttribute('onmousedown', 'nvis.uiOnMouseDown(event)');
-            titleBar.addEventListener('mousedown', (event) => { nvis.uiOnMouseDown(event); });
+            titleBar.addEventListener('mousedown', (event) => {
+                nvis.uiOnMouseDown(event);
+            });
             titleBar.className = 'titleBar';
             titleBar.appendChild(title);
             titleBar.appendChild(bar)
@@ -5603,7 +5765,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     break;
                 case 'w':
                     this.windows.add();
-                    this.updateUiPopup();
+                    this.updateUIPopup();
                     break;
                 case 'h':
                     this.helpPopup.style.display = 'block';
@@ -5611,12 +5773,12 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 case '+':
                     _state.layout.bAutomatic = false;
                     this.windows.inc();
-                    this.updateUiPopup();
+                    this.updateUIPopup();
                     break;
                 case '-':
                     _state.layout.bAutomatic = false;
                     this.windows.dec();
-                    this.updateUiPopup();
+                    this.updateUIPopup();
                     break;
                 default:
                     console.log('KeyDown not handled, keyCode: ' + keyCode + ', key: ' + key);
@@ -5665,6 +5827,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         onClick(event) {
 
+            //  TODO: pixel info should be triggered here...
+
             let cCoord = _state.input.mouse.canvasCoords;
             let windowId = this.windows.getWindowId(cCoord);
 
@@ -5672,7 +5836,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 return;
             }
 
-            let streamId = this.windows.windows[windowId].getStreamId();
+            // let streamId = this.windows.windows[windowId].getStreamId();
             let pCoord = this.windows.getStreamCoordinates(cCoord, true);
 
             if (pCoord === undefined) {
@@ -6030,7 +6194,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
     }
 
     let _uiStreamUpdateParameter = function (streamId, elementId, bUpdateUI) {
-        //console.log('uiStreamUpdateParamter(' + streamId + ', ' + elementId + ')');
+        // console.log('uiStreamUpdateParamter(' + streamId + ', ' + elementId + ')');
         _renderer.streams[streamId].uiUpdate(elementId);
         if (bUpdateUI) {
             _renderer.updateUIPopup();

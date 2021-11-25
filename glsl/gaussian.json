@@ -1,0 +1,77 @@
+{
+    "name": "Gaussian blur",
+    "fileName": "glsl/gaussian.glsl",
+    "inputs": 1,
+    "UI": {
+        "uSymmetric": {
+            "name": "Symmetric",
+            "type": "bool",
+            "value": true
+        },
+        "uRadius": {
+            "name": "Radius",
+            "type": "int",
+            "value": 1,
+            "min": 0,
+            "max": 32,
+            "condition": "uSymmetric"
+        },
+        "uRadiusX": {
+            "name": "X Radius",
+            "type": "int",
+            "value": 1,
+            "min": 0,
+            "max": 32,
+            "condition": "!uSymmetric"
+        },
+        "uRadiusY": {
+            "name": "Y Radius",
+            "type": "int",
+            "value": 1,
+            "min": 0,
+            "max": 32,
+            "condition": "!uSymmetric"
+        },
+        "uHalfRadiusSigma": {
+            "name": "Half radius sigma",
+            "type": "bool",
+            "value": true
+        },
+        "uSigma": {
+            "name": "Sigma",
+            "type": "float",
+            "value": 1.5,
+            "min": 0.0,
+            "max": 16.0,
+            "step": 0.1,
+            "condition": "uSymmetric & !uHalfRadiusSigma"
+        },
+        "uSigmaX": {
+            "name": "X Sigma",
+            "type": "float",
+            "value": 1.5,
+            "min": 0.0,
+            "max": 16.0,
+            "step": 0.1,
+            "condition": "!uSymmetric & !uHalfRadiusSigma"
+        },
+        "uSigmaY": {
+            "name": "Y Sigma",
+            "type": "float",
+            "value": 1.5,
+            "min": 0.0,
+            "max": 16.0,
+            "step": 0.1,
+            "condition": "!uSymmetric & !uHalfRadiusSigma"
+        },
+        "uAngle": {
+            "name": "Angle",
+            "type": "float",
+            "value": 0.0,
+            "min": 0.0,
+            "max": 360.0,
+            "step": 1.0,
+            "condition": "!uSymmetric"
+        }
+    }
+}
