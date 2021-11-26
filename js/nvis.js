@@ -477,8 +477,8 @@ var nvis = new function () {
         return _apiCommand({ command: 'translate', argument: { x: x, y: y }})
     }
 
-    let _apiAnnotation = function (windowId, type, parameters) {
-        return _apiCommand({ command: 'annotation', argument: { windowId: windowId, type: type, parameters: parameters }});
+    let _apiAnnotation = function (target, id, type, parameters) {
+        return _apiCommand({ command: 'annotation', argument: { target: target, id: id, type: type, parameters: parameters }});
     }
 
     let _apiStream = function (images, bWindow = true) {
@@ -588,7 +588,11 @@ var nvis = new function () {
             }
             return true;
         } else if (command == 'annotation') {
-            _renderer.windows.addAnnotation(argument.windowId, argument.type, argument.parameters);
+            if (argument.target == 'stream') {
+                _renderer.streams[argument.id].annotations.add(argument.type, argument.parameters);
+            } else if (argument.target == 'window') {
+                _renderer.windows.windows[argument.id].annotations.add(argument.type, argument.parameters);
+            }
         } else if (command == 'video') {
             let videoParser = new NvisVideoParser((fileName, frames) => _renderer.setupVideo(fileName, frames));
             videoParser.fromFile(argument.fileName);
@@ -1190,6 +1194,26 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
+    class NvisBoundingBox {
+
+        constructor(x, y, width, height) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+        }
+
+        inside(point) {
+            return (point.x >= this.x && point.x <= this.x + this.width && point.y >= this.y && point.y <= this.y + this.height);
+        }
+    }
+    
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     
     class NvisAnnotation extends NvisDraw {
 
@@ -1210,6 +1234,7 @@ var nvis = new function () {
             this.width = (parameters.width === undefined ? 3.0 : parameters.width);
         }
 
+        //  TODO: optimize...
         pixelSize(canvas) {
             let layout = _state.layout;
             let z = _state.zoom.level;
@@ -1224,6 +1249,7 @@ var nvis = new function () {
             return pixelSize;
         }
 
+        //  TODO: optimize...
         streamPxToTextureCoords(pos, windowId, canvas, stream) {
             let layout = _state.layout;
             let layoutDims = layout.getDimensions();
@@ -1251,7 +1277,7 @@ var nvis = new function () {
             //     offset = undefined;
             // }
 
-            return offset;
+            return { pixelSize: pixelSize, offset: offset };
         }
 
         rotate(point, alphaDegrees) {
@@ -1261,29 +1287,42 @@ var nvis = new function () {
             return { x: point.x * cosAlpha - point.y * sinAlpha, y: point.x * sinAlpha + point.y * cosAlpha };
         }
 
-        update(canvas, stream, bZoom) {
+        update(canvas, stream, boundingBox, bZoom) {
             let p = this.streamPxToTextureCoords(this.position, 0, canvas, stream);
             // console.log(JSON.stringify(p));
             let ar = (canvas.width / canvas.height);
-            let ps = this.pixelSize(canvas);
+            // let ps = this.pixelSize(canvas);
+
+            //console.log(JSON.stringify(offset));
+
+            let ps = p.pixelSize;
+            let o = p.offset;
+            o.x += boundingBox.x;
+            o.y += boundingBox.y;
 
             this.clear();
+
+            if (!boundingBox.inside(o)) {
+                return;
+            }
+
             if (this.type == 'arrow') {
                 let s = this.size;
                 s *= ps.w;
+
                 let r0 = this.rotate({ x: s, y: s }, this.rotation);
                 let r1 = this.rotate({ x: s, y: s * 0.5 }, this.rotation);
                 let r2 = this.rotate({ x: s * 3.0, y: s * 0.5 }, this.rotation);
                 let r3 = this.rotate({ x: s * 3.0, y: -s * 0.5 }, this.rotation);
                 let r4 = this.rotate({ x: s, y: -s * 0.5 }, this.rotation);
                 let r5 = this.rotate({ x: s, y: -s }, this.rotation);
-                this.addVertex(p, this.color);
-                this.addVertex({ x: p.x + r0.x, y: p.y + r0.y * ar }, this.color);
-                this.addVertex({ x: p.x + r1.x, y: p.y + r1.y * ar }, this.color);
-                this.addVertex({ x: p.x + r2.x, y: p.y + r2.y * ar }, this.color);
-                this.addVertex({ x: p.x + r3.x, y: p.y + r3.y * ar }, this.color);
-                this.addVertex({ x: p.x + r4.x, y: p.y + r4.y * ar }, this.color);
-                this.addVertex({ x: p.x + r5.x, y: p.y + r5.y * ar }, this.color);
+                this.addVertex(o, this.color);
+                this.addVertex({ x: o.x + r0.x, y: o.y + r0.y * ar }, this.color);
+                this.addVertex({ x: o.x + r1.x, y: o.y + r1.y * ar }, this.color);
+                this.addVertex({ x: o.x + r2.x, y: o.y + r2.y * ar }, this.color);
+                this.addVertex({ x: o.x + r3.x, y: o.y + r3.y * ar }, this.color);
+                this.addVertex({ x: o.x + r4.x, y: o.y + r4.y * ar }, this.color);
+                this.addVertex({ x: o.x + r5.x, y: o.y + r5.y * ar }, this.color);
 
             } else if (this.type == 'circle') {
 
@@ -1301,15 +1340,15 @@ var nvis = new function () {
                 for (let i = 0; i < steps; i++) {
                     let rv = this.rotate(ss, i * alphaStep);
                     rv.y = ar * rv.y;
-                    let p0 = { x: p.x + r * rv.x, y: p.y + r * rv.y };
-                    let p1 = { x: p.x + w * rv.x, y: p.y + w * rv.y };
+                    let p0 = { x: o.x + r * rv.x, y: o.y + r * rv.y };
+                    let p1 = { x: o.x + w * rv.x, y: o.y + w * rv.y };
                     // console.log('p0: ' + JSON.stringify(p0));
                     // console.log('p1: ' + JSON.stringify(p1));
                     this.addVertex(p0, this.color);
                     this.addVertex(p1, this.color);
                 }
-                this.addVertex({ x: p.x + r, y: p.y }, this.color)
-                this.addVertex({ x: p.x + w, y: p.y }, this.color)
+                this.addVertex({ x: o.x + r, y: o.y }, this.color)
+                this.addVertex({ x: o.x + w, y: o.y }, this.color)
 
             } else if (this.type == 'rectangle') {
 
@@ -1321,9 +1360,8 @@ var nvis = new function () {
 
     class NvisAnnotations {
 
-        constructor(glContext, canvas) {
+        constructor(glContext) {
             this.glContext = glContext;
-            this.canvas = canvas;
             
             this.annotations = [];
         }
@@ -1333,16 +1371,17 @@ var nvis = new function () {
             this.annotations.push(annotation);
         }
 
-        update(stream) {
+        update(canvas, stream, boundingBox) {
             for (let annotationId = 0; annotationId < this.annotations.length; annotationId++) {
-                this.annotations[annotationId].update(this.canvas, stream);
+                this.annotations[annotationId].update(canvas, stream, boundingBox);
             }
         }
 
-        render(stream) {
-            this.update(stream);
+        render(canvas, stream, boundingBox) {
+            this.update(canvas, stream, boundingBox);
             for (let annotationId = 0; annotationId < this.annotations.length; annotationId++) {
-                this.annotations[annotationId].render();
+                let annotation = this.annotations[annotationId];
+                annotation.render();
             }
         }
     }
@@ -3616,6 +3655,9 @@ var nvis = new function () {
 
             this.startTime = Date.now();
 
+            this.annotations = new NvisAnnotations(this.glContext);
+
+
             //  TODO: implement this
             this.defaultUI = `{
                 'uTonemapper': {
@@ -4099,6 +4141,7 @@ var nvis = new function () {
             return callbackString;
         }
 
+
         buildShaderUI(object, streamId) {
             let dom = document.createDocumentFragment();
 
@@ -4140,7 +4183,6 @@ var nvis = new function () {
                         bAllConditionsMet &&= bConditionMet;
                     }
                 }
-
 
                 let label = document.createElement('label');
                 label.setAttribute('for', key);
@@ -4575,10 +4617,6 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.adjust();
         }
 
-
-        addAnnotation(windowId, type, parameters) {
-            this.windows[windowId].annotations.add(type, parameters);
-        }
 
         insideWindow(canvasPxCoords) {
             return !(canvasPxCoords.x < 0 || canvasPxCoords.x >= this.canvas.width || canvasPxCoords.y < 0 || canvasPxCoords.y >= this.canvas.height);
@@ -5072,7 +5110,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.gridDrawer = new NvisGridDrawer(this.glContext);
             this.pixelDrawer = new NvisPixelDrawer(this.glContext);
 
-            this.annotations = new NvisAnnotations(this.glContext, this.canvas);
+            this.annotations = new NvisAnnotations(this.glContext);
 
             this.position = { x: 0, y: 0 };
             this.dimensions = { w: 0, h: 0 };
@@ -5297,39 +5335,47 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
 
-            if (_settings.bDrawGrid.value) {
+            //  TODO: move elsewhere, optimize (redoing several calculations now)?
+            let layout = _state.layout;
+            let layoutDims = layout.getDimensions();
+            let winDim = { w: this.canvas.width / layoutDims.w, h: this.canvas.height / layoutDims.h };
 
-                //  TODO: move elsewhere?
-                let layout = _state.layout;
-                let layoutDims = layout.getDimensions();
-                let winDim = { w: this.canvas.width / layoutDims.w, h: this.canvas.height / layoutDims.h };
+            let z = _state.zoom.level;
+            let sw = streamDim.w;
+            let sh = streamDim.h;
+            let ww = winDim.w;
+            let wh = winDim.h;
 
-                let z = _state.zoom.level;
-                let sw = streamDim.w;
-                let sh = streamDim.h;
-                let ww = winDim.w;
-                let wh = winDim.h;
+            let pixelSize = {
+                w: z / (ww * layoutDims.w),
+                h: z / (wh * layoutDims.h)
+            }
+            let isw = 1.0 / sw;
+            let ish = 1.0 / sh;
+            let offset = {
+                x: (isw - (_state.zoom.streamOffset.x % isw)) * (sw * pixelSize.w),
+                y: (ish - (_state.zoom.streamOffset.y % ish)) * (sh * pixelSize.h),
+            }
 
-                let pixelSize = {
-                    w: z / (ww * layoutDims.w),
-                    h: z / (wh * layoutDims.h)
-                }
-                let isw = 1.0 / sw;
-                let ish = 1.0 / sh;
-                let offset = {
-                    x: (isw - (_state.zoom.streamOffset.x % isw)) * (sw * pixelSize.w),
-                    y: (ish - (_state.zoom.streamOffset.y % ish)) * (sh * pixelSize.h),
-                }
+            if (z > 10.0) {
+                let alpha = Math.min(1.0, (z - 16.0) / 16.0);
 
-                if (z > 10.0) {
-                    let alpha = Math.min(1.0, (z - 16.0) / 16.0);
+                if (_settings.bDrawGrid.value) {
 
                     this.gridDrawer.update(windowId, offset, pixelSize, alpha);
                     this.gridDrawer.render();
                 }
             }
 
-            this.annotations.render(stream);
+            let dw = 1.0 / layoutDims.w;
+            let dh = 1.0 / layoutDims.h;
+            let ox = (windowId % layoutDims.w) * dw;
+            let oy = Math.floor(windowId / layoutDims.w) * dh;
+
+            let bb = new NvisBoundingBox(ox, oy, dw, dh);
+
+            this.annotations.render(this.canvas, stream, bb);
+            stream.annotations.render(this.canvas, stream, bb);
         }
 
 
