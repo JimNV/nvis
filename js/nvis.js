@@ -244,7 +244,7 @@ var nvis = new function () {
         frameId: {
             name: 'Frame',
             type: 'int',
-            value: _state.animation.frameId,
+            value: 1,
             min: 1,
             max: '#frames',
             step: 1
@@ -6422,6 +6422,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             // let frameId = Math.max(_state.animation.minFrameId, document.getElementById('settings-frameId').value - 1);
             let frameId = Math.max(_state.animation.minFrameId, _state.animation.frameId);
             _state.animation.frameId = frameId;
+            _settings.frameId.value = frameId + 1;
             document.getElementById('settings-frameId').value = frameId + 1;
             document.getElementById('settings-frameId-value').innerHTML = frameId + 1;
             console.log('minFrameId: frameId = ' + frameId + ', min = ' + _state.animation.minFrameId + ', max = ' + _state.animation.maxFrameId)
@@ -6436,6 +6437,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             // let frameId = Math.min(_state.animation.maxFrameId, document.getElementById('settings-frameId').value - 1);
             let frameId = Math.min(_state.animation.maxFrameId, _state.animation.frameId);
             _state.animation.frameId = frameId;
+            _settings.frameId.value = frameId + 1;
             document.getElementById('settings-frameId').value = frameId + 1;
             document.getElementById('settings-frameId-value').innerHTML = frameId + 1;
             console.log('maxFrameId: frameId = ' + frameId + ', min = ' + _state.animation.minFrameId + ', max = ' + _state.animation.maxFrameId)
