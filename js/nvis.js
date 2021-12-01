@@ -93,6 +93,12 @@ var nvis = new function () {
             maxFrameId: 0,
             time: undefined,
 
+            setNumFrames: function (numFrames) {
+                this.numFrames = numFrames;
+                this.minFrameId = 0;
+                this.maxFrameId = numFrames - 1;
+            },
+
             toggleActive: function () {
                 this.active = !this.active;
             },
@@ -102,28 +108,45 @@ var nvis = new function () {
             },
 
             inc: function () {
-                this.frameId = (this.frameId + 1) % this.numFrames;
-                //console.log('frameId: ' + this.frameId);
+                // this.frameId = (this.frameId + 1) % this.numFrames;
+                this.frameId++;
+                if (this.frameId > this.maxFrameId) {
+                    this.frameId = this.minFrameId;
+                }
+                document.getElementById('settings-frameId').value = (this.frameId + 1);
+                document.getElementById('settings-frameId-value').innerHTML = (this.frameId + 1);
             },
 
             dec: function () {
-                this.frameId = (this.frameId + this.numFrames - 1) % this.numFrames;
-                //console.log('frameId: ' + this.frameId);
+                // this.frameId = (this.frameId + this.numFrames - 1) % this.numFrames;
+                this.frameId--;
+                if (this.frameId < this.minFrameId) {
+                    this.frameId = this.maxFrameId;
+                }
+                document.getElementById('settings-frameId').value = (this.frameId + 1);
+                document.getElementById('settings-frameId-value').innerHTML = (this.frameId + 1);
             },
 
             update: function () {
                 if (this.active) {
                     if (this.pingPong) {
                         this.frameId += this.direction;
-                        this.frameId = Math.max(this.frameId, 0);
-                        this.frameId = Math.min(this.frameId, this.numFrames - 1);
-                            if (this.frameId == 0 || this.frameId == this.numFrames - 1) {
+                        this.frameId = Math.max(this.frameId, this.minFrameId);
+                        this.frameId = Math.min(this.frameId, this.maxFrameId);
+                        if (this.frameId == this.minFrameId || this.frameId == this.maxFrameId) {
                             this.direction = -this.direction;
                         }
+                    } else {
+                        this.frameId += this.direction;
+                        if (this.direction > 0 && this.frameId > this.maxFrameId) {
+                            this.frameId = this.minFrameId;
+                        }
+                        if (this.direction < 0 && this.frameId < this.minFrameId) {
+                            this.frameId = this.maxFrameId;
+                        }
                     }
-                    else {
-                        this.frameId = (this.frameId + this.numFrames + this.direction) % this.numFrames;
-                    }
+                    document.getElementById('settings-frameId').value = (this.frameId + 1);
+                    document.getElementById('settings-frameId-value').innerHTML = (this.frameId + 1);
                 }
             }
         }
@@ -185,6 +208,9 @@ var nvis = new function () {
             type: 'button',
             value: 'Clear all'
         },
+        Animation: {
+            type: 'ruler'
+        },
         bAnimate: {
             name: 'Animate',
             type: 'bool',
@@ -196,21 +222,51 @@ var nvis = new function () {
             value: _state.animation.pingPong,
             condition: 'bAnimate'
         },
+        direction: {
+            name: 'Direction',
+            type: 'dropdown',
+            value: 0,
+            alternatives: [
+                'Forward',
+                'Backward'
+            ],
+            condition: 'bAnimate & !bPingPong'
+        },
         fps: {
             name: 'Frames per second',
             type: 'int',
             value: _state.animation.fps,
             min: 1,
             max: 60,  //  TODO: maximize according to browser and screen capability
-            step: 1
+            step: 1,
+            condition: 'bAnimate'
         },
         frameId: {
             name: 'Frame',
             type: 'int',
-            value: _state.animation.frameId + 1,
+            value: _state.animation.frameId,
             min: 1,
             max: '#frames',
             step: 1
+        },
+        minFrameId: {
+            name: 'Min frame',
+            type: 'int',
+            value: 1,
+            min: 1,
+            max: '#frames',
+            step: 1,
+        },
+        maxFrameId: {
+            name: 'Max frame',
+            type: 'int',
+            value: '#frames',
+            min: 1,
+            max: '#frames',
+            step: 1,
+        },
+        Tonemapping: {
+            type: 'ruler'
         },
         bGlobalTonemapping: {
             name: 'Global tonemapping',
@@ -1232,6 +1288,17 @@ var nvis = new function () {
             this.rotation = (parameters.rotation === undefined ? 30 : parameters.rotation);
             this.radius = (parameters.radius === undefined ? 10.0 : parameters.radius);
             this.width = (parameters.width === undefined ? 3.0 : parameters.width);
+        }
+
+        description() {
+            let desc = this.type;
+            if (this.type == 'arrow') {
+                desc += ' with size ' + this.size + ' and rotation ' + this.rotation;
+            } else if (this.type == 'circle') {
+                desc += ' with radius ' + this.radius;
+            }
+            desc += ' at (' + this.position.x + ', ' + this.position.y + ')';
+            return desc;
         }
 
         //  TODO: optimize...
@@ -3462,76 +3529,123 @@ var nvis = new function () {
 
                 let el = undefined;
                 let type = object[key].type;
+                let value = object[key].value;
+
+                if (type == 'ruler') {
+                    el = document.createElement('hr');
+                }
                 if (type == 'bool' || type == 'int' || type == 'float') {
                     el = document.createElement('input');
                     el.setAttribute('id', elementId);
 
                     if (type == 'bool') {
+
                         el.setAttribute('type', 'checkbox');
-                        el.checked = object[key].value;
-                        if (object[key].value) {
+                        el.checked = value;
+                        if (value) {
                             el.setAttribute('checked', true);
                         }
-                        el.addEventListener('change', (ev) => { nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, true); }, true);
+                        el.addEventListener('change', (event) => {
+                            nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, true);
+                        }, true);
+
                     } else if (type == 'int') {
+
                         el.setAttribute('type', 'range');
-                        el.setAttribute('min', (object[key].min ? object[key].min : 0));
-                        if (object[key].max === undefined) {
-                            el.setAttribute('max', 1.0);
-                        } else {
-                            if (object[key].max == '#windows' && this.renderer.windows !== undefined) {
-                                el.setAttribute('max', this.renderer.windows.windows.length);
-                            } else if (object[key].max == '#frames' && this.renderer.windows !== undefined) {
-                                el.setAttribute('max', _state.animation.numFrames);
-                            } else {
-                                el.setAttribute('max', object[key].max);
-                            }
+
+                        let minValue = object[key].min;
+                        if (minValue === undefined) {
+                            minValue = 0;  //  TODO: needed?
                         }
-                        el.setAttribute('value', (object[key].value ? object[key].value : 0));
+                        el.setAttribute('min', minValue);
+
+                        let maxValue = object[key].max;
+                        if (maxValue === undefined) {
+                            maxValue = 1;  //  TODO: needed?
+                        } else if (maxValue == '#windows' && this.renderer.windows !== undefined) {
+                            maxValue = this.renderer.windows.windows.length;
+                        } else if (maxValue == '#frames') {
+                            maxValue = _state.animation.numFrames;
+                        }
+                        el.setAttribute('max', maxValue);
+
+                        if (value === undefined) {
+                            value = 0;
+                        } else if (value == '#frames') {
+                            value = _state.animation.numFrames;
+                        }
+                        value = Math.min(Math.max(value, minValue), maxValue);
+
+                        el.setAttribute('value', value);
+
+                        if (key == 'frameId')
+                            console.log('value: ' + value + ', min: ' + minValue + ', max: ' + maxValue)
+
                         el.setAttribute('step', (object[key].step ? object[key].step : 1));
-                        el.addEventListener('input', (ev) => { nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false); }, true);
+                        el.addEventListener('input', (event) => {
+                            nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false);
+                        }, true);
                         let oEl = document.createElement('span');
                         oEl.id = (elementId + '-value');
-                        oEl.innerHTML = (oEl.innerHTML == '' ? object[key].value : oEl.innerHTML);
+                        oEl.innerHTML = (oEl.innerHTML == '' ? value : oEl.innerHTML);
 
                         label.innerHTML += ' (' + oEl.outerHTML + ')';
+
                     } else if (type == 'float') {
+                        
                         el.setAttribute('type', 'range');
                         el.setAttribute('min', (object[key].min ? object[key].min : 0.0));
                         el.setAttribute('max', (object[key].max ? object[key].max : 1.0));
-                        el.setAttribute('value', (object[key].value ? object[key].value : 0.0));
+                        el.setAttribute('value', (value ? value : 0.0));
                         el.setAttribute('step', (object[key].step ? object[key].step : 0.1));
-                        el.addEventListener('input', (ev) => { nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false); }, true);
+                        el.addEventListener('input', (event) => {
+                            nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false);
+                        }, true);
                         let oEl = document.createElement('span');
                         oEl.id = (elementId + '-value');
-                        oEl.innerHTML = (oEl.innerHTML == '' ? object[key].value : oEl.innerHTML);
+                        oEl.innerHTML = (oEl.innerHTML == '' ? value : oEl.innerHTML);
 
                         label.innerHTML += ' (' + oEl.outerHTML + ')';
                     }
                 } else if (type == 'dropdown') {
+
                     el = document.createElement('select');
                     el.setAttribute('id', elementId);
-                    el.addEventListener('change', (ev) => { nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false); }, true);
+                    el.addEventListener('change', (event) => {
+                        nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false);
+                    }, true);
                     for (let optionId = 0; optionId < object[key].alternatives.length; optionId++) {
                         let oEl = document.createElement('option');
-                        if (object[key].value == optionId) {
+                        if (value == optionId) {
                             oEl.setAttribute('selected', true);
                         }
                         oEl.innerHTML = object[key].alternatives[optionId];
                         el.appendChild(oEl);
                     }
+
                 } else if (type == 'button') {
+
                     el = document.createElement('button');
                     el.setAttribute('id', elementId);
-                    el.innerHTML = object[key].value;
-                    el.addEventListener('click', (ev) => { if (confirm('Are you sure?')) nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false); }, true);
+                    el.innerHTML = value;
+                    el.addEventListener('click', (event) => {
+                        if (confirm('Are you sure?')) {
+                            nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false);
+                        }
+                    }, true);
+
                 }
 
                 if (el !== undefined) {
-                    if (type == 'bool' || type == 'button') {
+                    if (type == 'ruler') {
                         let cell = document.createElement('td');
                         cell.setAttribute('colspan', 2);
-                        //cell.innerHTML = el.outerHTML + label.outerHTML;
+                        cell.appendChild(el);
+                        row.appendChild(cell);
+                    } else if (type == 'bool' || type == 'button') {
+                        let cell = document.createElement('td');
+                        cell.setAttribute('colspan', 2);
+
                         cell.appendChild(el);
                         cell.appendChild(label);
 
@@ -5617,12 +5731,14 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
                 windowsDiv.appendChild(selectDiv);
             }
-            let newButton = document.createElement('button');
-            newButton.innerHTML = 'Add window';
-            newButton.addEventListener('click', () => {
-                nvis.uiAddWindow();
-            });
-            windowsDiv.appendChild(newButton);
+            if (this.streams.length > 0) {
+                let newButton = document.createElement('button');
+                newButton.innerHTML = 'Add window';
+                newButton.addEventListener('click', () => {
+                    nvis.uiAddWindow();
+                });
+                windowsDiv.appendChild(newButton);
+            }
 
             //  shaders
             let validShaders = [];
@@ -5695,6 +5811,63 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             annotationsDiv.id = 'tabAnnotations';
             annotationsDiv.className = 'tabContent';
             annotationsDiv.style.display = (_state.ui.tabId == 'tabAnnotations' ? 'block' : 'none');
+
+            for (let windowId = 0; windowId < this.windows.windows.length; windowId++) {
+                let windowAnnotations = this.windows.windows[windowId].annotations;
+                for (let annotationId = 0; annotationId < windowAnnotations.annotations.length; annotationId++) {
+                    let annotation = windowAnnotations.annotations[annotationId];
+                    let annotationDiv = document.createElement('div');
+                    let aSpan = document.createElement('span');
+                    aSpan.innerHTML = 'window ' + (windowId + 1) + ': ' + annotation.description();
+                    let aButton = document.createElement('button');
+                    aButton.innerHTML = 'Delete';
+                    aButton.style.marginLeft = '15px';
+                    aButton.addEventListener('click', () => {
+                        windowAnnotations.annotations.splice(annotationId, 1);
+                        this.updateUIPopup();
+                    })
+                    annotationDiv.appendChild(aSpan);
+                    annotationDiv.appendChild(aButton);
+                    annotationsDiv.appendChild(annotationDiv);
+                }
+            }
+            for (let streamId = 0; streamId < this.streams.length; streamId++) {
+                let streamAnnotations = this.streams[streamId].annotations;
+                for (let annotationId = 0; annotationId < streamAnnotations.annotations.length; annotationId++) {
+                    let annotation = streamAnnotations.annotations[annotationId];
+                    let annotationDiv = document.createElement('div');
+                    let aSpan = document.createElement('span');
+                    aSpan.innerHTML = 'stream ' + (streamId + 1) + ': ' + annotation.description();
+                    let aButton = document.createElement('button');
+                    aButton.innerHTML = 'Delete';
+                    aButton.style.marginLeft = '15px';
+                    aButton.addEventListener('click', () => {
+                        streamAnnotations.annotations.splice(annotationId);
+                        this.updateUIPopup();
+                    })
+                    annotationDiv.appendChild(aSpan);
+                    annotationDiv.appendChild(aButton);
+                    annotationsDiv.appendChild(annotationDiv);
+                }
+            }
+
+            // let annotationsOption = document.createElement('option');
+            // annotationsOption.innerHTML = '--- Select annotation ---';
+            // annotationsSelect.appendChild(annotationsOption);
+
+            // let annotationsLabel = document.createElement('label');
+            // annotationsLabel.innerHTML = 'Annotation: ';
+            // let annotationsSelect = document.createElement('select');
+            // annotationsSelect.id = 'annotation';
+            // annotationsSelect.addEventListener('change', (event) => {
+            //     let annotationId = document.getElementById('annotation').selectedIndex - 1;
+            // });
+
+            // selectDiv = document.createElement('div');
+            // selectDiv.appendChild(annotationsLabel);
+            // selectDiv.appendChild(annotationsSelect);
+
+            //annotationsDiv.appendChild(selectDiv);
 
 
             this.uiPopup.appendChild(tabs);
@@ -5946,7 +6119,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 newStream.setupTexture(texture, frame, false, dimensions);
             }
             this.streams.push(newStream);
-            _state.animation.numFrames = newStream.getNumImages();  //  TODO: check
+            _state.animation.setNumFrames(newStream.getNumImages());  //  TODO: check
             this.addWindow(this.streams.length - 1);
             this.windows.setStreamPxDimensions(dimensions);
             this.windows.adjust();
@@ -5994,7 +6167,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 let newStream = new NvisStream(this.glContext);
                 newStream.drop(files, this.windows);
                 this.streams.push(newStream);
-                _state.animation.numFrames = newStream.getNumImages();  //  TODO: check
+                _state.animation.setNumFrames(newStream.getNumImages());  //  TODO: check
                 this.addWindow(this.streams.length - 1);
                 this.windows.adjust();
             }
@@ -6072,7 +6245,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             newStream.load(fileNames, this.windows);
 
             //  TODO: fix this
-            _state.animation.numFrames = newStream.getNumImages();
+            _state.animation.setNumFrames(newStream.getNumImages());
 
             this.streams.push(newStream);
             this.windows.adjust();
@@ -6212,7 +6385,16 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
         if (key == 'bPingPong') {
-            _state.animation.pingPong = object.value;
+            let bPingPong = object.value;
+            _state.animation.pingPong = bPingPong;
+            if (!bPingPong) {
+                let direction = document.getElementById('settings-direction').selectedIndex;
+                _state.animation.direction = (direction == 0 ? 1 : -1);
+            }
+        }
+
+        if (key == 'direction') {
+            _state.animation.direction = (object.value == 0 ? 1 : -1);
         }
 
         if (key == 'fps') {
@@ -6220,12 +6402,51 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
         if (key == 'frameId') {
-            _state.animation.frameId = object.value - 1;
+            let frameId = object.value - 1;
+            frameId = Math.max(frameId, _state.animation.minFrameId);
+            frameId = Math.min(frameId, _state.animation.maxFrameId);
+            _state.animation.frameId = frameId;
+            object.value = frameId + 1;
+            console.log('frameId: ' + object.value);
+            document.getElementById('settings-frameId').value = frameId + 1;
+            document.getElementById('settings-frameId-value').innerHTML = frameId + 1;
+            console.log('frameId: frameId = ' + frameId + ', min = ' + _state.animation.minFrameId + ', max = ' + _state.animation.maxFrameId)
+        }
+
+        if (key == 'minFrameId') {
+            let minFrameId = Math.min(_state.animation.maxFrameId, object.value - 1);
+            _state.animation.minFrameId = minFrameId;
+            document.getElementById('settings-minFrameId').value = minFrameId + 1;
+
+            //  adjust frameId
+            // let frameId = Math.max(_state.animation.minFrameId, document.getElementById('settings-frameId').value - 1);
+            let frameId = Math.max(_state.animation.minFrameId, _state.animation.frameId);
+            _state.animation.frameId = frameId;
+            document.getElementById('settings-frameId').value = frameId + 1;
+            document.getElementById('settings-frameId-value').innerHTML = frameId + 1;
+            console.log('minFrameId: frameId = ' + frameId + ', min = ' + _state.animation.minFrameId + ', max = ' + _state.animation.maxFrameId)
+        }
+
+        if (key == 'maxFrameId') {
+            let maxFrameId = Math.max(_state.animation.minFrameId, object.value - 1);
+            _state.animation.maxFrameId = maxFrameId;
+            document.getElementById('settings-maxFrameId').value = maxFrameId + 1;
+
+            //  adjust frameId
+            // let frameId = Math.min(_state.animation.maxFrameId, document.getElementById('settings-frameId').value - 1);
+            let frameId = Math.min(_state.animation.maxFrameId, _state.animation.frameId);
+            _state.animation.frameId = frameId;
+            document.getElementById('settings-frameId').value = frameId + 1;
+            document.getElementById('settings-frameId-value').innerHTML = frameId + 1;
+            console.log('maxFrameId: frameId = ' + frameId + ', min = ' + _state.animation.minFrameId + ', max = ' + _state.animation.maxFrameId)
         }
 
         if (key == 'clearAll') {
+            _state.animation.numFrames = 0;
+            _state.animation.minFrameId = 0;
+            _state.animation.maxFrameId = 0;
             _apiClear();
-            _renderer.updateUIPopup();
+            _renderer.closeUIPopup();
         }
 
         let elementValue = document.getElementById(elementId + '-value');

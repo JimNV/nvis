@@ -3,8 +3,6 @@
     "description": "A image/stream viewer extension!",
     "version": "0.5",
     "manifest_version": 3,
-    "permissions": [
-    ],
     "background": {
         "service_worker": "content.js"
     },
