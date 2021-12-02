@@ -1,28 +1,32 @@
-//  Copyright 2021 NVIDIA Corporation
-//
-//  Redistribution and use in source and binary forms, with or without
-//  modification, are permitted provided that the following conditions are met:
-//
-//  1. Redistributions of source code must retain the above copyright notice,
-//     this list of conditions and the following disclaimer.
-//  2. Redistributions in binary form must reproduce the above copyright notice,
-//     this list of conditions and the following disclaimer in the documentation
-//     and/or other materials provided with the distribution.
-//  3. Neither the name of the copyright holder nor the names of its contributors
-//     may be used to endorse or promote products derived from this software
-//     without specific prior written permission.
-//
-//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-//  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-//  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-//  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-//  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-//  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-//  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-//  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-//  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-//  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-//  POSSIBILITY OF SUCH DAMAGE.
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 //--------|---------|---------|---------|---------|---------|---------|---------|
 
@@ -526,15 +530,15 @@ var nvis = new function () {
     }
 
     let _apiPosition = function (x, y) {
-        return _apiCommand({ command: 'position', argument: { x: x, y: y }})
+        return _apiCommand({ command: 'position', argument: { x: x, y: y } })
     }
 
     let _apiTranslate = function (x, y) {
-        return _apiCommand({ command: 'translate', argument: { x: x, y: y }})
+        return _apiCommand({ command: 'translate', argument: { x: x, y: y } })
     }
 
     let _apiAnnotation = function (target, id, type, parameters) {
-        return _apiCommand({ command: 'annotation', argument: { target: target, id: id, type: type, parameters: parameters }});
+        return _apiCommand({ command: 'annotation', argument: { target: target, id: id, type: type, parameters: parameters } });
     }
 
     let _apiStream = function (images, bWindow = true) {
@@ -671,14 +675,14 @@ var nvis = new function () {
                 } else {
                     newStream.setInputStreamIds(inputStreamIds);
                 }
-            // } else if (argument.generator !== undefined) {
-            //     let shaderId = _renderer.loadShader(argument.generator);
-            //     let newStream = _renderer.addShaderStream(shaderId);
-            //     let dimensions = { w: argument.width, h: argument.height };
-            //     newStream.setDimensions(dimensions);
-            //     if (_renderer.windows.streamPxDimensions === undefined) {
-            //         _renderer.windows.streamPxDimensions = dimensions;
-            //     }
+                // } else if (argument.generator !== undefined) {
+                //     let shaderId = _renderer.loadShader(argument.generator);
+                //     let newStream = _renderer.addShaderStream(shaderId);
+                //     let dimensions = { w: argument.width, h: argument.height };
+                //     newStream.setDimensions(dimensions);
+                //     if (_renderer.windows.streamPxDimensions === undefined) {
+                //         _renderer.windows.streamPxDimensions = dimensions;
+                //     }
             }
             if (argument.window) {
                 _renderer.addWindow(_renderer.streams.length - 1);
@@ -766,10 +770,10 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     let VideoToFramesMethod = {
-        fps : 0,
-        totalFrames : 1
+        fps: 0,
+        totalFrames: 1
     };
-      
+
     class NvisVideoParser {
 
         static canvas = document.createElement('canvas');
@@ -799,7 +803,7 @@ var nvis = new function () {
                 _renderer.popupInfo('Decoding video: ' + (self.frames.length + 1) + ' frames (' + video.currentTime.toFixed(1) + 's)')
             });
         }
-        
+
         storeFrame(video, context, resolve) {
             context.drawImage(this.video, 0, 0, this.video.videoWidth, this.video.videoHeight);
             resolve(context.getImageData(0, 0, this.video.videoWidth, this.video.videoHeight));
@@ -833,7 +837,7 @@ var nvis = new function () {
         //         };
         //         NvisVideoParser.canvas.width = self.video.videoWidth;
         //         NvisVideoParser.canvas.height = self.video.videoHeight;
-    
+
         //         self.duration = self.video.duration;
         //         let totalFrames = self.amount;
         //         if (self.type === VideoToFramesMethod.fps) {
@@ -874,14 +878,14 @@ var nvis = new function () {
                 URL.revokeObjectURL(oldObjectUrl);
             }
 
-            this.video.addEventListener('loadeddata', async function() {
+            this.video.addEventListener('loadeddata', async function () {
                 self.dimensions = {
                     w: self.video.videoWidth,
                     h: self.video.videoHeight
                 };
                 NvisVideoParser.canvas.width = self.video.videoWidth;
                 NvisVideoParser.canvas.height = self.video.videoHeight;
-    
+
                 self.duration = self.video.duration;
                 let totalFrames = self.amount;
                 if (self.type === VideoToFramesMethod.fps) {
@@ -1263,14 +1267,14 @@ var nvis = new function () {
             return (point.x >= this.x && point.x <= this.x + this.width && point.y >= this.y && point.y <= this.y + this.height);
         }
     }
-    
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    
+
     class NvisAnnotation extends NvisDraw {
 
         constructor(glContext, type, parameters = {}) {
@@ -1429,7 +1433,7 @@ var nvis = new function () {
 
         constructor(glContext) {
             this.glContext = glContext;
-            
+
             this.annotations = [];
         }
 
@@ -2559,7 +2563,7 @@ var nvis = new function () {
             this.bSuccess = true;
             this.type = this.buffer.readLine();
             const vDims = this.buffer.readLine().split(' ');
-            this.dimensions = { w: parseInt(vDims[0]), h: parseInt(vDims[1]) }; 
+            this.dimensions = { w: parseInt(vDims[0]), h: parseInt(vDims[1]) };
             this.scaleEndianess = parseFloat(this.buffer.readLine());
             this.littleEndian = (this.scaleEndianess < 0.0);
             this.buffer.littleEndian = this.littleEndian;
@@ -3592,7 +3596,7 @@ var nvis = new function () {
                         label.innerHTML += ' (' + oEl.outerHTML + ')';
 
                     } else if (type == 'float') {
-                        
+
                         el.setAttribute('type', 'range');
                         el.setAttribute('min', (object[key].min ? object[key].min : 0.0));
                         el.setAttribute('max', (object[key].max ? object[key].max : 1.0));
@@ -3677,7 +3681,7 @@ var nvis = new function () {
 
 
     class NvisColor {
-        
+
         constructor(r = 0, g = 0, b = 0, a = 255) {
             this.r = r;
             this.g = g;
@@ -3712,7 +3716,7 @@ var nvis = new function () {
         }
 
         toUniform() {
-            let uniform = [ this.r / 255.0, this.g / 255.0, this.b / 255.0 ];
+            let uniform = [this.r / 255.0, this.g / 255.0, this.b / 255.0];
             if (this.bAlpha) {
                 uniform.push(this.a / 255.0);
             }
@@ -3926,7 +3930,7 @@ var nvis = new function () {
             } else if (type == 'color') {
                 let color = new NvisColor();
                 color.fromCSS(object.value);
-                
+
                 color.setChannel(parseInt(elementId.substr(-1)), element.value);
                 object.value = color.toCSS();
 
@@ -3957,8 +3961,8 @@ var nvis = new function () {
 
             if (bFloat) {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, dimensions.w, dimensions.h, 0, gl.RGBA, gl.FLOAT, image);
-            // } else if (dimensions !== undefined) {  // XXXXXXXXXXXXXXXXXx
-            //     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                // } else if (dimensions !== undefined) {  // XXXXXXXXXXXXXXXXXx
+                //     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
             } else {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
@@ -4372,7 +4376,7 @@ var nvis = new function () {
                     el = document.createElement('div');
                     el.setAttribute('id', elementId);
 
-                    const channels = [ 'R', 'G', 'B', 'A' ];
+                    const channels = ['R', 'G', 'B', 'A'];
                     let color = new NvisColor();
                     color.fromCSS(object[key].value);
 
@@ -4466,7 +4470,7 @@ var nvis = new function () {
             // let ui = document.createDocumentFragment();
             let ui = document.createElement('div');
             ui.id = 'ui';
-            
+
             let fileName = streams[streamId].getFileName();
             let arrowRight = '&#9658;';
             let arrowDown = '&#9660;';
@@ -4476,8 +4480,7 @@ var nvis = new function () {
             uiTitle.id = 'streamTitleUI-' + streamId;
             uiTitle.innerHTML = (_state.ui.selectedStreamId == streamId ? arrowDown : arrowRight)
             uiTitle.innerHTML += (' stream ' + (streamId + 1) + ': ' + fileName);
-            if (_state.ui.selectedStreamId == streamId)
-            {
+            if (_state.ui.selectedStreamId == streamId) {
                 uiTitle.innerHTML = uiTitle.innerHTML.bold();
             }
 
@@ -4489,9 +4492,8 @@ var nvis = new function () {
 
                     let streamTitle = document.getElementById('streamTitleUI-' + id);
                     streamTitle.innerHTML = (_state.ui.selectedStreamId == id ? arrowDown : arrowRight)
-                    streamTitle.innerHTML += (' stream ' + (id + 1) + ': ' + streams[id].getFileName());    
-                    if (_state.ui.selectedStreamId == id)
-                    {
+                    streamTitle.innerHTML += (' stream ' + (id + 1) + ': ' + streams[id].getFileName());
+                    if (_state.ui.selectedStreamId == id) {
                         streamTitle.innerHTML = streamTitle.innerHTML.bold();
                     }
 
@@ -4536,14 +4538,14 @@ var nvis = new function () {
                     let inputDiv = document.createElement('div');
                     inputDiv.appendChild(label);
                     inputDiv.appendChild(sEl);
-                    
+
                     uiBody.style.display = (streamId == _state.ui.selectedStreamId ? 'block' : 'none');
 
                     uiBody.appendChild(inputDiv);
                 }
                 if (shader !== undefined && shader.isReady()) {
                     let shaderUI = this.buildShaderUI(this.shaderJSONObject.UI, streamId);
-                    
+
                     uiBody.appendChild(shaderUI);
                 }
 
@@ -4588,9 +4590,9 @@ var nvis = new function () {
 
         update(windowId, coordinates, color, bFloat) {
             if (this.windowId == windowId && this.coordinates.x == coordinates.x && this.coordinates.y == coordinates.y) {
-                 return;
+                return;
             }
-            
+
             // console.log('windowId: ' + windowId + ', coords: ' + JSON.stringify(coordinates) + ', color: ' + JSON.stringify(color));
 
             this.windowId = windowId;
@@ -4688,7 +4690,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 document.body.prepend(this.welcome);
             }
         }
-        
+
         hide() {
             if (this.windows.windows.length == 0 && this.welcome.parentElement !== null) {
                 this.welcome.parentElement.removeChild(this.welcome);
@@ -5759,7 +5761,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             select.id = 'shaderStream';
             select.addEventListener('change', (event) => {
                 let shaderId = document.getElementById('shaderStream').selectedIndex - 1;
-                document.getElementById('buttonCreate').disabled = !validShaders.includes(shaderId);                    
+                document.getElementById('buttonCreate').disabled = !validShaders.includes(shaderId);
             });
 
             let button = document.createElement('button');
