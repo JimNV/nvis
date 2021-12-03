@@ -100,9 +100,12 @@ void main()
 
             float weight = exp(-(xp * xp * invSX + yp * yp * invSY));
 
-            kernelSum += weight;
-            // colorSum += uInput[uint3(loc2d + int2(x, y), gFrameId)] * weight;
-            colorSum += texelFetch(uTexture0, loc2d + ivec2(x, y), 0) * weight;
+            ivec2 tap = loc2d + ivec2(x, y);
+            if (tap.x >= 0 && tap.x < dimensions.x && tap.y >= 0 && tap.y < dimensions.y)
+            {
+                kernelSum += weight;
+                colorSum += texelFetch(uTexture0, tap, 0) * weight;
+            }
         }
     }
 

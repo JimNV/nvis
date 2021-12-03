@@ -304,6 +304,9 @@ var nvis = new function () {
             step: 0.1,
             condition: 'bGlobalTonemapping & tonemapper == 0'
         },
+        Video: {
+            type: 'ruler'
+        },
         videoFPS: {
             name: 'Video decoding FPS',
             type: 'int',
@@ -649,9 +652,13 @@ var nvis = new function () {
             return true;
         } else if (command == 'annotation') {
             if (argument.target == 'stream') {
-                _renderer.streams[argument.id].annotations.add(argument.type, argument.parameters);
+                if (argument.id < _renderer.streams.length) {
+                    _renderer.streams[argument.id].annotations.add(argument.type, argument.parameters);
+                }
             } else if (argument.target == 'window') {
-                _renderer.windows.windows[argument.id].annotations.add(argument.type, argument.parameters);
+                if (argument.id < _renderer.windows.windows.length) {
+                    _renderer.windows.windows[argument.id].annotations.add(argument.type, argument.parameters);
+                }
             }
         } else if (command == 'video') {
             let videoParser = new NvisVideoParser((fileName, frames) => _renderer.setupVideo(fileName, frames));
@@ -1282,16 +1289,21 @@ var nvis = new function () {
                 super(glContext, 'trianglefan');
             } else if (type == 'circle') {
                 super(glContext, 'trianglestrip');
+            } else if (type == 'rectangle') {
+                super(glContext, 'trianglestrip');
             }
 
             this.type = type;
 
             this.position = parameters.position;
-            this.color = (parameters.color === undefined ? { r: 1.0, g: 0.0, b: 0.0, a: 1.0 } : parameters.color);
-            this.size = (parameters.size === undefined ? 0.1 : parameters.size);
-            this.rotation = (parameters.rotation === undefined ? 30 : parameters.rotation);
+            this.color = (parameters.color === undefined ? new NvisColor({ r: 1.0, g: 0-0, b: 0.0 }) : new NvisColor(parameters.color));
+
+            this.size = (parameters.size === undefined ? 25.0 : parameters.size);
+            this.rotation = (parameters.rotation === undefined ? 0 : parameters.rotation);
+            this.dimensions = (parameters.dimensions === undefined ? { w: 50, h: 40 } : parameters.dimensions);
             this.radius = (parameters.radius === undefined ? 10.0 : parameters.radius);
-            this.width = (parameters.width === undefined ? 3.0 : parameters.width);
+            this.width = (parameters.width === undefined ? 5.0 : parameters.width);
+            this.zoom = (parameters.zoom === undefined ? true : parameters.zoom);
         }
 
         description() {
@@ -1300,6 +1312,8 @@ var nvis = new function () {
                 desc += ' with size ' + this.size + ' and rotation ' + this.rotation;
             } else if (this.type == 'circle') {
                 desc += ' with radius ' + this.radius;
+            } else if (this.type == 'rectangle') {
+                desc += ' with dims ' + this.dimensions.w + 'x' + this.dimensions.h;
             }
             desc += ' at (' + this.position.x + ', ' + this.position.y + ')';
             return desc;
@@ -1320,8 +1334,8 @@ var nvis = new function () {
             return pixelSize;
         }
 
-        //  TODO: optimize...
         streamPxToTextureCoords(pos, windowId, canvas, stream) {
+            //  TODO: optimize...
             let layout = _state.layout;
             let layoutDims = layout.getDimensions();
             let winDim = { w: canvas.width / layoutDims.w, h: canvas.height / layoutDims.h };
@@ -1343,11 +1357,6 @@ var nvis = new function () {
                 y: (pos.y - so.y * sd.h + 0.5) * pixelSize.h,
             }
 
-            //  TODO: check windowId
-            // if (pos.x * pixelSize.w > ) {
-            //     offset = undefined;
-            // }
-
             return { pixelSize: pixelSize, offset: offset };
         }
 
@@ -1358,13 +1367,9 @@ var nvis = new function () {
             return { x: point.x * cosAlpha - point.y * sinAlpha, y: point.x * sinAlpha + point.y * cosAlpha };
         }
 
-        update(canvas, stream, boundingBox, bZoom) {
+        update(canvas, stream, boundingBox) {
             let p = this.streamPxToTextureCoords(this.position, 0, canvas, stream);
-            // console.log(JSON.stringify(p));
             let ar = (canvas.width / canvas.height);
-            // let ps = this.pixelSize(canvas);
-
-            //console.log(JSON.stringify(offset));
 
             let ps = p.pixelSize;
             let o = p.offset;
@@ -1378,8 +1383,11 @@ var nvis = new function () {
             }
 
             if (this.type == 'arrow') {
-                let s = this.size;
-                s *= ps.w;
+
+                let s = this.size * (ps.w / 3.0);
+                if (!this.zoom) {
+                    s /= _state.zoom.level;
+                }
 
                 let r0 = this.rotate({ x: s, y: s }, this.rotation);
                 let r1 = this.rotate({ x: s, y: s * 0.5 }, this.rotation);
@@ -1400,10 +1408,13 @@ var nvis = new function () {
                 let r = this.radius;
                 let w = (this.radius + this.width);
 
+                r *= ps.w;
+                w *= ps.w;
+
                 if (!this.zoom) {
-                    r *= ps.w;
-                    w *= ps.w;
-                }
+                    r /= _state.zoom.level;
+                    w /= _state.zoom.level;
+                } 
 
                 let steps = 30;
                 let alphaStep = 360 / steps;
@@ -1413,8 +1424,6 @@ var nvis = new function () {
                     rv.y = ar * rv.y;
                     let p0 = { x: o.x + r * rv.x, y: o.y + r * rv.y };
                     let p1 = { x: o.x + w * rv.x, y: o.y + w * rv.y };
-                    // console.log('p0: ' + JSON.stringify(p0));
-                    // console.log('p1: ' + JSON.stringify(p1));
                     this.addVertex(p0, this.color);
                     this.addVertex(p1, this.color);
                 }
@@ -1423,6 +1432,33 @@ var nvis = new function () {
 
             } else if (this.type == 'rectangle') {
 
+                let dw = this.dimensions.w / 2.0;
+                let dh = this.dimensions.h / 2.0;
+                dw *= ps.w;
+                dh *= ps.h;
+                let hw = ps.w * this.width / 2.0;
+
+                if (!this.zoom) {
+                    dw /= _state.zoom.level;
+                    dh /= _state.zoom.level;
+                    hw /= _state.zoom.level;
+                }
+
+                let r = [];
+                r.push(this.rotate({ x: -dw - hw, y: -dh - hw }, this.rotation));  //  1
+                r.push(this.rotate({ x: -dw + hw, y: -dh + hw }, this.rotation));  //  2
+                r.push(this.rotate({ x: dw + hw, y: -dh - hw }, this.rotation));  //  3
+                r.push(this.rotate({ x: dw - hw, y: -dh + hw }, this.rotation));  //  4
+                r.push(this.rotate({ x: dw + hw, y: dh + hw }, this.rotation));  //  5
+                r.push(this.rotate({ x: dw - hw, y: dh - hw }, this.rotation));  //  6
+                r.push(this.rotate({ x: -dw - hw, y: dh + hw }, this.rotation));  //  7
+                r.push(this.rotate({ x: -dw + hw, y: dh - hw }, this.rotation));  //  8                
+                r.push(this.rotate({ x: -dw - hw, y: -dh - hw }, this.rotation));  //  9
+                r.push(this.rotate({ x: -dw + hw, y: -dh + hw }, this.rotation));  //  10
+
+                for (let i = 0; i < r.length; i++) {
+                    this.addVertex({ x: o.x + r[i].x, y: o.y + r[i].y * ar }, this.color);
+                }
             }
 
         }
@@ -3582,9 +3618,6 @@ var nvis = new function () {
 
                         el.setAttribute('value', value);
 
-                        if (key == 'frameId')
-                            console.log('value: ' + value + ', min: ' + minValue + ', max: ' + maxValue)
-
                         el.setAttribute('step', (object[key].step ? object[key].step : 1));
                         el.addEventListener('input', (event) => {
                             nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false);
@@ -3682,12 +3715,18 @@ var nvis = new function () {
 
     class NvisColor {
 
-        constructor(r = 0, g = 0, b = 0, a = 255) {
-            this.r = r;
-            this.g = g;
-            this.b = b;
-            this.a = a;
-            this.bAlpha = true;
+        constructor(r, g = 0.0, b = 0.0, a = undefined) {
+            if (r instanceof Object) {
+                this.r = r.r;
+                this.g = r.g;
+                this.b = r.b;
+                this.a = r.a;
+            } else {
+                this.r = r;
+                this.g = g;
+                this.b = b;
+                this.a = a;
+            }
         }
 
         getChannel(c) {
@@ -3716,26 +3755,32 @@ var nvis = new function () {
         }
 
         toUniform() {
-            let uniform = [this.r / 255.0, this.g / 255.0, this.b / 255.0];
-            if (this.bAlpha) {
-                uniform.push(this.a / 255.0);
+            let uniform = [this.r, this.g, this.b];
+            if (this.a !== undefined) {
+                uniform.push(this.a);
             }
             return uniform;
+        }
+
+        fromObject(color, integer = false) {
+            this.r = color.r;
+            this.g = color.g;
+            this.b = color.b;
+            this.a = color.a;
         }
 
         fromCSS(cssColor) {
             let pPos = cssColor.indexOf("(");
             let type = cssColor.substr(0, pPos);
             let values = cssColor.slice(pPos + 1, -1).split(',').map(Number);
-            this.bAlpha = (type == 'rgba');
-            this.r = values[0];
-            this.g = values[1];
-            this.b = values[2];
-            this.a = (this.bAlpha ? values[3] : undefined);
+            this.r = values[0] / 255.0;
+            this.g = values[1] / 255.0;
+            this.b = values[2] / 255.0;
+            this.a = (type == 'rgba' ? values[3] / 255.0 : undefined);
         }
 
         toCSS() {
-            return 'rgb' + (this.bAlpha ? 'a' : '') + '(' + this.r + ',' + this.g + ',' + this.b + (this.bAlpha ? (',' + this.a) : '') + ')';
+            return 'rgb' + (this.a === undefined ? '' : 'a') + '(' + Math.round(this.r * 255.0) + ',' + Math.round(this.g * 255.0) + ',' + Math.round(this.b * 255.0) + (this.a === undefined ? '' : (',' + Math.round(this.a * 255.0))) + ')';
         }
     }
 
@@ -4506,11 +4551,13 @@ var nvis = new function () {
 
             ui.appendChild(uiTitle);
 
-            if (this.shaderId != -1) {
+            let uiBody = document.createElement('div');
+            uiBody.id = 'streamBodyUI-' + streamId;
+            uiBody.className = 'uiBody';
+            uiBody.style.display = (streamId == _state.ui.selectedStreamId ? 'block' : 'none');
 
-                let uiBody = document.createElement('div');
-                uiBody.id = 'streamBodyUI-' + streamId;
-                uiBody.className = 'uiBody';
+
+            if (this.shaderId != -1) {
 
                 let shader = shaders.shaders[this.shaderId];
 
@@ -4539,8 +4586,6 @@ var nvis = new function () {
                     inputDiv.appendChild(label);
                     inputDiv.appendChild(sEl);
 
-                    uiBody.style.display = (streamId == _state.ui.selectedStreamId ? 'block' : 'none');
-
                     uiBody.appendChild(inputDiv);
                 }
                 if (shader !== undefined && shader.isReady()) {
@@ -4549,8 +4594,18 @@ var nvis = new function () {
                     uiBody.appendChild(shaderUI);
                 }
 
-                ui.appendChild(uiBody);
             }
+
+            let deleteButton = document.createElement('button');
+            deleteButton.innerHTML = 'Delete';
+            deleteButton.addEventListener('click', () => {
+                if (confirm('Are you sure?')) {
+                    nvis.uiDeleteStream(streamId);
+                }
+            });
+            uiBody.appendChild(deleteButton);
+
+            ui.appendChild(uiBody);
 
             return ui;
         }
@@ -5784,6 +5839,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     newStream.setDimensions(_renderer.windows.streamPxDimensions);
                 }
                 this.addWindow(this.streams.length - 1);
+                this.closeUIPopup();
             });
 
             let option = document.createElement('option');
@@ -5814,44 +5870,73 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             annotationsDiv.className = 'tabContent';
             annotationsDiv.style.display = (_state.ui.tabId == 'tabAnnotations' ? 'block' : 'none');
 
+            let table = document.createElement('table');
+
             for (let windowId = 0; windowId < this.windows.windows.length; windowId++) {
                 let windowAnnotations = this.windows.windows[windowId].annotations;
+
                 for (let annotationId = 0; annotationId < windowAnnotations.annotations.length; annotationId++) {
+
                     let annotation = windowAnnotations.annotations[annotationId];
-                    let annotationDiv = document.createElement('div');
-                    let aSpan = document.createElement('span');
-                    aSpan.innerHTML = 'window ' + (windowId + 1) + ': ' + annotation.description();
+
+                    let nameCell = document.createElement('td');
+                    if (annotationId == 0) {
+                        nameCell.innerHTML = 'window ' + (windowId + 1) + ': ';
+                    }
+
+                    let descCell = document.createElement('td');
+                    descCell.innerHTML = annotation.description();
+
                     let aButton = document.createElement('button');
                     aButton.innerHTML = 'Delete';
                     aButton.style.marginLeft = '15px';
                     aButton.addEventListener('click', () => {
                         windowAnnotations.annotations.splice(annotationId, 1);
                         this.updateUIPopup();
-                    })
-                    annotationDiv.appendChild(aSpan);
-                    annotationDiv.appendChild(aButton);
-                    annotationsDiv.appendChild(annotationDiv);
+                    });
+                    let deleteCell = document.createElement('td');
+                    deleteCell.appendChild(aButton);
+
+                    let row = document.createElement('tr');
+                    row.appendChild(nameCell);
+                    row.appendChild(descCell);
+                    row.appendChild(deleteCell);
+                    table.appendChild(row);
                 }
             }
             for (let streamId = 0; streamId < this.streams.length; streamId++) {
                 let streamAnnotations = this.streams[streamId].annotations;
+
                 for (let annotationId = 0; annotationId < streamAnnotations.annotations.length; annotationId++) {
+
                     let annotation = streamAnnotations.annotations[annotationId];
-                    let annotationDiv = document.createElement('div');
-                    let aSpan = document.createElement('span');
-                    aSpan.innerHTML = 'stream ' + (streamId + 1) + ': ' + annotation.description();
+
+                    let nameCell = document.createElement('td');
+                    if (annotationId == 0) {
+                        nameCell.innerHTML = 'stream ' + (streamId + 1) + ': ';
+                    }
+
+                    let descCell = document.createElement('td');
+                    descCell.innerHTML = annotation.description();
+
                     let aButton = document.createElement('button');
                     aButton.innerHTML = 'Delete';
                     aButton.style.marginLeft = '15px';
                     aButton.addEventListener('click', () => {
-                        streamAnnotations.annotations.splice(annotationId);
+                        windowAnnotations.annotations.splice(annotationId, 1);
                         this.updateUIPopup();
-                    })
-                    annotationDiv.appendChild(aSpan);
-                    annotationDiv.appendChild(aButton);
-                    annotationsDiv.appendChild(annotationDiv);
+                    });
+                    let deleteCell = document.createElement('td');
+                    deleteCell.appendChild(aButton);
+
+                    let row = document.createElement('tr');
+                    row.appendChild(nameCell);
+                    row.appendChild(descCell);
+                    row.appendChild(deleteCell);
+                    table.appendChild(row);
                 }
             }
+            annotationsDiv.appendChild(table);
 
             // let annotationsOption = document.createElement('option');
             // annotationsOption.innerHTML = '--- Select annotation ---';
@@ -6501,6 +6586,72 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         _renderer.updateUIPopup();
     }
 
+    let _uiDeleteStream = function (deleteStreamId) {
+
+        let numStreams =_renderer.streams.length;
+
+        if (numStreams == 1) {
+            _apiClear();
+            _renderer.closeUIPopup();
+            return;
+        }
+
+        let updateWindowIds = [];
+        for (let windowId = 0; windowId < _renderer.windows.windows.length; windowId++) {
+            let window = _renderer.windows.windows[windowId];
+            if (window.streamId >= deleteStreamId) {
+                updateWindowIds.push(windowId);
+            }
+        }
+
+
+        //  find replacement stream id as input, require one without inputs
+        let replacementStreamId = undefined;
+        for (let streamId = 0; streamId < numStreams; streamId++) {
+            let stream = _renderer.streams[streamId];
+            if (stream.inputStreamIds.length == 0 && streamId != deleteStreamId) {
+                replacementStreamId = streamId;
+                break;
+            }
+        }
+        if (replacementStreamId !== undefined && replacementStreamId > deleteStreamId) {
+            replacementStreamId--;
+        }
+
+        let deleteStreamIds = [];
+        deleteStreamIds.push(deleteStreamId);
+        for (let streamId = 0; streamId < numStreams; streamId++) {
+            let stream = _renderer.streams[streamId];
+            for (let inputId = 0; inputId < stream.inputStreamIds.length; inputId++) {
+                if (stream.inputStreamIds[inputId] == deleteStreamId) {
+                    if (replacementStreamId === undefined) {
+                        deleteStreamIds.push(streamId);
+                    } else {
+                        stream.inputStreamIds[inputId] = replacementStreamId;
+                    }
+                }
+            }
+        }
+
+        // console.log('streams: ' + JSON.stringify(deleteStreamIds));
+        // console.log('windows: ' + JSON.stringify(updateWindowIds));
+
+        for (let streamId = deleteStreamIds.length - 1; streamId >= 0; streamId--) {
+            _renderer.streams.splice(deleteStreamIds[streamId], 1);
+        }
+        if (replacementStreamId !== undefined) {
+            for (let windowId = 0; windowId < updateWindowIds.length; windowId++) {
+                _renderer.windows.windows[updateWindowIds[windowId]].streamId = replacementStreamId;
+            }
+        } else {
+            _renderer.windows.clear();
+            _renderer.closeUIPopup();
+        }
+
+        _renderer.windows.adjust();
+        _renderer.updateUIPopup();
+    }
+
 
     return {
         //  API
@@ -6522,6 +6673,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         uiSetWindowStreamId: _uiSetWindowStreamId,
         uiAddWindow: _uiAddWindow,
         uiDeleteWindow: _uiDeleteWindow,
+        uiDeleteStream: _uiDeleteStream,
         uiOpenTab: _uiOpenTab,
         uiOnMouseDown: _uiOnMouseDown,
         uiOnMouseUp: _uiOnMouseUp,
