@@ -88,6 +88,7 @@ var nvis = new function () {
         },
         animation: {
             active: false,
+            performance: false,
             fps: 60,
             pingPong: true,
             direction: 1,
@@ -95,7 +96,7 @@ var nvis = new function () {
             numFrames: 1,  //  TODO: fix this!
             minFrameId: 0,
             maxFrameId: 0,
-            time: undefined,
+            time: 0,
 
             setNumFrames: function (numFrames) {
                 this.numFrames = numFrames;
@@ -214,6 +215,11 @@ var nvis = new function () {
         },
         Animation: {
             type: 'ruler'
+        },
+        bPerformance: {
+            name: 'Performance info',
+            type: 'bool',
+            value: _state.animation.performance
         },
         bAnimate: {
             name: 'Animate',
@@ -497,6 +503,17 @@ var nvis = new function () {
             text-shadow: 5px 5px 10px black;
         }`);
 
+        //  performance info
+        addStylesheetRules(`#performanceInfo {
+            font: 16px Arial;
+            color: white;
+            opacity: 1.0;
+            position: absolute;
+            left: 0px;
+            top: 0px;
+            text-shadow: 5px 5px 10px black;
+        }`);
+
         //  pixel info overlay
         addStylesheetRules(`div.overlay {
             display: none;
@@ -553,8 +570,12 @@ var nvis = new function () {
         return _apiCommand({ command: 'video', argument: { name: fileName, fileName: fileName, window: bWindow } });
     }
 
-    let _apiShader = function (fileName, inputs = undefined, bWindow = true) {
-        return _apiCommand({ command: 'shader', argument: { fileName: fileName, inputs: inputs, window: bWindow } });
+    let _apiShader = function (fileNameOrId, inputs = undefined, parameters = {}, bWindow = true) {
+        if (typeof fileNameOrId == 'string') {
+            return _apiCommand({ command: 'shader', argument: { fileName: fileNameOrId, parameters: parameters, inputs: inputs, window: bWindow } });
+        } else if (typeof fileNameOrId == 'number') {
+            return _apiCommand({ command: 'shader', argument: { shaderId: fileNameOrId, parameters: parameters, inputs: inputs, window: bWindow } });
+        }
     }
 
     let _apiShaders = function (fileNames) {
@@ -699,16 +720,25 @@ var nvis = new function () {
             let shaderId = _renderer.loadShader(argument);
             return shaderId;
         } else if (command == 'shader') {
-            let shaderId = _renderer.loadShader(argument.fileName);
+            let shaderId = argument.shaderId;
+            if (shaderId === undefined) {
+                shaderId = _renderer.loadShader(argument.fileName);
+            }
+            let newStream = _renderer.addShaderStream(shaderId);
             if (argument.inputs !== undefined) {
-                let newStream = _renderer.addShaderStream(shaderId);
                 let inputStreamIds = argument.inputs;
                 if (inputStreamIds !== undefined) {
                     newStream.setInputStreamIds(inputStreamIds);
                 }
-                if (argument.window) {
-                    _renderer.addWindow(_renderer.streams.length - 1);
+            }
+            if (argument.parameters !== undefined) {
+                for (let key of Object.keys(argument.parameters)) {
+                    // console.log('key: ' + key);
+                    newStream.apiParameters[key] = argument.parameters[key];
                 }
+            }
+            if (argument.window) {
+                _renderer.addWindow(_renderer.streams.length - 1);
             }
             return shaderId;
         } else if (command == 'generator') {
@@ -934,43 +964,48 @@ var nvis = new function () {
         constructor(glContext, mode = 'lines') {
             this.glContext = glContext;
 
+            let gl = this.glContext;
+
             //  TODO: make dynamic, or as input to constructor
             const MaxVertices = 1024;
 
-            this.mode = this.glContext.LINES;
+            this.mode = gl.LINES;
 
             switch (mode) {
                 case 'points':
-                    this.mode = this.glContext.POINTS;
+                    this.mode = gl.POINTS;
                     break;
                 case 'linestrip':
-                    this.mode = this.glContext.LINE_STRIP;
+                    this.mode = gl.LINE_STRIP;
                     break;
                 case 'lineloop':
-                    this.mode = this.glContext.LINE_LOOP;
+                    this.mode = gl.LINE_LOOP;
                     break;
                 case 'triangles':
-                    this.mode = this.glContext.TRIANGLES;
+                    this.mode = gl.TRIANGLES;
                     break;
                 case 'trianglestrip':
-                    this.mode = this.glContext.TRIANGLE_STRIP;
+                    this.mode = gl.TRIANGLE_STRIP;
+                    break;
+                case 'texturequad':
+                    this.mode = gl.TRIANGLE_STRIP;
                     break;
                 case 'trianglefan':
-                    this.mode = this.glContext.TRIANGLE_FAN;
+                    this.mode = gl.TRIANGLE_FAN;
                     break;
                 case 'widelineloop':  //  our own, used for wide lines
-                    this.mode = this.glContext.TRIANGLE_STRIP;
+                    this.mode = gl.TRIANGLE_STRIP;
                     break;
                 case 'lines':
                 default:
-                    this.mode = this.glContext.LINES;
+                    this.mode = gl.LINES;
                     break;
             }
 
             this.pointSize = 1.0;
 
-            this.vertexPositionBuffer = this.glContext.createBuffer();
-            this.colorValueBuffer = this.glContext.createBuffer();
+            this.vertexPositionBuffer = gl.createBuffer();
+            this.colorValueBuffer = gl.createBuffer();
 
             this.numVertices = 0;
             this.vertexPositions = new Float32Array(MaxVertices * 2);
@@ -1000,27 +1035,54 @@ var nvis = new function () {
                 color = vColor;
             }`;
 
-            this.vertexShader = this.glContext.createShader(this.glContext.VERTEX_SHADER);
-            this.fragmentShader = this.glContext.createShader(this.glContext.FRAGMENT_SHADER);
-            this.shaderProgram = this.glContext.createProgram();
+            this.vertexSourceTexture = `#version 300 es
+            precision highp float;
+            in vec2 aVertexPosition;
+            in vec2 aTextureCoord;
+            out vec2 vTextureCoord;
+            void main()
+            {
+                gl_Position = vec4(aVertexPosition, 0.0, 1.0);
+                vTextureCoord = aTextureCoord;
+            }`;
 
-            this.glContext.shaderSource(this.vertexShader, this.vertexSource);
-            this.glContext.compileShader(this.vertexShader);
-            if (!this.glContext.getShaderParameter(this.vertexShader, this.glContext.COMPILE_STATUS)) {
-                alert('WebGL: ' + this.glContext.getShaderInfoLog(this.vertexShader));
+            this.fragmentSourceTexture = `#version 300 es
+            precision highp float;
+            in vec2 vTextureCoord;
+            uniform sampler2D uSampler;
+            out vec4 color;
+
+            void main()
+            {
+                if (vTextureCoord.x < 0.0 || vTextureCoord.x > 1.0 || vTextureCoord.y < 0.0 || vTextureCoord.y > 1.0) {
+                    color = vec4(0.1, 0.1, 0.1, 1.0);
+                    return;
+                }
+
+                color = texture(uSampler, vTextureCoord);
+            }`;
+
+            this.vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            this.fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            this.shaderProgram = gl.createProgram();
+
+            gl.shaderSource(this.vertexShader, this.vertexSource);
+            gl.compileShader(this.vertexShader);
+            if (!gl.getShaderParameter(this.vertexShader, gl.COMPILE_STATUS)) {
+                alert('WebGL: ' + gl.getShaderInfoLog(this.vertexShader));
             }
-            this.glContext.shaderSource(this.fragmentShader, this.fragmentSource);
-            this.glContext.compileShader(this.fragmentShader);
-            if (!this.glContext.getShaderParameter(this.fragmentShader, this.glContext.COMPILE_STATUS)) {
-                alert('WebGL: ' + this.glContext.getShaderInfoLog(this.fragmentShader));
+            gl.shaderSource(this.fragmentShader, this.fragmentSource);
+            gl.compileShader(this.fragmentShader);
+            if (!gl.getShaderParameter(this.fragmentShader, gl.COMPILE_STATUS)) {
+                alert('WebGL: ' + gl.getShaderInfoLog(this.fragmentShader));
             }
 
-            this.glContext.attachShader(this.shaderProgram, this.vertexShader);
-            this.glContext.attachShader(this.shaderProgram, this.fragmentShader);
-            this.glContext.linkProgram(this.shaderProgram);
+            gl.attachShader(this.shaderProgram, this.vertexShader);
+            gl.attachShader(this.shaderProgram, this.fragmentShader);
+            gl.linkProgram(this.shaderProgram);
 
-            if (!this.glContext.getProgramParameter(this.shaderProgram, this.glContext.LINK_STATUS)) {
-                alert('Could not initialize shader!');
+            if (!gl.getProgramParameter(this.shaderProgram, gl.LINK_STATUS)) {
+                alert('WebGL: ' + gl.getProgramInfoLog(this.shaderProgram));
             }
         }
 
@@ -1047,9 +1109,6 @@ var nvis = new function () {
             this.numVertices++;
         }
 
-        //  TODO: implement
-        addQuad(position, nextPosition, width, color = { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }) {
-        }
 
         addSegmentLine(v0, v1, segments, colors, bInterpolated = false) {
             let dx = (v1.x - v0.x) / segments;
@@ -1102,6 +1161,144 @@ var nvis = new function () {
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
             gl.drawArrays(this.mode, 0, this.numVertices);
+        }
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    class NvisQuadDraw {
+
+        constructor(glContext) {
+            this.glContext = glContext;
+
+            let gl = this.glContext;
+
+            this.vertexSource = `#version 300 es
+            precision highp float;
+            in vec2 aVertexPosition;
+            in vec2 aTextureCoord;
+            out vec2 vTextureCoord;
+            void main()
+            {
+                gl_Position = vec4(aVertexPosition, 0.0, 1.0);
+                vTextureCoord = aTextureCoord;
+            }`;
+
+            this.fragmentSource = `#version 300 es
+            precision highp float;
+            in vec2 vTextureCoord;
+            uniform sampler2D uSampler;
+            out vec4 color;
+
+            void main()
+            {
+                if (vTextureCoord.x < 0.0 || vTextureCoord.x > 1.0 || vTextureCoord.y < 0.0 || vTextureCoord.y > 1.0) {
+                    color = vec4(0.1, 0.1, 0.1, 1.0);
+                    return;
+                }
+
+                color = texture(uSampler, vTextureCoord);
+            }`;
+
+            this.vertexPositions = new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
+            this.vertexPositionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, this.vertexPositions, gl.STATIC_DRAW);
+
+            this.textureCoordinates = new Float32Array([0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 1.0, 1.0]);
+            this.textureCoordinateBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, this.textureCoordinates, gl.STATIC_DRAW);
+
+            this.vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            this.fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            this.shaderProgram = gl.createProgram();
+
+            gl.shaderSource(this.vertexShader, this.vertexSource);
+            gl.compileShader(this.vertexShader);
+            if (!gl.getShaderParameter(this.vertexShader, gl.COMPILE_STATUS)) {
+                alert('WebGL: ' + gl.getShaderInfoLog(this.vertexShader));
+            }
+
+            gl.shaderSource(this.fragmentShader, this.fragmentSource);
+            gl.compileShader(this.fragmentShader);
+            if (!gl.getShaderParameter(this.fragmentShader, gl.COMPILE_STATUS)) {
+                alert('WebGL: ' + gl.getShaderInfoLog(this.fragmentShader));
+            }
+
+            gl.attachShader(this.shaderProgram, this.vertexShader);
+            gl.attachShader(this.shaderProgram, this.fragmentShader);
+            gl.linkProgram(this.shaderProgram);
+
+            if (!gl.getProgramParameter(this.shaderProgram, gl.LINK_STATUS)) {
+                alert('WebGL: ' + gl.getProgramInfoLog(this.shaderProgram));
+            }
+        }
+
+
+        resize(stream, window, destination) {
+            let gl = this.glContext;
+
+            for (let i = 0; i < 8; i++) {
+                this.vertexPositions[i] = window.vertexPositions[i] + 0.1;
+            }
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, this.vertexPositions, gl.STATIC_DRAW);
+
+            let streamDim = stream.dimensions;
+
+            let dw = destination.x / streamDim.w;
+            let dh = destination.y / streamDim.h;
+
+            //  top-left
+            this.textureCoordinates[0] = dw;
+            this.textureCoordinates[1] = dh;
+            //  top-right
+            this.textureCoordinates[2] = 1.0;
+            this.textureCoordinates[3] = dh;
+            //  bottom-left
+            this.textureCoordinates[4] = dw;
+            this.textureCoordinates[5] = 1.0;
+            //  bottom-right
+            this.textureCoordinates[6] = 1.0;
+            this.textureCoordinates[7] = 1.0;
+            
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, this.textureCoordinates, gl.STATIC_DRAW);
+        }
+
+
+        render(stream) {
+            let gl = this.glContext;
+
+            gl.useProgram(this.shaderProgram);
+
+            let aVertexPosition = gl.getAttribLocation(this.shaderProgram, 'aVertexPosition');
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
+            gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(aVertexPosition);
+
+            let aTextureCoord = gl.getAttribLocation(this.shaderProgram, 'aTextureCoord');
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+            gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(aTextureCoord);
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, stream.outputTexture);
+
+            let uSampler = gl.getUniformLocation(this.shaderProgram, 'uSampler');
+            gl.uniform1i(uSampler, 0);
+
+            // gl.enable(gl.BLEND);
+            // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         }
     }
 
@@ -1291,12 +1488,15 @@ var nvis = new function () {
                 super(glContext, 'trianglestrip');
             } else if (type == 'rectangle') {
                 super(glContext, 'trianglestrip');
+            } else if (type == 'inset') {
+                super(glContext, 'trianglestrip');
+                this.quadDrawer = new NvisQuadDraw(glContext);
             }
 
             this.type = type;
 
             this.position = parameters.position;
-            this.color = (parameters.color === undefined ? new NvisColor({ r: 1.0, g: 0-0, b: 0.0 }) : new NvisColor(parameters.color));
+            this.color = (parameters.color === undefined ? new NvisColor({ r: 1.0, g: 0 - 0, b: 0.0 }) : new NvisColor(parameters.color));
 
             this.size = (parameters.size === undefined ? 25.0 : parameters.size);
             this.rotation = (parameters.rotation === undefined ? 0 : parameters.rotation);
@@ -1304,20 +1504,28 @@ var nvis = new function () {
             this.radius = (parameters.radius === undefined ? 10.0 : parameters.radius);
             this.width = (parameters.width === undefined ? 5.0 : parameters.width);
             this.zoom = (parameters.zoom === undefined ? true : parameters.zoom);
+            this.source = parameters.source;
+            this.destination = parameters.destination;
         }
+
 
         description() {
             let desc = this.type;
             if (this.type == 'arrow') {
                 desc += ' with size ' + this.size + ' and rotation ' + this.rotation;
+                desc += ' at (' + this.position.x + ', ' + this.position.y + ')';
             } else if (this.type == 'circle') {
                 desc += ' with radius ' + this.radius;
+                desc += ' at (' + this.position.x + ', ' + this.position.y + ')';
             } else if (this.type == 'rectangle') {
                 desc += ' with dims ' + this.dimensions.w + 'x' + this.dimensions.h;
+                desc += ' at (' + this.dimensions.x + ', ' + this.dimensions.y + ')';
+            } else if (this.type == 'inset') {
+                desc += ' with source (' + this.source.x + ', ' + this.source.y + ') dims (' + this.source.w + ',' + this.source.h + ')';
             }
-            desc += ' at (' + this.position.x + ', ' + this.position.y + ')';
             return desc;
         }
+
 
         //  TODO: optimize...
         pixelSize(canvas) {
@@ -1334,7 +1542,8 @@ var nvis = new function () {
             return pixelSize;
         }
 
-        streamPxToTextureCoords(pos, windowId, canvas, stream) {
+
+        streamPxToTextureCoords(pos, canvas, stream) {
             //  TODO: optimize...
             let layout = _state.layout;
             let layoutDims = layout.getDimensions();
@@ -1360,6 +1569,7 @@ var nvis = new function () {
             return { pixelSize: pixelSize, offset: offset };
         }
 
+
         rotate(point, alphaDegrees) {
             let alpha = -alphaDegrees * (Math.PI / 180);
             let cosAlpha = Math.cos(alpha);
@@ -1367,23 +1577,24 @@ var nvis = new function () {
             return { x: point.x * cosAlpha - point.y * sinAlpha, y: point.x * sinAlpha + point.y * cosAlpha };
         }
 
-        update(canvas, stream, boundingBox) {
-            let p = this.streamPxToTextureCoords(this.position, 0, canvas, stream);
-            let ar = (canvas.width / canvas.height);
 
-            let ps = p.pixelSize;
-            let o = p.offset;
-            o.x += boundingBox.x;
-            o.y += boundingBox.y;
+        update(canvas, stream, window, boundingBox) {
+            let ar = (canvas.width / canvas.height);
 
             this.clear();
 
-            if (!boundingBox.inside(o)) {
-                return;
-            }
-
             if (this.type == 'arrow') {
 
+                let p = this.streamPxToTextureCoords(this.position, canvas, stream);
+                let ps = p.pixelSize;
+                let o = p.offset;
+                o.x += boundingBox.x;
+                o.y += boundingBox.y;
+
+                if (!boundingBox.inside(o)) {
+                    return;
+                }
+        
                 let s = this.size * (ps.w / 3.0);
                 if (!this.zoom) {
                     s /= _state.zoom.level;
@@ -1405,6 +1616,16 @@ var nvis = new function () {
 
             } else if (this.type == 'circle') {
 
+                let p = this.streamPxToTextureCoords(this.position, canvas, stream);
+                let ps = p.pixelSize;
+                let o = p.offset;
+                o.x += boundingBox.x;
+                o.y += boundingBox.y;
+
+                if (!boundingBox.inside(o)) {
+                    return;
+                }
+
                 let r = this.radius;
                 let w = (this.radius + this.width);
 
@@ -1414,7 +1635,7 @@ var nvis = new function () {
                 if (!this.zoom) {
                     r /= _state.zoom.level;
                     w /= _state.zoom.level;
-                } 
+                }
 
                 let steps = 30;
                 let alphaStep = 360 / steps;
@@ -1432,10 +1653,71 @@ var nvis = new function () {
 
             } else if (this.type == 'rectangle') {
 
-                let dw = this.dimensions.w / 2.0;
-                let dh = this.dimensions.h / 2.0;
-                dw *= ps.w;
-                dh *= ps.h;
+                let p = this.streamPxToTextureCoords({ x: this.dimensions.x + (this.dimensions.w - 1) / 2.0, y: this.dimensions.y + (this.dimensions.h - 1) / 2.0 }, canvas, stream);
+                let o = p.offset;
+                let ps = p.pixelSize;
+
+                o.x += boundingBox.x;
+                o.y += boundingBox.y;
+
+                if (!boundingBox.inside(o)) {
+                    return;
+                }
+
+                let d = { w: this.dimensions.w / 2.0, h: this.dimensions.h / 2.0 };
+                let dw = d.w * ps.w;
+                let dh = d.h * ps.h;
+                let hw = ps.w * this.width / 2.0;
+
+                if (!this.zoom) {
+                    dw /= _state.zoom.level;
+                    dh /= _state.zoom.level;
+                    hw /= _state.zoom.level;
+                }
+
+                let r = [];
+                r.push({ x: -dw - hw, y: -dh - hw });  //  1
+                r.push({ x: -dw + hw, y: -dh + hw });  //  2
+                r.push({ x: dw + hw, y: -dh - hw });  //  3
+                r.push({ x: dw - hw, y: -dh + hw });  //  4
+                r.push({ x: dw + hw, y: dh + hw });  //  5
+                r.push({ x: dw - hw, y: dh - hw });  //  6
+                r.push({ x: -dw - hw, y: dh + hw });  //  7
+                r.push({ x: -dw + hw, y: dh - hw });  //  8                
+                r.push({ x: -dw - hw, y: -dh - hw });  //  9
+                r.push({ x: -dw + hw, y: -dh + hw });  //  10
+
+                for (let i = 0; i < r.length; i++) {
+                    this.addVertex({ x: o.x + r[i].x, y: o.y + r[i].y }, this.color);
+                }
+
+            } else if (this.type == 'inset') {
+
+                let w = window;
+
+                let bNeg = {
+                    x: this.destination.x < 0 || Object.is(this.destination.x, -0),
+                    y: this.destination.y < 0 || Object.is(this.destination.y, -0),
+                }
+                let pos = {
+                    x: (bNeg.x ? stream.dimensions.w + this.destination.x - this.destination.w : this.destination.x),
+                    y: (bNeg.y ? stream.dimensions.h + this.destination.y - this.destination.h : this.destination.y)
+                };
+
+                let p = this.streamPxToTextureCoords({ x: pos.x + (this.destination.w - 1) / 2.0, y: pos.y + (this.destination.h - 1) / 2.0 }, canvas, stream);
+                let o = p.offset;
+                let ps = p.pixelSize;
+
+                o.x += boundingBox.x;
+                o.y += boundingBox.y;
+
+                if (!boundingBox.inside(o)) {
+                    return;
+                }
+
+                let d = { w: this.destination.w / 2.0, h: this.destination.h / 2.0 };
+                let dw = d.w * ps.w;
+                let dh = d.h * ps.h;
                 let hw = ps.w * this.width / 2.0;
 
                 if (!this.zoom) {
@@ -1457,13 +1739,15 @@ var nvis = new function () {
                 r.push(this.rotate({ x: -dw + hw, y: -dh + hw }, this.rotation));  //  10
 
                 for (let i = 0; i < r.length; i++) {
-                    this.addVertex({ x: o.x + r[i].x, y: o.y + r[i].y * ar }, this.color);
+                    this.addVertex({ x: o.x + r[i].x, y: o.y + r[i].y }, this.color);
                 }
+
             }
 
         }
 
     }
+
 
     class NvisAnnotations {
 
@@ -1478,17 +1762,21 @@ var nvis = new function () {
             this.annotations.push(annotation);
         }
 
-        update(canvas, stream, boundingBox) {
+        update(canvas, stream, window, boundingBox) {
             for (let annotationId = 0; annotationId < this.annotations.length; annotationId++) {
-                this.annotations[annotationId].update(canvas, stream, boundingBox);
+                this.annotations[annotationId].update(canvas, stream, window, boundingBox);
             }
         }
 
-        render(canvas, stream, boundingBox) {
-            this.update(canvas, stream, boundingBox);
+        render(canvas, stream, window, boundingBox) {
+            this.update(canvas, stream, window, boundingBox);
             for (let annotationId = 0; annotationId < this.annotations.length; annotationId++) {
                 let annotation = this.annotations[annotationId];
                 annotation.render();
+                if (annotation.quadDrawer !== undefined) {
+                    annotation.quadDrawer.resize(stream, window, annotation.destination);
+                    annotation.quadDrawer.render(stream);
+                }
             }
         }
     }
@@ -3818,6 +4106,8 @@ var nvis = new function () {
 
             this.startTime = Date.now();
 
+            this.apiParameters = {};
+
             this.annotations = new NvisAnnotations(this.glContext);
 
 
@@ -3895,14 +4185,8 @@ var nvis = new function () {
 
             let gl = this.glContext;
 
-            //  lazily get the UI JSON from the shader
-            if (!this.bUIReady) {
-                let json = shader.json;
-                if (json === undefined) {
-                    return;
-                }
-                this.shaderJSONObject = JSON.parse(json);
-                this.bUIReady = true;
+            if (this.shaderJSONObject === undefined) {
+                return;
             }
 
             let uiObject = this.shaderJSONObject.UI;
@@ -4271,19 +4555,19 @@ var nvis = new function () {
         }
 
 
-        getFileName() {
+        getName() {
             //  TODO: fix
-            let fileName = '';
+            let name = '';
             if (this.fileNames.length > 0) {
-                fileName += this.fileNames[0];
+                name += this.fileNames[0];
                 if (this.fileNames.length > 1) {
-                    fileName += (' (' + this.fileNames.length + ')');
+                    name += (' (' + this.fileNames.length + ')');
                 }
             } else {
-                // fileName = 'Shader TODO: fix!';
-                fileName = this.shaderJSONObject.name;
+                name = this.shaderJSONObject.name;
             }
-            return fileName;
+
+            return name;
         }
 
 
@@ -4302,6 +4586,125 @@ var nvis = new function () {
             callbackString += '; nvis.uiStreamUpdateParameter(' + streamId + ', "' + elementId + '", ' + bUpdateUI + ')';
             //console.log(callbackString);
             return callbackString;
+        }
+
+
+        render(window, frameId, shaders, streams, vbStreamHasWindow) {
+
+            let shader = undefined;
+            if (this.shaderId == -1) {
+                shader = shaders.streamShader;
+            } else {
+                shader = shaders.shaders[this.shaderId];
+            }
+            if (shader === undefined || !shader.isReady()) {
+                return;
+            }
+
+            this.prepareUI(shader);
+
+            //  first, render shader streams to textures
+            let shaderProgram = shader.getProgram();
+
+            let gl = this.glContext;
+
+            gl.useProgram(shaderProgram);
+
+            let aVertexPosition = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
+            gl.bindBuffer(gl.ARRAY_BUFFER, window.fullVertexPositionBuffer);
+            gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(aVertexPosition);
+
+            let aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
+            gl.bindBuffer(gl.ARRAY_BUFFER, window.fullTextureCoordinateBuffer);
+            gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(aTextureCoord);
+
+            gl.bindTexture(gl.TEXTURE_2D, this.outputTexture);
+
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+
+            if (this.shaderId == -1) {
+                gl.bindTexture(gl.TEXTURE_2D, this.getTexture(frameId));
+            } else {
+                for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
+                    let activeTexture = window.TextureUnits[inputId];
+                    gl.activeTexture(activeTexture);
+                    let inputStreamId = this.getInputStreamId(inputId);
+
+                    // if (!vbStreamHasWindow[inputStreamId]) {
+                    //     let inputStream = streams[inputStreamId];
+                    //     if (inputStream.shaderId != -1) {
+                    //         inputStream.backgroundRender(window, frameId, shaders, streams, vbStreamHasWindow);
+                    //         // console.log('input stream ' + inputStreamId + ' has no window...');
+                    //     }
+                    // }
+
+                    if (this.getInputStreamId(inputId) !== undefined) {
+                        gl.bindTexture(gl.TEXTURE_2D, streams[this.getInputStreamId(inputId)].getTexture(frameId));
+                        gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
+                    }
+                }
+            }
+
+            let uTonemapper = gl.getUniformLocation(shaderProgram, 'uTonemapper');
+            if (_settings.bGlobalTonemapping.value) {
+                gl.uniform1i(uTonemapper, _settings.tonemapper.value);
+                if (_settings.tonemapper.value == 0) {
+                    let uGamma = gl.getUniformLocation(shaderProgram, 'uGamma');
+                    gl.uniform1f(uGamma, _settings.gamma.value);
+                    let uExposure = gl.getUniformLocation(shaderProgram, 'uExposure');
+                    gl.uniform1f(uExposure, _settings.exposure.value);
+                }
+            } else {
+                gl.uniform1i(uTonemapper, -1);
+            }
+
+            let streamDim = this.getDimensions();
+            if (streamDim === undefined) {
+                return;
+            }
+            gl.viewport(0, 0, streamDim.w, streamDim.h);
+
+            this.setUniforms(shader);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+
+            // //  next, render window to canvas
+            // // gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+            // gl.viewport(0, 0, 2048, 256);
+
+            // shaderProgram = shaders.textureShader.getProgram();
+            // gl.useProgram(shaderProgram);
+
+            // aVertexPosition = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
+            // gl.bindBuffer(gl.ARRAY_BUFFER, window.vertexPositionBuffer);
+            // gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
+            // gl.enableVertexAttribArray(aVertexPosition);
+
+            // aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
+            // gl.bindBuffer(gl.ARRAY_BUFFER, window.textureCoordinateBuffer);
+            // gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
+            // gl.enableVertexAttribArray(aTextureCoord);
+
+            // gl.activeTexture(gl.TEXTURE0);
+            // gl.bindTexture(gl.TEXTURE_2D, this.outputTexture);
+
+            // let uSampler = gl.getUniformLocation(shaderProgram, 'uSampler');
+            // gl.uniform1i(uSampler, 0);
+
+            // let uAlphaCheckerboard = gl.getUniformLocation(shaderProgram, 'uAlphaCheckerboard');
+            // gl.uniform1i(uAlphaCheckerboard, _settings.bAlphaCheckerboard.value);
+
+            // //  TODO: this shouldn't be necessary, can get dimensions directly in shader
+            // gl.uniform2f(gl.getUniformLocation(shaderProgram, 'uDimensions'), streamDim.w, streamDim.h);
+
+            // gl.enable(gl.BLEND);
+            // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+            // gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         }
 
 
@@ -4509,14 +4912,37 @@ var nvis = new function () {
         }
 
 
+        prepareUI(shader) {
+            //  lazily get the UI JSON from the shader
+            if (!this.bUIReady) {
+                let json = shader.json;
+                if (json === undefined) {
+                    return;
+                }
+                this.shaderJSONObject = JSON.parse(json);
+
+                //  set default UI parameters from API call
+                for (let key of Object.keys(this.apiParameters)) {
+                    this.shaderJSONObject.UI[key].value = this.apiParameters[key];
+                }
+
+                this.bUIReady = true;
+            }
+        }
+
+
         getUI(streamId, streams, shaders) {
+
+            // if (!this.bUIReady && this.shaderId != -1) {
+            //     this.prepareUI(shaders.shaders[this.shaderId]);
+            // }
 
             //  streamId is needed since the stream itself does not know its id
             // let ui = document.createDocumentFragment();
             let ui = document.createElement('div');
             ui.id = 'ui';
 
-            let fileName = streams[streamId].getFileName();
+            let fileName = streams[streamId].getName();
             let arrowRight = '&#9658;';
             let arrowDown = '&#9660;';
 
@@ -4537,7 +4963,7 @@ var nvis = new function () {
 
                     let streamTitle = document.getElementById('streamTitleUI-' + id);
                     streamTitle.innerHTML = (_state.ui.selectedStreamId == id ? arrowDown : arrowRight)
-                    streamTitle.innerHTML += (' stream ' + (id + 1) + ': ' + streams[id].getFileName());
+                    streamTitle.innerHTML += (' stream ' + (id + 1) + ': ' + streams[id].getName());
                     if (_state.ui.selectedStreamId == id) {
                         streamTitle.innerHTML = streamTitle.innerHTML.bold();
                     }
@@ -4556,7 +4982,6 @@ var nvis = new function () {
             uiBody.className = 'uiBody';
             uiBody.style.display = (streamId == _state.ui.selectedStreamId ? 'block' : 'none');
 
-
             if (this.shaderId != -1) {
 
                 let shader = shaders.shaders[this.shaderId];
@@ -4574,8 +4999,15 @@ var nvis = new function () {
                     });
                     for (let otherStreamId = 0; otherStreamId < streams.length; otherStreamId++) {
                         if (otherStreamId != streamId) {
+                            let otherStream = streams[otherStreamId];
+ 
+                            if (!otherStream.bUIReady && otherStream.shaderId != -1) {
+                                let otherShader = shaders.shaders[otherStream.shaderId];
+                                otherStream.prepareUI(otherShader);
+                            }
+
                             let sOp = document.createElement('option');
-                            sOp.innerHTML = streams[otherStreamId].getFileName();
+                            sOp.innerHTML = otherStream.getName();
                             if (this.inputStreamIds[inputId] == otherStreamId) {
                                 sOp.setAttribute('selected', true);
                             }
@@ -4911,7 +5343,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             let win = new NvisWindow(this.glContext, this.canvas);
 
             win.updateTextureCoordinates(this.textureCoordinates);
-            win.setStreamId(streamId);
+            win.streamId = streamId;
 
             this.welcome.hide();
 
@@ -4963,7 +5395,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
 
         setWindowStreamId(windowId, streamId) {
-            this.windows[windowId].setStreamId(streamId);
+            this.windows[windowId].streamId = streamId;
         }
 
 
@@ -5051,8 +5483,6 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 this.canvas.width = width;
                 this.canvas.height = height;
                 return;
-            } else {
-
             }
 
             //  determine layout width/height
@@ -5181,9 +5611,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         incStream(canvasPxCoords, streams) {
             let windowId = this.getWindowId(canvasPxCoords);
             if (windowId !== undefined) {
-                let streamId = this.windows[windowId].getStreamId();
+                let streamId = this.windows[windowId].streamId;
                 let nextStreamId = (streamId + 1) % streams.length;
-                this.windows[windowId].setStreamId(nextStreamId);
+                this.windows[windowId].streamId = nextStreamId;
             }
         }
 
@@ -5191,16 +5621,51 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         decStream(canvasPxCoords, streams) {
             let windowId = this.getWindowId(canvasPxCoords);
             if (windowId !== undefined) {
-                let streamId = this.windows[windowId].getStreamId();
+                let streamId = this.windows[windowId].streamId;
                 let nextStreamId = (streamId + streams.length - 1) % streams.length;
-                this.windows[windowId].setStreamId(nextStreamId);
+                this.windows[windowId].streamId = nextStreamId;
+            }
+        }
+
+
+        findStreamsToRender(vStreamIds, shaders, streams, streamId) {
+            vStreamIds[streamId] = true;
+            let stream = streams[streamId];
+            let shader = shaders.shaders[stream.shaderId];
+            
+            if (shader === undefined) {
+                return;
+            }
+            
+            for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
+                let inputStreamId = stream.getInputStreamId(inputId);
+                if (!vStreamIds[inputStreamId]) {
+                    this.findStreamsToRender(vStreamIds, shaders, streams, inputStreamId);
+                }
             }
         }
 
 
         render(frameId, streams, shaders) {
+
+            let vbStreamsToRender = new Array(streams.length).fill(false);
+            let vStreamWindow = new Array(streams.length).fill(undefined);
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
-                this.windows[windowId].render(windowId, frameId, streams, shaders);
+                let window = this.windows[windowId];
+                let streamId = window.streamId;
+                vStreamWindow[streamId] = window;
+                this.findStreamsToRender(vbStreamsToRender, shaders, streams, streamId);
+            }
+
+            for (let streamId = 0; streamId < vbStreamsToRender.length; streamId++) {
+                if (vbStreamsToRender[streamId] && vStreamWindow[streamId] === undefined) {
+                    // console.log('Would render stream ' + streamId);
+                    streams[streamId].render(this.windows[0], frameId, shaders, streams, []);
+                }
+            }
+
+            for (let windowId = 0; windowId < this.windows.length; windowId++) {
+                this.windows[windowId].render(windowId, frameId, streams, shaders, []);
             }
 
             if (_settings.bDrawPixel.value && _state.zoom.level >= 8.0) {
@@ -5227,7 +5692,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
                 for (let windowId = 0; windowId < this.windows.length; windowId++) {
                     let window = this.windows[windowId];
-                    let stream = streams[window.getStreamId()];
+                    let stream = streams[window.streamId];
                     let streamDim = stream.getDimensions();
 
                     if (streamDim === undefined) {
@@ -5332,10 +5797,6 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             if (this.streamId === undefined) {
                 return;
             }
-            // else if (this.stream.getDimensions() === undefined) {
-            //     //  TODO: is this needed?
-            //     return;
-            // }
 
             let gl = this.glContext;
 
@@ -5361,44 +5822,81 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
 
-        getStreamId() {
-            return this.streamId;
+        findStreamDimensions(streamId, streams, shaders) {
+
+            //  for shader streams, we need to find dimensions by recursively searching inputs
+            let stream = streams[streamId];
+
+            if (stream === undefined) {
+                return undefined;
+            }
+
+            let dimensions = stream.getDimensions();
+            if (dimensions !== undefined) {
+                return dimensions;
+            }
+
+            let shaderId = stream.shaderId;
+            if (shaderId == -1) {
+                //  dimensions not known yet
+                return undefined;
+            }
+
+            let shader = shaders.shaders[shaderId];
+            if (shader === undefined) {
+                //  shader not known yet
+                return undefined;
+            }
+
+            for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
+                let inputStreamId = stream.getInputStreamId(inputId);
+                let inputDimensions = this.findStreamDimensions(inputStreamId, streams, shaders);
+                if (inputDimensions !== undefined) {
+                    stream.setDimensions(inputDimensions);
+                    return inputDimensions;
+                }
+            }
+
+            return undefined;
         }
 
 
-        setStreamId(streamId) {
-            this.streamId = streamId;
-        }
-
-
-        render(windowId, frameId, streams, shaders) {
+        render(windowId, frameId, streams, shaders, vbStreamHasWindow) {
             let gl = this.glContext;
 
             //  below, a lot of checks are needed due to asynch file/shader loading
+
+            let streamDims = this.findStreamDimensions(this.streamId, streams, shaders);
+            if (streamDims === undefined) {
+                return;
+            }
+
             let stream = streams[this.streamId];
             if (stream === undefined) {
                 return;
             }
-            let streamDim = stream.getDimensions();
+
+            // let streamDim = stream.getDimensions();
             let shaderId = stream.getShaderId();
-            let bStreamDimKnown = false;
-            if (streamDim === undefined) {
-                if (shaderId != -1) {
-                    //  dimensions unknown for a shader stream -> check inputs
-                    let shader = shaders.shaders[shaderId];
-                    if (shader !== undefined && shader.getNumInputs() != 0) {
-                        let inputStream = streams[stream.getInputStreamId(0)];
-                        if (inputStream !== undefined && inputStream.getDimensions() !== undefined) {
-                            streamDim = inputStream.getDimensions();
-                            stream.setDimensions(streamDim, inputStream.bFloat);
-                            bStreamDimKnown = true;
-                        }
-                    }
-                }
-                if (!bStreamDimKnown) {
-                    return;
-                }
-            }
+            // let bStreamDimKnown = false;
+            // if (streamDim === undefined) {
+            //     if (shaderId != -1) {
+            //         //  dimensions unknown for a shader stream -> check inputs
+            //         streamDim = this.findStreamDimensions(this.streamId, streams, shaders);
+            //         let shader = shaders.shaders[shaderId];
+            //         if (shader !== undefined && shader.getNumInputs() != 0) {
+            //             let inputStream = streams[stream.getInputStreamId(0)];
+            //             if (inputStream !== undefined && inputStream.getDimensions() !== undefined) {
+            //                 streamDim = inputStream.getDimensions();
+            //                 stream.setDimensions(streamDim, inputStream.bFloat);
+            //                 bStreamDimKnown = true;
+            //             }
+            //         }
+            //     }
+            //     if (!bStreamDimKnown) {
+            //         return;
+            //     }
+            // }
 
             if (_state.input.mouse.showInfo && _state.input.mouse.streamCoords !== undefined) {
                 let loc = _state.input.mouse.streamCoords;
@@ -5420,6 +5918,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 return;
             }
 
+            stream.prepareUI(shader);
+
             //  first, render shader streams to textures
             let shaderProgram = shader.getProgram();
 
@@ -5437,15 +5937,24 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             gl.bindFramebuffer(gl.FRAMEBUFFER, stream.frameBuffer);
 
-            gl.bindTexture(gl.TEXTURE_2D, stream.outputTexture);
             if (shaderId == -1) {
                 gl.bindTexture(gl.TEXTURE_2D, stream.getTexture(frameId));
             } else {
                 for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
                     let activeTexture = this.TextureUnits[inputId];
                     gl.activeTexture(activeTexture);
-                    if (stream.getInputStreamId(inputId) !== undefined) {
-                        gl.bindTexture(gl.TEXTURE_2D, streams[stream.getInputStreamId(inputId)].getTexture(frameId));
+                    let inputStreamId = stream.getInputStreamId(inputId);
+
+                    // if (!vbStreamHasWindow[inputStreamId]) {
+                    //     let inputStream = streams[inputStreamId];
+                    //     // if (inputStream.shaderId != -1) {
+                    //         //inputStream.backgroundRender(this, frameId, shaders, streams, vbStreamHasWindow);
+                    //         console.log('input stream ' + inputStreamId + ' has no window...');
+                    //     // }
+                    // }
+
+                    if (inputStreamId !== undefined) {
+                        gl.bindTexture(gl.TEXTURE_2D, streams[inputStreamId].getTexture(frameId));
                         gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
                     }
                 }
@@ -5464,7 +5973,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 gl.uniform1i(uTonemapper, -1);
             }
 
-            gl.viewport(0, 0, streamDim.w, streamDim.h);
+            gl.viewport(0, 0, streamDims.w, streamDims.h);
 
             stream.setUniforms(shader);
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -5472,7 +5981,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
 
-            //  next, render windows to canvas
+            //  next, render window to canvas
             gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
             shaderProgram = shaders.textureShader.getProgram();
@@ -5498,22 +6007,21 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             gl.uniform1i(uAlphaCheckerboard, _settings.bAlphaCheckerboard.value);
 
             //  TODO: this shouldn't be necessary, can get dimensions directly in shader
-            gl.uniform2f(gl.getUniformLocation(shaderProgram, 'uDimensions'), streamDim.w, streamDim.h);
+            gl.uniform2f(gl.getUniformLocation(shaderProgram, 'uDimensions'), streamDims.w, streamDims.h);
 
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-
-            //  TODO: move elsewhere, optimize (redoing several calculations now)?
+            //  TODO: move elsewhere, optimize (redoing several calculations now)
             let layout = _state.layout;
             let layoutDims = layout.getDimensions();
             let winDim = { w: this.canvas.width / layoutDims.w, h: this.canvas.height / layoutDims.h };
 
             let z = _state.zoom.level;
-            let sw = streamDim.w;
-            let sh = streamDim.h;
+            let sw = streamDims.w;
+            let sh = streamDims.h;
             let ww = winDim.w;
             let wh = winDim.h;
 
@@ -5545,8 +6053,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             let bb = new NvisBoundingBox(ox, oy, dw, dh);
 
-            this.annotations.render(this.canvas, stream, bb);
-            stream.annotations.render(this.canvas, stream, bb);
+            this.annotations.render(this.canvas, stream, this, bb);
+            stream.annotations.render(this.canvas, stream, this, bb);
         }
 
 
@@ -5556,6 +6064,159 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             gl.bufferData(gl.ARRAY_BUFFER, textureCoordinates, gl.STATIC_DRAW);
         }
 
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    class NvisExportCanvas {
+
+        constructor() {
+
+            this.canvas = document.createElement('canvas');
+            this.glContext = this.canvas.getContext('webgl2');
+
+            if (this.glContext === null) {
+                alert('Unable to initialize WebGL!');
+                return;
+            }
+
+            let gl = this.glContext;
+
+            //  extensions
+            gl.getExtension('EXT_color_buffer_float')
+            gl.getExtension('EXT_float_blend');
+
+            this.canvas.style.display = 'none';
+            this.canvas.width = 1000;
+            this.canvas.height = 1000;
+
+            this.vertexSource = `#version 300 es
+            precision highp float;
+            in vec2 aVertexPosition;
+            in vec2 aTextureCoord;
+            out vec2 vTextureCoord;
+            void main()
+            {
+                gl_Position = vec4(aVertexPosition, 0.0, 1.0);
+                vTextureCoord = aTextureCoord;
+            }`;
+
+            this.fragmentSource = `#version 300 es
+            precision highp float;
+            in vec2 vTextureCoord;
+            uniform sampler2D uSampler;
+            uniform bool uAlphaCheckerboard;
+            out vec4 color;
+
+            float modi(float a, float b) {
+                return floor(a - floor((a + 0.5) / b) * b);
+            }
+
+            void main()
+            {
+                if (vTextureCoord.x < 0.0 || vTextureCoord.x > 1.0 || vTextureCoord.y < 0.0 || vTextureCoord.y > 1.0) {
+                    color = vec4(0.1, 0.1, 0.1, 1.0);
+                    return;
+                }
+
+                const float GridSize = 16.0;
+
+                vec4 c = texture(uSampler, vTextureCoord);
+                color = vec4(c.r, c.g, c.b, 1.0);
+                
+                //  gray checkerboard for background
+                if (uAlphaCheckerboard && c.a < 1.0)
+                {
+                    vec2 dimensions = vec2(textureSize(uSampler, 0));
+                    vec2 pos = (vTextureCoord * dimensions) / GridSize;
+                    float xx = pos.x;
+                    float yy = pos.y;
+                    vec4 gridColor = vec4(0.6, 0.6, 0.6, 1.0);
+                    if (modi(pos.x, 2.0) == 0.0 ^^ modi(pos.y, 2.0) == 0.0) {
+                        gridColor = vec4(0.5, 0.5, 0.5, 1.0);
+                    }
+
+                    color = gridColor + vec4(color.rgb * color.a, 1.0);
+                }
+                color = vec4(1.0, 0.0, 0.0, 1.0);
+            }`;
+
+            this.vertexPositions = new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
+            this.vertexPositionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, this.vertexPositions, gl.STATIC_DRAW);
+
+            this.textureCoordinates = new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
+            this.textureCoordinateBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, this.textureCoordinates, gl.STATIC_DRAW);
+
+
+            this.vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            this.fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            this.shaderProgram = gl.createProgram();
+
+            gl.shaderSource(this.vertexShader, this.vertexSource);
+            gl.compileShader(this.vertexShader);
+            if (!gl.getShaderParameter(this.vertexShader, gl.COMPILE_STATUS)) {
+                alert('WebGL: ' + gl.getShaderInfoLog(this.vertexShader));
+            }
+            gl.shaderSource(this.fragmentShader, this.fragmentSource);
+            gl.compileShader(this.fragmentShader);
+            if (!gl.getShaderParameter(this.fragmentShader, gl.COMPILE_STATUS)) {
+                alert('WebGL: ' + gl.getShaderInfoLog(this.fragmentShader));
+            }
+
+            gl.attachShader(this.shaderProgram, this.vertexShader);
+            gl.attachShader(this.shaderProgram, this.fragmentShader);
+            gl.linkProgram(this.shaderProgram);
+
+            if (!gl.getProgramParameter(this.shaderProgram, gl.LINK_STATUS)) {
+                alert('WebGL: ' + gl.getProgramInfoLog(this.shaderProgram));
+            }
+
+            this.aVertexPosition = gl.getAttribLocation(this.shaderProgram, 'aVertexPosition');
+            this.aTextureCoord = gl.getAttribLocation(this.shaderProgram, 'aTextureCoord');
+
+
+            // document.body.appendChild(this.canvas);
+        }
+
+
+        render(stream) {
+            let gl = this.glContext;
+
+            gl.useProgram(this.shaderProgram);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
+            gl.vertexAttribPointer(this.aVertexPosition, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(this.aVertexPosition);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+            gl.vertexAttribPointer(this.aTextureCoord, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(this.aTextureCoord);
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, stream.outputTexture);
+            gl.bindTexture(gl.FRAMEBUFFER, stream.frameBuffer);
+
+            let uSampler = gl.getUniformLocation(this.shaderProgram, 'uSampler');
+            gl.uniform1i(uSampler, 0);
+
+            let uAlphaCheckerboard = gl.getUniformLocation(this.shaderProgram, 'uAlphaCheckerboard');
+            gl.uniform1i(uAlphaCheckerboard, _settings.bAlphaCheckerboard.value);
+
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
     }
 
 
@@ -5575,6 +6236,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.uiPopup = undefined;
             this.infoPopup = undefined;
             this.fileInput = undefined;
+            this.performanceInfo = undefined;
 
             this.streams = [];
             this.windows = undefined;
@@ -5585,6 +6247,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.settingsUI = new NvisUI('settings', _settings, this);
 
             this.canvas = document.createElement('canvas');
+
+            this.saveCanvas = new NvisExportCanvas();
 
             this.glContext = this.canvas.getContext('webgl2');
             if (this.glContext === null) {
@@ -5637,6 +6301,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             //this.fileInput.onchange = this.onFileDrop;
             this.fileInput.addEventListener('change', (event) => this.onFileDrop(event));
 
+            this.performanceInfo = document.createElement('span');
+            this.performanceInfo.id = 'performanceInfo'
+
+            document.body.appendChild(this.performanceInfo);
             document.body.appendChild(this.uiPopup);
             document.body.appendChild(this.helpPopup);
             document.body.appendChild(this.fileInput);
@@ -5662,10 +6330,6 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             document.body.addEventListener('keyup', (event) => this.onKeyUp(event));
 
         };
-
-        getContext = function () {
-            return this.glContext;
-        }
 
         onWheel(event) {
             event.preventDefault();
@@ -5759,9 +6423,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 select.id = 'windowStream-' + windowId;
                 select.addEventListener('change', () => { nvis.uiSetWindowStreamId(windowId); });
 
-                let windowStreamId = this.windows.getWindow(windowId).getStreamId();
+                let windowStreamId = this.windows.getWindow(windowId).streamId;
                 for (let streamId = 0; streamId < this.streams.length; streamId++) {
-                    let fileName = this.streams[streamId].getFileName();
+                    let fileName = this.streams[streamId].getName();
                     let option = document.createElement('option');
                     option.innerHTML = fileName;
                     if (streamId == windowStreamId) {
@@ -5923,7 +6587,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     aButton.innerHTML = 'Delete';
                     aButton.style.marginLeft = '15px';
                     aButton.addEventListener('click', () => {
-                        windowAnnotations.annotations.splice(annotationId, 1);
+                        streamAnnotations.annotations.splice(annotationId, 1);
                         this.updateUIPopup();
                     });
                     let deleteCell = document.createElement('td');
@@ -6073,6 +6737,26 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     this.windows.add();
                     this.updateUIPopup();
                     break;
+                case 's':
+                    _state.save = true;
+                    _renderer.saveCanvas.render(_renderer.streams[0]);
+
+                    let filename = 'test.png';
+                    let data = _renderer.saveCanvas.canvas.toDataURL('image/png');
+                    let img = document.createElement('img');
+                    img.setAttribute('src', data);
+                    let pom = document.createElement('a');
+                    pom.setAttribute('href', data);
+                    pom.setAttribute('download', filename);
+                    pom.style.display = 'none';
+                    pom.appendChild(img);
+                    document.body.appendChild(_renderer.saveCanvas.canvas);
+                    document.body.appendChild(pom);
+                    pom.click();
+                    document.body.removeChild(pom);
+                    document.body.removeChild(_renderer.saveCanvas.canvas);
+
+                    break;
                 case 'h':
                     this.helpPopup.style.display = 'block';
                     break;
@@ -6142,7 +6826,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 return;
             }
 
-            // let streamId = this.windows.windows[windowId].getStreamId();
+            // let streamId = this.windows.windows[windowId].streamId;
             let pCoord = this.windows.getStreamCoordinates(cCoord, true);
 
             if (pCoord === undefined) {
@@ -6188,7 +6872,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         setWindowStreamId(windowId) {
             let elementId = ('windowStream-' + windowId);
             let newStreamId = document.getElementById(elementId).selectedIndex;
-            this.windows.getWindow(windowId).setStreamId(newStreamId);
+            this.windows.getWindow(windowId).streamId = newStreamId;
         }
 
         setupVideo(fileName, frames) {
@@ -6359,7 +7043,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         start() {
             //this.render();
-            requestAnimationFrame(() => this.animate());
+            requestAnimationFrame(() => this.animate(0));
+            //setInterval(() => this.animate(), 1.0 / (1000 * _state.animation.fps))
         }
 
         animate(timeStamp) {
@@ -6367,22 +7052,21 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             let fps = _state.animation.fps;
 
-            if (_state.animation.time === undefined) {
-                _state.animation.time = timeStamp;
-            }
-
             const elapsed = timeStamp - _state.animation.time;
+            _state.animation.time = timeStamp;
+
+            if (_state.animation.performance) {
+                document.getElementById('performanceInfo').innerHTML = 'FPS: ' + (1000 / elapsed).toFixed(1);
+            }
 
             if (elapsed >= 1000.0 / fps) {
                 _state.animation.update();
-                _state.animation.time = timeStamp;
             }
 
-            setTimeout(() => {
-                requestAnimationFrame((t) => this.animate(t));
-            }, 1);
-
             this.render();
+
+            requestAnimationFrame((t) => this.animate(t));
+
         }
 
     }
@@ -6469,6 +7153,11 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         if (key == 'bAnimate') {
             _state.animation.active = object.value;
+        }
+
+        if (key == 'bPerformance') {
+            _state.animation.performance = object.value;
+            document.getElementById('performanceInfo').style.display = (object.value ? '' : 'none');
         }
 
         if (key == 'bPingPong') {
@@ -6588,7 +7277,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
     let _uiDeleteStream = function (deleteStreamId) {
 
-        let numStreams =_renderer.streams.length;
+        let numStreams = _renderer.streams.length;
 
         if (numStreams == 1) {
             _apiClear();

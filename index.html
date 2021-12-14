@@ -7,7 +7,16 @@
 </head>
 <body>
     <script>
-        nvis.shaders(["glsl/difference.json", "glsl/gaussian.json", "glsl/mixer.json", "glsl/pixelate.json", "glsl/ssim.json", "glsl/tiling.json"]);
+        nvis.shaders([
+            "glsl/blurDetection.json",
+            "glsl/difference.json",
+            "glsl/gaussian.json",
+            "glsl/max.json",
+            "glsl/simpleMax.json",
+            "glsl/mixer.json",
+            "glsl/pixelate.json",
+            "glsl/ssim.json",
+            "glsl/tiling.json"]);
         // nvis.config("config/sponza.json");
 
         // nvis.config("config/triangles-config.json");
@@ -22,30 +31,34 @@
 
         // nvis.zoom(2.0);
         // nvis.translate(0.5, 0.5);
-        nvis.stream("images/png/texture.png");
-        nvis.shader("glsl/gaussian.json", [0], true);
-        // nvis.stream("images/png/lena.png");
+        // nvis.shader("glsl/gaussian.json", [0], true);
+        nvis.stream("images/png/plane.png", false);
+        // nvis.shader(6, [ 0 ], {}, false);
+        // nvis.shader(2, [ 1 ], { uRadius: 10 }, true);
+        // nvis.stream("images/png/texture.png", false);
+        nvis.shader(4, [ 0 ], { uDirection: 0 }, false);
+        nvis.shader(4, [ 1 ], { uDirection: 1 }, false);
+        nvis.shader(4, [ 2 ], { uDirection: 0 }, false);
+        nvis.shader(4, [ 3 ], { uDirection: 1 }, false);
+        nvis.shader(4, [ 4 ], { uDirection: 0 }, false);
+        nvis.shader(4, [ 5 ], { uDirection: 1 }, false);
+        nvis.shader(4, [ 6 ], { uDirection: 0 }, false);
+        nvis.shader(4, [ 7 ], { uDirection: 1 }, true);
+        nvis.shader(2, [ 8 ], { uRadius: 10 }, true);
+
         // nvis.annotation("stream", 0, "arrow", { position: { x: 64, y: 128 }, color: { r: 0.5, g: 0.5, b: 1.0 }, size: 64.0, rotation: 30, zoom: false })
         // nvis.annotation("window", 1, "circle", { position: { x: 200, y: 100 }, radius: 5, width: 3, zoom: false });
         // nvis.annotation("window", 1, "circle", { position: { x: 200, y: 100 }, radius: 10, width: 3 });
         // nvis.annotation("window", 1, "circle", { position: { x: 200, y: 100 }, radius: 15, width: 3 });
         // nvis.annotation("window", 1, "circle", { position: { x: 200, y: 100 }, radius: 20, width: 3 });
         // nvis.annotation("window", 1, "circle", { position: { x: 200, y: 100 }, radius: 25, width: 3 });
-        // nvis.annotation("stream", 1, "rectangle", { position: { x: 128, y: 64 }, color: { r: 0.2, g: 1.0, b: 0.2 }, rotation: 45, dimensions: { w: 150, h: 100 }, width: 20.0, zoom: false });
+        // nvis.annotation("stream", 1, "rectangle", { dimensions: { x: 64, y: 64, w: 128, h: 64 }, rotation: 0, width: 3.0, zoom: true });
+        // nvis.annotation("stream", 0, "inset", { source: { x: 256, y: 256, w: 16, h: 16 }, destination: { x: -0, y: -0, w: 128, h: 128 }, width: 3.0 });
         // nvis.stream("images/png/wolf.png");
         // nvis.generator("glsl/tiling.json", 512, 512, true);
         // nvis.shader("glsl/ssim.json", [0, 1], true);
 
         // nvis.video("images/mp4/earth-1280x720.mp4");
-
-        // nvis.stream("images/png/lena.png", false);
-        // nvis.stream("images/png/texture.png", false);
-        // nvis.shader("glsl/mixer.json", [ 0, 1 ], true)
-
-        // nvis.stream("images/png/lena.png", true);
-        // nvis.shader("glsl/pixelate.json", [0], true);
-        // nvis.stream("images/png/lena.png", false);
-        // nvis.shader("glsl/ssim.json", [1, 2], true);
     </script>
 </body>
 </html>
