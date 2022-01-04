@@ -1,0 +1,47 @@
+{
+    "name": "Sharpness",
+    "fileName": "glsl/sharpness.glsl",
+    "inputs": 2,
+    "UI": {
+        "uType": {
+            "name": "Type",
+            "type": "dropdown",
+            "value": 0,
+            "alternatives": [
+                "Sobel",
+                "Laplacian (five point)",
+                "Laplacian (nine point)",
+                "Laplacian variance"
+            ]
+        },
+        "uVarianceRadius": {
+            "name": "Radius",
+            "type": "int",
+            "value": 3,
+            "min": 1,
+            "max": 25,
+            "condition": "uType == 3"
+        },
+        "uMultiplier": {
+            "name": "Multiplier",
+            "type": "float",
+            "value": 10.0,
+            "min": 1.0,
+            "max": 100.0,
+            "step": 0.5
+        },
+        "uTolerance": {
+            "name": "Tolerance",
+            "type": "float",
+            "value": 1.0,
+            "min": 0.0,
+            "max": 10.0,
+            "step": 0.1
+        },
+        "uOverlay": {
+            "name": "Overlay",
+            "type": "bool",
+            "value": true
+        }
+    }
+}

@@ -1,0 +1,16 @@
+{
+    "name": "Simple Max Kernel",
+    "fileName": "glsl/simpleMax.glsl",
+    "inputs": 1,
+    "UI": {
+        "uDirection": {
+            "name": "Direction",
+            "type": "dropdown",
+            "value": 0,
+            "alternatives": [
+                "Horizontal",
+                "Vertical"
+            ]
+        }
+    }
+}

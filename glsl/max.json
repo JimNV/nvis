@@ -1,0 +1,6 @@
+{
+    "name": "Simple Max Kernel",
+    "fileName": "glsl/max.glsl",
+    "inputs": 1,
+    "UI": {}
+}

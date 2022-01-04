@@ -4810,7 +4810,7 @@ var nvis = new function () {
                     el = document.createElement('select');
                     el.setAttribute('id', elementId);
                     el.addEventListener('change', (ev) => {
-                        nvis.uiStreamUpdateParameter(streamId, elementId, false);
+                        nvis.uiStreamUpdateParameter(streamId, elementId, true);
                     }, true);
                     for (let optionId = 0; optionId < object[key].alternatives.length; optionId++) {
                         let oEl = document.createElement('option');
@@ -7048,9 +7048,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
         animate(timeStamp) {
-            // TODO: fix this...
-
-            let fps = _state.animation.fps;
+            requestAnimationFrame((t) => this.animate(t));
 
             const elapsed = timeStamp - _state.animation.time;
             _state.animation.time = timeStamp;
@@ -7059,14 +7057,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 document.getElementById('performanceInfo').innerHTML = 'FPS: ' + (1000 / elapsed).toFixed(1);
             }
 
-            if (elapsed >= 1000.0 / fps) {
+            if (elapsed >= 1000.0 / _state.animation.fps) {
                 _state.animation.update();
+                this.render();
             }
-
-            this.render();
-
-            requestAnimationFrame((t) => this.animate(t));
-
         }
 
     }

@@ -1,0 +1,79 @@
+{
+    "nvis": {
+        "versionMajor": 2,
+        "versionMinor": 5
+    },
+    "app": {
+        "pingPongPlayback": true,
+        "keepChannels": [
+            true,
+            true,
+            true,
+            true
+        ],
+        "displayExtraInfo": true,
+        "desiredPlaybackFramerate": 60,
+        "playbackFrameStep": 1,
+        "numDFTTimeSamples": 6,
+        "normalizeDFT": false,
+        "globalGammaCorrection": false,
+        "globalGamma": 2.200000047683716,
+        "globalExposure": 0.0,
+        "windowPlacementAutomatic": true,
+        "windowPlacementGridWidth": 2,
+        "swapMouseButtonsSelectTranslation": false,
+        "floatDisplayPrecision": 3
+    },
+    "stream": {
+        "streams": [
+            {
+                "streamType": "FILE",
+                "streamName": "sponza",
+                "streamId": 0,
+                "size": 1,
+                "useGamma": false,
+                "gamma": 2.200000047683716,
+                "exposure": 0.0,
+                "frameIdOffset": 0,
+                "invert": false,
+                "abs": false,
+                "flipX": false,
+                "flipY": false,
+                "multiplier": 1.0,
+                "cropSizePos": [
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "frameStart": 0,
+                "files": [
+                    "C:\\Users\\jnilsson\\git\\nvis-online\\images\\sponza.exr"
+                ],
+                "motionVectorDesc": {
+                    "active": false,
+                    "streamId": 4294967295,
+                    "flipX": false,
+                    "flipY": false,
+                    "relative": false,
+                    "warpLength": 1
+                }
+            }
+        ],
+        "minFrameId": 0,
+        "maxFrameId": 0
+    },
+    "window": {
+        "focusbox": {
+            "minX": 0.0,
+            "minY": 0.0,
+            "maxX": 808.5457763671875,
+            "maxY": 614.817626953125
+        },
+        "windows": [
+            {
+                "streamId": 0
+            }
+        ]
+    }
+}

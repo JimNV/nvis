@@ -1,0 +1,41 @@
+Keys:
+          Space         - play current image sequence
+          F1            - show/hide on-screen text messages
+          F2            - show/hide GUI panel
+          F3            - reset (single window, 1:1 size)
+          F4            - maximize zoom, keep window size
+          F5            - reload all shaders
+  Shift + F5            - reload all images
+          F6            - toggle information in bottom of stream windows
+          Left/Right    - move to prev/next image
+   Ctrl + Left/Right    - move to prev/next 10 images
+    Alt + Left/Right    - continuous move forward/backwards at playback rate
+          Down/Up       - move to prev/next image sequence (applies to window where mouse is)
+  Shift + Arrows        - move inside image (when zoomed)
+          R/G/B         - toggle color channel
+          C             - save current images  (+ Alt: save visible region; + Ctrl & Alt: save as zoomed)
+  Shift + C             - save current streams (+ Alt: save visible region; + Ctrl & Alt: save as zoomed)
+   Ctrl + C             - copy active window to clipboard
+   Ctrl + S             - save current context (streams, windows) and global settings into a JSON config file
+          E             - toggle gamma exposure function (applies to file streams, and window where mouse is)
+          H             - show histogram (applies to file streams, and window where mouse is)
+          L             - load image sequence or saved config (via file dialog)
+          N             - toggle normalized DFT
+          Q             - toggle ping-pong playback
+          W             - add another stream window
+  Shift + W             - add another stream window (keep current stream window size)
+          D             - delete window under mouse
+  Shift + D             - delete stream under mouse
+          I             - show content in time + DFT (toggle information type by typing 'I' repeatedly, applies to file streams)
+          X             - flip stream under mouse in x direction
+          Y             - flip stream under mouse in y direction
+          1             - add stream with STIM metric [needs at least two streams] (+shift = add window)
+          2             - add stream with SSIM metric [needs at least two streams] (+shift = add window)
+          3             - add stream with diff metric [needs at least two streams] (+shift = add window)
+
+Mouse:
+          Left mouse    - drag to zoom in, click to undo zooms
+          Right Mouse   - drag to translate when zoomed in
+                        - check "Swap mouse buttons" in GUI to swap zoom and translation behavior
+          Wheel         - zoom
+  Shift + Wheel         - increase/decrease playback speed
