@@ -712,7 +712,7 @@ var nvis = new function () {
                 //         _renderer.windows.streamPxDimensions = dimensions;
                 //     }
             }
-            if (argument.window) {
+            if (argument.window || _renderer.windows.windows.length == 0) {
                 _renderer.addWindow(_renderer.streams.length - 1);
             }
             return streamId;
