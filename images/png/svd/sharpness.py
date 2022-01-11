@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import sys
+import os
 
 
 def get_blur_degree(image_file, sv_num=10):
@@ -55,19 +56,37 @@ def get_blur_map(image_file, win_size=10, sv_num=3):
     
     return blur_map
 
-fileName = sys.argv[1]
-winSize = int(sys.argv[2])
+fileName0 = sys.argv[1]
+fileName1 = sys.argv[2]
+winSize = int(sys.argv[3])
 strideSize = int(winSize / 2 - 1)
+#strideSize = int(sys.argv[4])
 
-blur_map = get_blur_map(fileName, winSize, strideSize)
-blur_map = np.clip(blur_map, 0.0, 1.0)
-cv2.imwrite("svd-" + str(winSize) + "-" + fileName, (1 - blur_map) * 255)
+baseImage = cv2.imread(fileName0)
 
-# import glob
-#
-# files = glob.glob('data/test*')
-# for file in files:
-#     print file, get_blur_degree(file)
-#     out_file = file.replace('test_image','blur_map')
-#     blur_map = get_blur_map(file)
-#     cv2.imwrite(out_file, (1-blur_map)*255)
+blurMap0 = get_blur_map(fileName0, winSize, strideSize)
+blurMap1 = get_blur_map(fileName1, winSize, strideSize)
+
+tolerance = 0.0
+multiplier = 1.0
+
+diffMap = (blurMap0 - blurMap1) * multiplier 
+
+selectMaskHigher = diffMap > tolerance
+selectMaskLower = diffMap < -tolerance
+#baseImage[selectMaskHigher] = [baseImage[:, :, 0], diffMap[:, :], baseImage[:, :, 1]]
+#baseImage[selectMaskLower,0] = [-diffMap[:, :], baseImage[:, :, 1], baseImage[:, :, 2]]
+
+for y in range(baseImage.shape[0]):
+    for x in range(baseImage.shape[1]):
+        value = diffMap[y, x] * 255;
+        if selectMaskHigher[y, x]:
+            baseImage[y, x, 2] += value
+        elif selectMaskLower[y, x]:
+            baseImage[y, x, 1] += -value
+
+baseImage = np.clip(baseImage, 0, 255)
+
+cv2.imwrite("blur-a-" + str(winSize) + ".png", (1 - blurMap0) * 255)
+cv2.imwrite("blur-b-" + str(winSize) + ".png", (1 - blurMap1) * 255)
+cv2.imwrite("output-" + str(winSize) + ".png", baseImage)

@@ -1,9 +1,10 @@
 nvis.shaders([
-    "glsl/blurDetection.json",
     "glsl/difference.json",
     "glsl/gaussian.json",
     "glsl/mixer.json",
     "glsl/pixelate.json",
+    "glsl/sharpness.json",
+    "glsl/sobel.json",
     "glsl/ssim.json",
     "glsl/tiling.json"
 ]);
