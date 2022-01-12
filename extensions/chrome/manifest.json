@@ -1,7 +1,7 @@
 {
     "name": "NVIDIA nvis",
     "description": "A image/stream viewer extension!",
-    "version": "0.5",
+    "version": "0.6",
     "manifest_version": 3,
     "background": {
         "service_worker": "content.js"
