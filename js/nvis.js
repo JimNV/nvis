@@ -83,7 +83,8 @@ var nvis = new function () {
                 showInfo: false
             },
             keyboard: {
-                shift: false
+                shift: false,
+                control: false
             }
         },
         animation: {
@@ -5061,6 +5062,10 @@ var nvis = new function () {
             this.div = document.createElement('div');
             this.div.className = 'overlay';
 
+            this.windowId = undefined;
+            this.coordinates = undefined;
+            this.frameId = undefined;
+
             // this.div.style.left = this.position.x + 'px';
             // this.div.style.top = this.position.y + 'px';
             // this.div.style.width = this.size.w + 'px';
@@ -5076,15 +5081,16 @@ var nvis = new function () {
         }
 
         update(windowId, coordinates, color, bFloat) {
-            if (this.windowId == windowId && this.coordinates.x == coordinates.x && this.coordinates.y == coordinates.y) {
+            if (this.windowId == windowId && this.coordinates.x == coordinates.x && this.coordinates.y == coordinates.y && this.frameId == _state.animation.frameId) {
                 return;
             }
 
-            // console.log('windowId: ' + windowId + ', coords: ' + JSON.stringify(coordinates) + ', color: ' + JSON.stringify(color));
+            // console.log('windowId: ' + windowId + ', coords: ' + JSON.stringify(coordinates) + ', color: ' + JSON.stringify(color) + ', frameId: ' + _state.animation.frameId);
 
             this.windowId = windowId;
             this.coordinates = coordinates;
             this.color = color;
+            this.frameId = _state.animation.frameId;
 
             this.text = '';
             if (coordinates === undefined) {
@@ -6676,6 +6682,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 case 'Shift':  //  Shift
                     _state.input.keyboard.shift = true;
                     break;
+                case 'Control':  //  Control
+                    _state.input.keyboard.control = true;
+                    break;
                 case 'ArrowLeft':  //  ArrowLeft
                     _state.animation.dec();
                     this.popupInfo('Frame: ' + (_state.animation.frameId + 1) + ' / ' + _state.animation.numFrames);
@@ -6715,6 +6724,30 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     _state.animation.togglePingPong();
                     _settings.bPingPong.value = _state.animation.pingPong;
                     this.popupInfo('Animation ping-pong: ' + (_state.animation.pingPong ? 'on' : 'off'));
+                    break;
+                case 'c':
+                    if (_state.input.keyboard.control) {
+                        console.log("Clipboard");
+                        let type = "image/png";
+                        let data = new Uint8Array(200 * 200 * 4);
+                        // let data = _renderer.streams[0].textures[0];
+                        let gl = _renderer.glContext;
+                        gl.bindFramebuffer(gl.FRAMEBUFFER, _renderer.streams[0].frameBuffer);
+                        gl.readPixels(0, 0, 200, 200, gl.RGBA, gl.UNSIGNED_BYTE, data);
+                        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                        let blob = new Blob([data], { type });
+                        let clipboardData = [new ClipboardItem({ [type]: blob })];
+                    
+                        navigator.clipboard.write(clipboardData).then(
+                            function () {
+                                console.log("Clipboard success!");
+                            },
+                            function () {
+                                console.log("Clipboard FAIL!");
+                            }
+                        );
+                    
+                    }
                     break;
                 case 'd':
                     this.windows.deleteAtMouse(_state.input.mouse.canvasCoords);
@@ -6784,6 +6817,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             switch (key) {
                 case 'Shift':
                     _state.input.keyboard.shift = false;
+                    break;
+                case 'Control':
+                    _state.input.keyboard.control = false;
                     break;
                 case 'h':
                     this.helpPopup.style.display = 'none';

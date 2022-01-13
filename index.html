@@ -8,11 +8,8 @@
 <body>
     <script>
         nvis.shaders([
-            "glsl/blurDetection.json",
             "glsl/difference.json",
             "glsl/gaussian.json",
-            "glsl/max.json",
-            "glsl/simpleMax.json",
             "glsl/mixer.json",
             "glsl/pixelate.json",
             "glsl/sharpness.json",
@@ -35,7 +32,9 @@
         // nvis.stream("images/png/hairball-test.png");
         nvis.stream("images/png/BF2042_example_a.png");
         nvis.stream("images/png/BF2042_example_b.png", false);
-        nvis.shader(7, [ 0, 1 ], { uType: 3, uMultiplier: 50.0, uVarianceRadius: 1, uTolerance: 0.0 });
+        nvis.shader(4, [ 0, 1 ], { uType: 3, uMultiplier: 10.0, uVarianceRadius: 3, uTolerance: 0.0 });
+
+        // nvis.video("images/mp4/earth-1280x720.mp4")
 
         // nvis.zoom(2.0);
         // nvis.translate(0.5, 0.5);
