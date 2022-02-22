@@ -350,7 +350,6 @@ var nvis = new function () {
             overflow: hidden;
             user-select: none;
         }`);
-
         addStylesheetRules(`div#welcome {
             position: absolute;
             width: 100%;
@@ -586,8 +585,16 @@ var nvis = new function () {
         }
     }
 
-    let _apiGenerator = function (fileName, width, height, bWindow = true) {
-        return _apiCommand({ command: 'generator', argument: { fileName: fileName, width: width, height: height, window: bWindow } });
+    let _apiGraph = function (fileName) {
+    }
+
+    let _apiGenerator = function (fileNameOrId, parameters = {}, bWindow = true) {
+        // return _apiCommand({ command: 'generator', argument: { fileName: fileName, width: width, height: height, window: bWindow } });
+        if (typeof fileNameOrId == 'string') {
+            return _apiCommand({ command: 'generator', argument: { fileName: fileNameOrId, parameters: parameters, window: bWindow } });
+        } else if (typeof fileNameOrId == 'number') {
+            return _apiCommand({ command: 'generator', argument: { shaderId: fileNameOrId, parameters: parameters, window: bWindow } });
+        }
     }
 
     let _apiWindow = function (streamId = 0) {
@@ -726,6 +733,8 @@ var nvis = new function () {
                 shaderId = _renderer.loadShader(argument.fileName);
             }
             let newStream = _renderer.addShaderStream(shaderId);
+            newStream.bFloat = (argument.parameters['float'] === undefined ? true : argument.parameters['float']);
+            delete argument.parameters['float'];
             if (argument.inputs !== undefined) {
                 let inputStreamIds = argument.inputs;
                 if (inputStreamIds !== undefined) {
@@ -743,9 +752,13 @@ var nvis = new function () {
             }
             return shaderId;
         } else if (command == 'generator') {
-            let shaderId = _renderer.loadShader(argument.fileName);
+            let shaderId = argument.shaderId;
+            if (shaderId === undefined) {
+                shaderId = _renderer.loadShader(argument.fileName);
+            }
             let newStream = _renderer.addShaderStream(shaderId);
-            let dimensions = { w: argument.width, h: argument.height };
+            newStream.bFloat = (argument.parameters.float === undefined ? true : argument.parameters.float);
+            let dimensions = { w: argument.parameters.width, h: argument.parameters.height };
             newStream.setDimensions(dimensions);
             if (_renderer.windows.streamPxDimensions === undefined) {
                 _renderer.windows.streamPxDimensions = dimensions;
@@ -1886,6 +1899,7 @@ var nvis = new function () {
 
             let xhr = new XMLHttpRequest();
             xhr.open('GET', fileName);
+            xhr.responseType = 'text';
             xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, max-age=0');
             xhr.onload = function (event) {
                 if (this.status == 200 && this.responseText !== null) {
@@ -2566,21 +2580,88 @@ var nvis = new function () {
     // return status;
     // }
 
-    class NvisDeflate {
+    class NvisZlib {
 
-        constructor(bufferView, offset, length) {
-            this.bufferView = bufferView;
-            this.offset = offset;
-            this.length = length;
+        static deflate(input) {
 
+            let output = new NvisBitBuffer(new ArrayBuffer(input.length * 2));  //  twice the input size should be enough
 
+            const cm = 8;
+            const WindowSize = 0x8000;
+            const cinfo = Math.LOG2E * Math.log(WindowSize) - 8;
+            const cmf = (cinfo << 4) | cm;
+
+            output.writeUint8(cmf);
+
+            const fdict = 0;
+            const flevel = 0; //  fastest, TODO: handle Huffman (fixed and dynamic)
+            let flags = (flevel << 6) | (fdict << 5);
+            const fcheck = 31 - (cmf * 256 + flags) % 31;
+            flags |= fcheck;
+
+            output.writeUint8(flags);
+
+            let inputLength = input.length;
+            for (let position = 0; position < inputLength;) {
+                let blockArray = input.subarray(position, position + 0xffff);
+                position += blockArray.length;
+                
+                this.deflateBlock(output, blockArray, (position === inputLength));
+            }
+
+            //  Adler-32 checksum
+            let adler = this.adler32(input);
+
+            output.writeUint8(adler >> 24) & 0xff;
+            output.writeUint8(adler >> 16) & 0xff;
+            output.writeUint8(adler >>  8) & 0xff;
+            output.writeUint8(adler >>  0) & 0xff;
+
+            output.shrinkWrap();
+
+            return output;
+        };
+          
+        static deflateBlock(output, vBlock, isFinalBlock) {
+            //  header
+            let bfinal = (isFinalBlock ? 1 : 0);
+            let btype = 0;  //  none (so far), TODO: fixed Huffman (1), dynamic Huffman (2)
+            output.writeUint8(bfinal | (btype << 1));
+
+            //  length
+            let len = vBlock.length;
+            let nlen = (~len + 0x10000) & 0xffff;
+            output.writeUint16(len);
+            output.writeUint16(nlen);
+
+            //  copy data
+            output.copyArray(vBlock, 0, vBlock.length);
         }
 
-        getByte() {
-            let value = this.bufferView.getUint8(this.offset);
-            this.offset++;
-            return value;
-        }
+
+        static adler32(array, adler = 1) {
+            var s1 = adler & 0xffff;
+            var s2 = (adler >>> 16) & 0xffff;
+            let i = 0;
+
+            const DefaultLength = 1024;
+
+            let length = array.length;
+            while (length > 0) {
+                let tlen = (length > DefaultLength ? DefaultLength : length);
+                length -= tlen;
+                do {
+                    s1 += array[i++];
+                    s2 += s1;
+                } while (--tlen);
+
+                s1 %= 65521;
+                s2 %= 65521;
+            }
+
+            return ((s2 << 16) | s1) >>> 0;
+        };
+
     }
 
 
@@ -2605,9 +2686,27 @@ var nvis = new function () {
             this.view = new DataView(this.buffer, params.offset);
         }
 
+        shrinkWrap() {
+            let size = this.bytePointer + (this.bitPointer > 0 ? 1 : 0);
+            let newView = new Uint8Array(new ArrayBuffer(size));
+
+            for (let i = 0; i < size; i++) {
+                newView[i] = this.view.getUint8(i);
+            }
+
+            this.bitSize = size * 8;
+            this.buffer = newView.buffer;
+        }
+
         consume(buffer, length) {
             for (let i = 0; i < length; i++) {
                 this.writeUint8(buffer.readUint8());
+            }
+        }
+
+        copyArray(array, offset = 0, length = array.length) {
+            for (let i = 0; i < length; i++) {
+                this.writeUint8(array[offset + i]);
             }
         }
 
@@ -2758,6 +2857,10 @@ var nvis = new function () {
             this.view.setUint8(byteIndex, value);
         }
 
+        getInt8(byteIndex) {
+            return this.view.getInt8(byteIndex);
+        }
+
         /////////
 
         peekUint16(bytePointer = this.bytePointer) {
@@ -2789,6 +2892,16 @@ var nvis = new function () {
             let value = this.view.getUint32(this.bytePointer, this.littleEndian);
             this.bytePointer += 4;
             return value;
+        }
+
+        writeUint32(value) {
+            this.view.setUint32(this.bytePointer, value, this.littleEndian);
+            this.bytePointer += 4;
+        }
+
+        writeInt32(value) {
+            this.view.setInt32(this.bytePointer, value, this.littleEndian);
+            this.bytePointer += 4;
         }
 
         readInt32() {
@@ -2856,6 +2969,12 @@ var nvis = new function () {
                 s += String.fromCharCode(c);
             }
             return s;
+        }
+
+        writeString(string) {
+            for (let i = 0; i < string.length; i++) {
+                this.writeUint8(string.charCodeAt(i));
+            }
         }
 
         readLine() {
@@ -4092,7 +4211,7 @@ var nvis = new function () {
 
             this.textures = [];
 
-            this.bFloat = false;
+            this.bFloat = undefined;
 
             this.shaderId = shaderId;  //  = -1 for file streams
             this.inputStreamIds = [];
@@ -4291,8 +4410,6 @@ var nvis = new function () {
 
             if (bFloat) {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, dimensions.w, dimensions.h, 0, gl.RGBA, gl.FLOAT, image);
-                // } else if (dimensions !== undefined) {  // XXXXXXXXXXXXXXXXXx
-                //     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
             } else {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
             }
@@ -4306,17 +4423,20 @@ var nvis = new function () {
         }
 
 
-        setDimensions(dimensions, bFloat) {
+        setDimensions(dimensions) {
 
             let gl = this.glContext;
 
-            this.bFloat = bFloat;
+            // this.bFloat = bFloat;
             this.dimensions = dimensions;
 
             this.outputTexture = gl.createTexture();
+
+            // this.setupTexture(this.outputTexture, null, bFloat, dimensions);
+
             gl.bindTexture(gl.TEXTURE_2D, this.outputTexture);
 
-            if (bFloat) {
+            if (this.bFloat) {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, dimensions.w, dimensions.h, 0, gl.RGBA, gl.FLOAT, null);
             } else {
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dimensions.w, dimensions.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -4354,13 +4474,18 @@ var nvis = new function () {
                 let fileName = fileNames[fileId];
                 this.fileNames.push(fileName);
 
+                console.log('loading file: ' + fileName);
+
                 if (fileName.match(/.exr$/) || fileName.match(/.pfm$/)) {
 
                     let xhr = new XMLHttpRequest();
+                    // let url = browser.runtime.getURL('/' + fileName);
                     xhr.open('GET', fileName);
+                    // xhr.open(url);
                     xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, max-age=0');
                     xhr.responseType = 'arraybuffer';
                     xhr.onload = function () {
+                        console.log("xhr.onload()");
                         if (this.status == 200 && this.response !== null) {
                             numFilesLoaded++;
 
@@ -4376,12 +4501,14 @@ var nvis = new function () {
                                 self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
 
                                 if (numFilesLoaded == fileNames.length) {
-                                    self.setDimensions(file.dimensions, true);
+                                    self.setDimensions(file.dimensions);
                                     //callback(file.dimensions);
                                     windows.setStreamPxDimensions(file.dimensions);
                                     windows.adjust();
                                 }
                             }
+                        } else {
+                            console.log('status: ' + this.status + ', response: ' + this.response);
                         }
                     };
                     xhr.send();
@@ -4397,7 +4524,7 @@ var nvis = new function () {
 
                         if (numFilesLoaded == fileNames.length) {
                             let dimensions = { w: image.width, h: image.height };
-                            self.setDimensions(dimensions, false);
+                            self.setDimensions(dimensions);
                             //callback(self.dimensions);
                             windows.setStreamPxDimensions(dimensions);
                             windows.adjust();
@@ -4444,7 +4571,7 @@ var nvis = new function () {
 
                             if (numFilesLoaded == files.length) {
                                 let dimensions = { w: image.width, h: image.height };
-                                self.setDimensions(dimensions, false);
+                                self.setDimensions(dimensions);
                                 windows.setStreamPxDimensions(dimensions);
                                 windows.adjust();
                             }
@@ -4477,7 +4604,7 @@ var nvis = new function () {
                             numFilesLoaded++;
 
                             if (numFilesLoaded == files.length) {
-                                self.setDimensions(file.dimensions, true);
+                                self.setDimensions(file.dimensions);
                                 windows.setStreamPxDimensions(file.dimensions);
                                 windows.adjust();
                             }
@@ -4501,7 +4628,7 @@ var nvis = new function () {
                             numFilesLoaded++;
 
                             if (numFilesLoaded == files.length) {
-                                self.setDimensions(file.dimensions, true);
+                                self.setDimensions(file.dimensions);
                                 windows.setStreamPxDimensions(file.dimensions);
                                 windows.adjust();
                             }
@@ -4924,7 +5051,9 @@ var nvis = new function () {
 
                 //  set default UI parameters from API call
                 for (let key of Object.keys(this.apiParameters)) {
-                    this.shaderJSONObject.UI[key].value = this.apiParameters[key];
+                    if (this.shaderJSONObject.UI[key] !== undefined) {
+                        this.shaderJSONObject.UI[key].value = this.apiParameters[key];
+                    }
                 }
 
                 this.bUIReady = true;
@@ -5854,13 +5983,16 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 return undefined;
             }
 
+            //  deduce dimensions based on inputs
+            //  input order is priority order
             for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
                 let inputStreamId = stream.getInputStreamId(inputId);
                 let inputDimensions = this.findStreamDimensions(inputStreamId, streams, shaders);
-                if (inputDimensions !== undefined) {
-                    stream.setDimensions(inputDimensions);
-                    return inputDimensions;
+                if (inputDimensions === undefined) {
+                    return undefined;
                 }
+                stream.setDimensions(inputDimensions);
+                return inputDimensions;
             }
 
             return undefined;
@@ -5894,7 +6026,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             //             let inputStream = streams[stream.getInputStreamId(0)];
             //             if (inputStream !== undefined && inputStream.getDimensions() !== undefined) {
             //                 streamDim = inputStream.getDimensions();
-            //                 stream.setDimensions(streamDim, inputStream.bFloat);
+            //                 stream.setDimensions(streamDim);
             //                 bStreamDimKnown = true;
             //             }
             //         }
@@ -5981,6 +6113,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             gl.viewport(0, 0, streamDims.w, streamDims.h);
 
+            gl.enable(gl.BLEND);
+            // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.blendFunc(gl.ONE, gl.ZERO);
+
             stream.setUniforms(shader);
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
@@ -6016,7 +6152,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             gl.uniform2f(gl.getUniformLocation(shaderProgram, 'uDimensions'), streamDims.w, streamDims.h);
 
             gl.enable(gl.BLEND);
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.blendFunc(gl.ONE, gl.ZERO);
 
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
@@ -6225,6 +6362,514 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
     }
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    class NvisBase64 {
+
+        static lookup = [];
+        static revLookup = [];
+        static code = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+        // static lookup = new Array(Base64.code.length);
+        // static revLookup = new Array(Base64.code.length);
+
+        static {
+
+            for (let i = 0; i < NvisBase64.code.length; ++i) {
+                NvisBase64.lookup[i] = NvisBase64.code[i];
+                NvisBase64.revLookup[NvisBase64.code.charCodeAt(i)] = i;
+            }
+
+            // See: https://en.wikipedia.org/wiki/Base64#URL_applications
+            NvisBase64.revLookup['-'.charCodeAt(0)] = 62
+            NvisBase64.revLookup['_'.charCodeAt(0)] = 63
+
+        }
+        // }
+        // exports.byteLength = byteLength
+        // exports.toByteArray = toByteArray
+        // exports.fromByteArray = fromByteArray
+
+        // var lookup = []
+        // var revLookup = []
+        // var Arr = typeof Uint8Array !== 'undefined' ? Uint8Array : Array
+
+        // var code = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+        // for (var i = 0, len = code.length; i < len; ++i) {
+        //   lookup[i] = code[i]
+        //   revLookup[code.charCodeAt(i)] = i
+        // }
+
+        // // Support decoding URL-safe base64 strings, as Node.js does.
+        // // See: https://en.wikipedia.org/wiki/Base64#URL_applications
+        // revLookup['-'.charCodeAt(0)] = 62
+        // revLookup['_'.charCodeAt(0)] = 63
+
+        static toBlob(base64, type) {
+            var bytes = window.atob(base64);
+            let arrayBuffer = new ArrayBuffer(bytes.length);
+            let byteArray = new Uint8Array(ab);
+            for (let i = 0; i < bytes.length; i++) {
+                byteArray[i] = bytes.charCodeAt(i);
+            }
+            return new Blob([arrayBuffer], { type: type });
+        }
+
+        static getLens(b64) {
+            var len = b64.length
+
+            if (len % 4 > 0) {
+                throw new Error('Invalid string. Length must be a multiple of 4')
+            }
+
+            // Trim off extra bytes after placeholder bytes are found
+            // See: https://github.com/beatgammit/base64-js/issues/42
+            var validLen = b64.indexOf('=')
+            if (validLen === -1) {
+                validLen = len
+            }
+
+            let placeHoldersLen = (validLen === len ? 0 : 4 - (validLen % 4));
+
+            return [validLen, placeHoldersLen]
+        }
+
+        // base64 is 4/3 + up to two characters of the original data
+        static byteLength(b64) {
+            var lens = NvisBase64.getLens(b64)
+            var validLen = lens[0]
+            var placeHoldersLen = lens[1]
+            return ((validLen + placeHoldersLen) * 3 / 4) - placeHoldersLen
+        }
+
+        static _byteLength(b64, validLen, placeHoldersLen) {
+            return ((validLen + placeHoldersLen) * 3 / 4) - placeHoldersLen
+        }
+
+        static toByteArray(b64) {
+            var lens = NvisBase64.getLens(b64);
+            var validLen = lens[0];
+            var placeHoldersLen = lens[1];
+
+            var arr = new Uint8Array(NvisBase64._byteLength(b64, validLen, placeHoldersLen));
+
+            let curByte = 0;
+
+            // if there are placeholders, only get up to the last complete 4 chars
+            let len = (placeHoldersLen > 0 ? validLen - 4 : validLen);
+
+            let i = 0;
+            for (i = 0; i < len; i += 4) {
+                let tmp = (NvisBase64.revLookup[b64.charCodeAt(i)] << 18) | (NvisBase64.revLookup[b64.charCodeAt(i + 1)] << 12) | (NvisBase64.revLookup[b64.charCodeAt(i + 2)] << 6) | NvisBase64.revLookup[b64.charCodeAt(i + 3)];
+                arr[curByte++] = (tmp >> 16) & 0xff;
+                arr[curByte++] = (tmp >> 8) & 0xff;
+                arr[curByte++] = tmp & 0xff;
+            }
+
+            if (placeHoldersLen === 2) {
+                let tmp = (NvisBase64.revLookup[b64.charCodeAt(i)] << 2) | (NvisBase64.revLookup[b64.charCodeAt(i + 1)] >> 4);
+                arr[curByte++] = tmp & 0xff;
+            }
+
+            if (placeHoldersLen === 1) {
+                let tmp = (NvisBase64.revLookup[b64.charCodeAt(i)] << 10) | (NvisBase64.revLookup[b64.charCodeAt(i + 1)] << 4) | (NvisBase64.revLookup[b64.charCodeAt(i + 2)] >> 2);
+                arr[curByte++] = (tmp >> 8) & 0xff;
+                arr[curByte++] = tmp & 0xff;
+            }
+
+            return arr;
+        }
+
+        static tripletToBase64(num) {
+            return NvisBase64.lookup[num >> 18 & 0x3f] + NvisBase64.lookup[num >> 12 & 0x3f] + NvisBase64.lookup[num >> 6 & 0x3f] + NvisBase64.lookup[num & 0x3f];
+        }
+
+        static encodeChunk(uint8, start, end) {
+            let output = [];
+            for (let i = start; i < end; i += 3) {
+                let tmp = ((uint8[i] << 16) & 0xff0000) + ((uint8[i + 1] << 8) & 0xff00) + (uint8[i + 2] & 0xff);
+                output.push(NvisBase64.tripletToBase64(tmp));
+            }
+            return output.join('');
+        }
+
+        static fromByteArray(uint8) {
+            let len = uint8.length;
+            let extraBytes = len % 3; // if we have 1 byte left, pad 2 bytes
+            let parts = [];
+            let maxChunkLength = 16383; // must be multiple of 3
+
+            //  go through the array every three bytes, we'll deal with trailing stuff later
+            for (let i = 0, len2 = len - extraBytes; i < len2; i += maxChunkLength) {
+                parts.push(NvisBase64.encodeChunk(uint8, i, (i + maxChunkLength) > len2 ? len2 : (i + maxChunkLength)));
+            }
+
+            //  pad the end with zeros, but make sure to not forget the extra bytes
+            if (extraBytes === 1) {
+                let tmp = uint8[len - 1];
+                parts.push(NvisBase64.lookup[tmp >> 2] + NvisBase64.lookup[(tmp << 4) & 0x3F] + '==');
+            } else if (extraBytes === 2) {
+                let tmp = (uint8[len - 2] << 8) + uint8[len - 1];
+                parts.push(NvisBase64.lookup[tmp >> 10] + NvisBase64.lookup[(tmp >> 4) & 0x3F] + NvisBase64.lookup[(tmp << 2) & 0x3F] + '=');
+            }
+
+            return parts.join('')
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    class NvisCRC32 {
+
+        static crc32Table = new Array(256);
+        static crc32 = 0xffffffff;
+
+        static begin() {
+            this.crc32 = 0xffffffff;
+        }
+
+        static add(value) {
+            this.crc32 = this.crc32Table[(this.crc32 ^ value) & 0xff] ^ (this.crc32 >>> 8);
+        }
+
+        static end() {
+            this.crc32 = (this.crc32 ^ 0xffffffff) >>> 0;
+        }
+
+        static {
+            for (let i = 0; i < 256; i++) {
+                let c = i;
+                for (let j = 0; j < 8; j++) {
+                    c = (c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1);
+                }
+                this.crc32Table[i] = c;
+            }
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    class NvisPNG extends NvisBitBuffer {
+
+        //static CRC32 = new NvisCRC32();
+
+        constructor(width, height, data) {
+            const Signature = '\x89PNG\r\n\x1A\n';
+            const ChunkTypeIHDR = 'IHDR';
+            const ChunkTypeIDAT = 'IDAT';
+            const ChunkTypeIEND = 'IEND';
+            const SizeChunkLength = 4;
+            const SizeChunkType = 4;
+            const SizeChunkCRC = 4;
+            const SizeIHDR = 13;
+            const SizeIEND = 0;
+            const SizeData = width * height * 4;
+            const SizeChunk = (1 << 16);
+            const NumDataChunks = Math.floor(SizeData / SizeChunk);
+            const SizeLastChunk = SizeData - NumDataChunks * SizeChunk;
+            const SizeIDATs = NumDataChunks * (SizeChunk + 12) + (SizeLastChunk + 12);
+            const SizeFile = Signature.length + (SizeIHDR + 12) + SizeIDATs + (SizeIEND + 12);
+
+            super(new ArrayBuffer(SizeFile * 2), { littleEndian: false });
+
+            this.writeString(Signature);
+
+            this.writeUint32(SizeIHDR);
+            this.writeString(ChunkTypeIHDR);
+            this.writeUint32(width);
+            this.writeUint32(height);
+            this.writeUint8(8);  //  bit depth (per channel)
+            this.writeUint8(6);  //  color type (6 = RGBA)
+            this.writeUint8(0);  //  compression method (0 = deflate)
+            this.writeUint8(0);  //  filter method (0 = no filter)
+            this.writeUint8(0);  //  interlace method (0 = no interlace)
+            this.writeUint32(this.crc32(SizeChunkType + SizeIHDR));
+
+            for (let dc = 0; dc < NumDataChunks; dc++) {
+                let offset = dc * SizeChunk;
+                let chunk = data.subarray(offset, offset + SizeChunk);
+                let output = NvisZlib.deflate(chunk);
+                let length = output.buffer.byteLength;
+                output.bytePointer = 0;  //  reset to consume
+
+                this.writeUint32(length);
+                this.writeString(ChunkTypeIDAT);
+                this.consume(output, length);
+                this.writeUint32(this.crc32(SizeChunkType + length));
+            }
+
+            if (SizeLastChunk > 0) {
+                let offset = NumDataChunks * SizeChunk;
+                let chunk = data.subarray(offset, offset + SizeLastChunk);
+                let output = NvisZlib.deflate(chunk);
+                let length = output.buffer.byteLength;
+                output.bytePointer = 0;  //  reset to consume
+
+                this.writeUint32(length);
+                this.writeString(ChunkTypeIDAT);
+                this.consume(output, length);
+                this.writeUint32(this.crc32(SizeChunkType + length));
+            }
+
+            this.writeUint32(SizeIEND);
+            this.writeString(ChunkTypeIEND);
+            this.writeUint32(this.crc32(SizeChunkType + SizeIEND));
+            this.shrinkWrap();
+        }
+
+        getBase64() {
+            // let buffer = NvisZlib.deflate(this.buffer);
+            // return base64.fromByteArray(new Uint8Array(this.buffer.buffer));
+            return NvisBase64.fromByteArray(new Uint8Array(this.buffer));
+        }
+
+        crc32(offset) {
+            NvisCRC32.begin();
+            for (let i = this.bytePointer - offset; i < this.bytePointer; i++) {
+                NvisCRC32.add(this.getInt8(i));
+            }
+            NvisCRC32.end();
+
+            return NvisCRC32.crc32;
+        }
+
+    }
+
+    class NvisPNG2 {
+
+        //let HEADER = '\x89PNG\r\n\x1A\n';
+
+        createCRC(_crc32) {
+            /* Create crc32 lookup table */
+            //const _crc32 = new Array();
+            for (let i = 0; i < 256; i++) {
+                let c = i;
+                for (let j = 0; j < 8; j++) {
+                    if (c & 1) {
+                        c = -306674912 ^ ((c >> 1) & 0x7fffffff);
+                    } else {
+                        c = (c >> 1) & 0x7fffffff;
+                    }
+                }
+                _crc32[i] = c;
+            }
+        }
+
+        // compute crc32 of the PNG chunks
+        crc32(offset, size) {
+            let crc = -1;
+            for (var i = 4; i < size - 4; i++) {
+                crc = this._crc32[(crc ^ this.buffer[offset + i]) & 0xff] ^ ((crc >> 8) & 0x00ffffff);
+            }
+            this.write4(offset + size - 4, crc ^ -1);
+        }
+
+        write4(offset, value) {
+            this.buffer[offset++] = (value >> 24) & 255;
+            this.buffer[offset++] = (value >> 16) & 255;
+            this.buffer[offset++] = (value >> 8) & 255;
+            this.buffer[offset++] = value & 255;
+            return offset;
+        }
+
+        write2(offset, value) {
+            this.buffer[offset++] = (value >> 8) & 255;
+            this.buffer[offset++] = value & 255;
+            return offset;
+        }
+
+        write2lsb(offset, value) {
+            this.buffer[offset++] = value & 255;
+            this.buffer[offset++] = (value >> 8) & 255;
+            return offset;
+        }
+
+        writeString(buffer, offset, string) {
+            for (let i = 0, n = string.length; i < n; i++) {
+                buffer[offset++] = string.charCodeAt(i);
+            }
+            return offset;
+        }
+
+        constructor(width, height, depth, backgroundColor = 'transparent') {
+
+            const HEADER = '\x89PNG\r\n\x1A\n';
+
+            this._crc32 = new Array();
+            this.createCRC(this._crc32);
+
+            this.width = width;
+            this.height = height;
+            this.depth = depth;
+
+            // pixel data and row filter identifier size
+            this.bit_depth = 8;
+            this.pix_format = 3; // indexed
+            this.pix_size = height * (width + 1);
+
+            // deflate header, pix_size, block headers, adler32 checksum
+            this.data_size = 2 + this.pix_size + 5 * Math.floor((0xfffe + this.pix_size) / 0xffff) + 4;
+
+            // offsets and sizes of Png chunks
+            this.ihdr_offs = 0;                                 // IHDR offset and size
+            this.ihdr_size = 4 + 4 + 13 + 4;
+            this.plte_offs = this.ihdr_offs + this.ihdr_size;   // PLTE offset and size
+            this.plte_size = 4 + 4 + 3 * depth + 4;
+            this.trns_offs = this.plte_offs + this.plte_size;   // tRNS offset and size
+            // this.trns_offs = this.ihdr_offs + this.plte_size;   // tRNS offset and size
+            this.trns_size = 4 + 4 + depth + 4;
+            this.idat_offs = this.trns_offs + this.trns_size;   // IDAT offset and size
+            this.idat_size = 4 + 4 + this.data_size + 4;
+            this.iend_offs = this.idat_offs + this.idat_size;   // IEND offset and size
+            this.iend_size = 4 + 4 + 4;
+            this.buffer_size = this.iend_offs + this.iend_size;    // total PNG size
+
+            // allocate buffers
+            const rawBuffer = new ArrayBuffer(HEADER.length + this.buffer_size);
+            this.writeString(new Uint8Array(rawBuffer), 0, HEADER);
+            const buffer = new Uint8Array(rawBuffer, HEADER.length, this.buffer_size);
+            this.buffer = buffer;
+            this.palette = new Object();
+            this.pindex = 0;
+
+            // initialize non-zero elements
+            let off = this.write4(this.ihdr_offs, this.ihdr_size - 12);
+            off = this.writeString(buffer, off, 'IHDR');
+            off = this.write4(off, width);
+            off = this.write4(off, height);
+            this.buffer[off++] = this.bit_depth;
+            this.buffer[off++] = this.pix_format;
+            off = this.write4(this.plte_offs, this.plte_size - 12);
+            this.writeString(buffer, off, 'PLTE');
+            off = this.write4(this.trns_offs, this.trns_size - 12);
+            this.writeString(buffer, off, 'tRNS');
+            off = this.write4(this.idat_offs, this.idat_size - 12);
+            this.writeString(buffer, off, 'IDAT');
+            off = this.write4(this.iend_offs, this.iend_size - 12);
+            this.writeString(buffer, off, 'IEND')
+
+            // initialize deflate header
+            let header = ((8 + (7 << 4)) << 8) | (3 << 6);
+            header += 31 - (header % 31);
+            this.write2(this.idat_offs + 8, header);
+
+            // initialize deflate block headers
+            for (let i = 0; (i << 16) - 1 < this.pix_size; i++) {
+                let size, bits;
+                if (i + 0xffff < this.pix_size) {
+                    size = 0xffff;
+                    bits = 0;
+                } else {
+                    size = this.pix_size - (i << 16) - i;
+                    bits = 1;
+                }
+                let off = this.idat_offs + 8 + 2 + (i << 16) + (i << 2);
+                this.buffer[off++] = bits;
+                off = this.write2lsb(off, size);
+                this.write2lsb(off, ~size);
+            }
+
+            this.backgroundColor = this.createColor(backgroundColor);
+        }
+
+        index(x, y) {
+            const i = y * (this.width + 1) + x + 1;
+            return this.idat_offs + 8 + 2 + 5 * Math.floor((i / 0xffff) + 1) + i;
+        }
+
+        color(red, green, blue, alpha) {
+
+            alpha = (alpha >= 0 ? alpha : 255);
+            const color = (((((alpha << 8) | red) << 8) | green) << 8) | blue;
+
+            if (this.palette[color] === undefined) {
+                if (this.pindex == this.depth) return 0;
+
+                const ndx = this.plte_offs + 8 + 3 * this.pindex;
+
+                this.buffer[ndx + 0] = red;
+                this.buffer[ndx + 1] = green;
+                this.buffer[ndx + 2] = blue;
+                this.buffer[this.trns_offs + 8 + this.pindex] = alpha;
+
+                this.palette[color] = this.pindex++;
+            }
+            return this.palette[color];
+        }
+
+        getBase64() {
+            this.deflate();
+            // return base64.fromByteArray(new Uint8Array(this.buffer.buffer));
+            return NvisBase64.fromByteArray(new Uint8Array(this.buffer.buffer));
+        }
+
+        deflate() {
+            const { width, height, buffer } = this;
+
+            // compute adler32 of output pixels + row filter bytes
+            const BASE = 65521; // largest prime smaller than 65536
+            const NMAX = 5552;  // NMAX is the largest n such that 255n(n+1)/2 + (n+1)(BASE-1) <= 2^32-1
+            let s1 = 1;
+            let s2 = 0;
+            let n = NMAX;
+
+            const baseOffset = this.idat_offs + 8 + 2 + 5;
+            for (let y = 0; y < height; y++) {
+                for (let x = -1; x < width; x++) {
+                    const i = y * (width + 1) + x + 1;
+                    s1 += this.buffer[baseOffset * Math.floor((i / 0xffff) + 1) + i];
+                    s2 += s1;
+                    if ((n -= 1) == 0) {
+                        s1 %= BASE;
+                        s2 %= BASE;
+                        n = NMAX;
+                    }
+                }
+            }
+            s1 %= BASE;
+            s2 %= BASE;
+            this.write4(this.idat_offs + this.idat_size - 8, (s2 << 16) | s1);
+
+            this.crc32(this.ihdr_offs, this.ihdr_size);
+            this.crc32(this.plte_offs, this.plte_size);
+            this.crc32(this.trns_offs, this.trns_size);
+            this.crc32(this.idat_offs, this.idat_size);
+            this.crc32(this.iend_offs, this.iend_size);
+        }
+
+        getDataURL() {
+            return 'data:image/png;base64,' + this.getBase64();
+        }
+
+        createColor(r, g, b, a = 255) {
+        // createColor(color) {
+            // color = tinycolor(color);
+            // const rgb = color.toRgb();
+            // return this.color(rgb.r, rgb.g, rgb.b, Math.round(rgb.a * 255));
+            return this.color(r, g, b, a);
+        }
+
+        setPixel(x, y, color) {
+            const i = y * (this.width + 1) + x + 1;
+            this.buffer[this.idat_offs + 8 + 2 + 5 * Math.floor((i / 0xffff) + 1) + i] = color;
+        }
+
+        getPixel(x, y) {
+            const i = y * (this.width + 1) + x + 1;
+            return this.buffer[this.idat_offs + 8 + 2 + 5 * Math.floor((i / 0xffff) + 1) + i];
+        }
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -6652,6 +7297,49 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.uiPopup.style.display = 'none';
         }
 
+        convertBase64ToBlob(base64, type) {
+            var bytes = window.atob(base64);
+            var ab = new ArrayBuffer(bytes.length);
+            var ia = new Uint8Array(ab);
+            for (var i = 0; i < bytes.length; i++) {
+                ia[i] = bytes.charCodeAt(i);
+            }
+            return new Blob([ab], { type: type });
+        }
+
+        writeClipImg() {
+
+            let width = this.streams[0].dimensions.w;
+            let height = this.streams[0].dimensions.w;
+
+            const data = new ArrayBuffer(width * height * 4);
+            const dataView = new Uint8ClampedArray(data);
+
+            let gl = this.glContext;
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.streams[0].frameBuffer);
+            gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, dataView);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+            let png = new NvisPNG(width, height, dataView);
+            // let png = new NvisPNG2(width, height, 8);
+            // const redColor = png.createColor(255, 0, 0, 255);
+            // png.setPixel(0, 0, redColor);
+
+            let b64 = png.getBase64();
+            let blob = this.convertBase64ToBlob(b64, 'image/png');
+
+            let clipboardItem = new ClipboardItem({ 'image/png': blob });
+
+            navigator.clipboard.write([clipboardItem]).then(function () {
+                // console.log('Success');
+            }, function (err) {
+                console.log('Fail: ' + err);
+            });
+
+            // console.log('Fetched image copied.');
+            this.popupInfo('Copied to clipboard');
+        }
+
         onKeyDown(event) {
             event = event || window.event;
             let keyCode = event.keyCode || event.which;
@@ -6726,27 +7414,48 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     this.popupInfo('Animation ping-pong: ' + (_state.animation.pingPong ? 'on' : 'off'));
                     break;
                 case 'c':
-                    if (_state.input.keyboard.control) {
-                        console.log("Clipboard");
-                        let type = "image/png";
-                        let data = new Uint8Array(200 * 200 * 4);
-                        // let data = _renderer.streams[0].textures[0];
-                        let gl = _renderer.glContext;
-                        gl.bindFramebuffer(gl.FRAMEBUFFER, _renderer.streams[0].frameBuffer);
-                        gl.readPixels(0, 0, 200, 200, gl.RGBA, gl.UNSIGNED_BYTE, data);
-                        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                        let blob = new Blob([data], { type });
-                        let clipboardData = [new ClipboardItem({ [type]: blob })];
+                    // this.writeClipImg();
+                    if (false && _state.input.keyboard.control) {
+                        console.log('Clipboard');
+
+                        navigator.permissions.query({ name: 'clipboard-write' }).then(result => {
+                            if (result.state === 'granted') {
+
+                                let gl = _renderer.glContext;
+
+                                let mimeType = 'image/png';
+                                let data = new ArrayBuffer(200 * 200 * 4);
+                                let dataView = new Uint8Array(data);
+
+                                gl.bindFramebuffer(gl.FRAMEBUFFER, _renderer.streams[0].frameBuffer);
+                                gl.readPixels(0, 0, 200, 200, gl.RGBA, gl.UNSIGNED_BYTE, dataView);
+                                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+                                let blob = new Blob([ dataView ], { mimeType });
+                                let clipboardData = new ClipboardItem({ [ mimeType ]: blob });
                     
-                        navigator.clipboard.write(clipboardData).then(
-                            function () {
-                                console.log("Clipboard success!");
-                            },
-                            function () {
-                                console.log("Clipboard FAIL!");
+                                let aBlob = new Blob([ "Hello World!" ], { type: 'text/text' });
+                                let asdf = new ClipboardItem({ [ aBlob.type ]: aBlob });
+                                navigator.clipboard.writeText([asdf]).then(function(result) {
+
+                                // navigator.clipboard.writeText(clipboardData).then(function(result) {
+                                    console.log("Copied to clipboard successfully! " + result);
+                                }, function(error) {
+                                    console.error("Unable to write to clipboard. Error: " + error);
+                                });
+                            } else {
+                                console.error("clipboard-permission not granted: " + result);
                             }
-                        );
-                    
+                        });
+                        // let response = navigator.clipboard.write(clipboardData)
+                        // .then(
+                        //     function () {
+                        //         console.log("Clipboard success!");
+                        //     },
+                        //     function (res) {
+                        //         console.log("Clipboard FAIL: " + res);
+                        //     }
+                        // );
                     }
                     break;
                 case 'd':
@@ -6762,7 +7471,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     break;
                 case 'D':
                     if (this.streams.length > 1) {
-                        _apiShader('glsl/difference.json', [0, 1], true);
+                        _apiShader('glsl/difference.json', [0, 1], {}, true);
                         //this.renderer.loadShader('glsl/difference.json');
                     }
                     break;
@@ -7382,6 +8091,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         stream: _apiStream,
         shader: _apiShader,
         shaders: _apiShaders,
+        graph: _apiGraph,
         generator: _apiGenerator,
         config: _apiConfig,
         window: _apiWindow,
