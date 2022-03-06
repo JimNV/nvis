@@ -179,5 +179,6 @@ void main()
 
     colorSum /= kernelSum;
     outColor = vec4(colorSum, 1.0);
+    // outColor = vec4(texelFetch(uTexture0, loc2d, 0).rgb, 1.0);
     // outColor = vec4(float(loc2d.x), float(loc2d.y), float(uDimensions.x), float(uDimensions.y));
 }

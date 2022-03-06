@@ -771,8 +771,9 @@ var nvis = new function () {
 
             if (_renderer.shaderGraphDescriptions[shaderGraphDescriptionId] === undefined) {
                 //  shader graph description not loaded yet --> queue shader graph
-                console.log('queueing shader graph ' + shaderGraphId);
-                _renderer.shaderGraphs.push(argument);
+                console.log('queueing shader graph: ' + JSON.stringify(argument));
+                argument.shaderGraphId = shaderGraphId;
+                _renderer.shaderGraphQueue.push(argument);
             } else {
                 _renderer.parseShaderGraph(shaderGraphId, argument);
             }
@@ -1986,40 +1987,6 @@ var nvis = new function () {
 
         getNumInputs() {
             return this.numInputs;
-        }
-    }
-
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-
-    class NvisShaderGraphs {
-        
-        constructor() {
-            this.shaderGraphs = [];
-        }
-
-        load(jsonFileName) {
-
-
-        }
-    }
-
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-
-    class NvisShaderGraph {
-        
-        constructor(callback) {
         }
     }
 
@@ -4294,6 +4261,29 @@ var nvis = new function () {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
 
+    class NvisShaderGraph {
+        constructor() {
+            this.id = -1;
+            this.descriptionId = -1;
+            this.arguments = undefined;
+            this.json = undefined;
+            this.streamIds = [];  //  participating streams
+            this.inputStreamIds = [];  //  external inputs
+            this.streamIdOffset = 0;  //  to know shader graphs "internal" stream id
+            // this.bInput = false;
+            // this.bOutput = false;
+            this.outputStreamId = -1;
+        }
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
     class NvisStream {
 
         constructor(glContext, shaderId = -1) {
@@ -4309,12 +4299,50 @@ var nvis = new function () {
 
             this.shaderId = shaderId;  //  = -1 for file streams
             this.shaderGraphId = -1;
+            // this.shaderGraph = {
+            //     id: -1,
+            //     json: undefined,
+            //     streamIds: [],
+            //     inputStreams: [],
+            //     bInput: false,
+            //     bOutput: false
+            // };
+            
             this.inputStreamIds = [];
             this.shaderJSONObject = undefined;
             this.bUIReady = false;
 
             this.outputTexture = undefined;
             this.frameBuffer = undefined;
+
+            let gl = this.glContext;
+
+            let fullVertexPositions = new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
+            this.fullVertexPositionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.fullVertexPositionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, fullVertexPositions, gl.STATIC_DRAW);
+
+            let fullTextureCoordinates = new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
+            this.fullTextureCoordinateBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.fullTextureCoordinateBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, fullTextureCoordinates, gl.STATIC_DRAW);
+
+            this.TextureUnits = [
+                gl.TEXTURE0,
+                gl.TEXTURE1,
+                gl.TEXTURE2,
+                gl.TEXTURE3,
+                gl.TEXTURE4,
+                gl.TEXTURE5,
+                gl.TEXTURE6,
+                gl.TEXTURE7,
+            ];
+
+            // let gl = this.glContext;
+            // this.outputTexture = gl.createTexture();
+            // this.frameBuffer = gl.createFramebuffer();
+            // gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+            // gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.outputTexture, 0);
 
             this.numTextures = 1;
             this.currentTexture = 0;
@@ -4396,30 +4424,34 @@ var nvis = new function () {
         }
 
 
-        setUniforms(shader) {
+        setUniforms(shader, shaderGraphs) {
 
             let gl = this.glContext;
 
-            if (this.shaderJSONObject === undefined) {
+            if (this.shaderGraphId == -1 && this.shaderJSONObject === undefined) {
                 return;
             }
 
-            let uiObject = this.shaderJSONObject.UI;
+            if (this.shaderGraphId != -1 && shaderGraphs[this.shaderGraphId].json === undefined) {
+                return;
+            }
+            
+            let uiObject = (this.shaderGraphId == -1 ? this.shaderJSONObject.UI : shaderGraphs[this.shaderGraphId].json.UI);
             if (uiObject === undefined) {
                 return;
             }
 
             //  common uniforms
             let uniform = gl.getUniformLocation(shader.getProgram(), 'uDimensions');  //  TODO: not needed
-            if (uniform !== undefined) {
+            if (uniform !== null) {
                 gl.uniform2f(uniform, this.dimensions.w, this.dimensions.h);
             }
             uniform = gl.getUniformLocation(shader.getProgram(), 'uTime');
-            if (uniform !== undefined) {
+            if (uniform !== null) {
                 gl.uniform1f(uniform, (Date.now() - this.startTime) / 1000.0);
             }
             uniform = gl.getUniformLocation(shader.getProgram(), 'uMouse');
-            if (uniform !== undefined && _state.input.mouse.streamCoords !== undefined) {
+            if (uniform !== null && _state.input.mouse.streamCoords !== undefined) {
                 gl.uniform4f(uniform, _state.input.mouse.streamCoords.x, _state.input.mouse.streamCoords.y, (_state.input.mouse.down ? 1.0 : 0.0), 0.0);
             }
 
@@ -4427,7 +4459,7 @@ var nvis = new function () {
                 let type = uiObject[key].type;
                 let uniform = gl.getUniformLocation(shader.getProgram(), key);
 
-                if (uniform === undefined) {
+                if (uniform === null) {
                     continue;
                 }
 
@@ -4460,11 +4492,11 @@ var nvis = new function () {
         }
 
 
-        uiUpdate(elementId) {
+        uiUpdate(elementId, shaderGraphs) {
             //_object[key].value = value;
             let key = elementId.replace(/\-.*$/, '');
             let element = document.getElementById(elementId);
-            let object = this.shaderJSONObject.UI[key];
+            let object = (this.shaderGraphId == -1 ? this.shaderJSONObject.UI[key] : shaderGraphs[this.shaderGraphId].json.UI[key]);
             let type = object.type;
 
             if (type == 'bool') {
@@ -4544,7 +4576,6 @@ var nvis = new function () {
 
             this.frameBuffer = gl.createFramebuffer();
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
-
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.outputTexture, 0);
 
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -4754,11 +4785,19 @@ var nvis = new function () {
 
 
         getInputStreamId(inputId) {
-            return this.inputStreamIds[inputId];
+            // if (this.shaderGraph.id == -1) {
+                return this.inputStreamIds[inputId];
+            // } else {
+            //     return this.shaderGraph.inputStreams[inputId];
+            // }
         }
 
         setInputStreamId(inputId, streamId) {
-            this.inputStreamIds[inputId] = streamId;
+            // if (this.shaderGraph.id == -1) {
+                this.inputStreamIds[inputId] = streamId;
+            // } else {
+            //     this.shaderGraph.inputStreams[inputId] = streamId;
+            // }
         }
 
 
@@ -4778,7 +4817,7 @@ var nvis = new function () {
         }
 
 
-        getName() {
+        getName(shaderGraphs) {
             //  TODO: fix
             let name = '';
             if (this.fileNames.length > 0) {
@@ -4786,7 +4825,10 @@ var nvis = new function () {
                 if (this.fileNames.length > 1) {
                     name += (' (' + this.fileNames.length + ')');
                 }
-            } else {
+            // } else if (this.shaderGraphId != -1 && this.shaderGraph.bOutput) {
+            } else if (this.shaderGraphId != -1) {
+                name = shaderGraphs[this.shaderGraphId].json.name;
+            } else if (this.bUIReady) {
                 name = this.shaderJSONObject.name;
             }
 
@@ -4811,8 +4853,49 @@ var nvis = new function () {
             return callbackString;
         }
 
+        //  TODO: temporary duplicate from NvisWindows class, make static elsewhere
+        findStreamDimensions(streamId, streams, shaders) {
 
-        render(window, frameId, shaders, streams, vbStreamHasWindow) {
+            //  for shader streams, we need to find dimensions by recursively searching inputs
+            let stream = streams[streamId];
+
+            if (stream === undefined) {
+                return undefined;
+            }
+
+            let dimensions = stream.getDimensions();
+            if (dimensions !== undefined) {
+                return dimensions;
+            }
+
+            let shaderId = stream.shaderId;
+            if (shaderId == -1) {
+                //  dimensions not known yet
+                return undefined;
+            }
+
+            let shader = shaders.shaders[shaderId];
+            if (shader === undefined) {
+                //  shader not known yet
+                return undefined;
+            }
+
+            //  deduce dimensions based on inputs
+            //  input order is priority order
+            for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
+                let inputStreamId = stream.getInputStreamId(inputId);
+                let inputDimensions = this.findStreamDimensions(inputStreamId, streams, shaders);
+                if (inputDimensions === undefined) {
+                    return undefined;
+                }
+                stream.setDimensions(inputDimensions);
+                return inputDimensions;
+            }
+
+            return undefined;
+        }
+
+        render(frameId, shaders, streams, shaderGraphs, streamId) {
 
             let shader = undefined;
             if (this.shaderId == -1) {
@@ -4823,52 +4906,80 @@ var nvis = new function () {
             if (shader === undefined || !shader.isReady()) {
                 return;
             }
+            let streamDims = this.getDimensions();
+            if (streamDims === undefined) {
+                streamDims = this.findStreamDimensions(streamId, streams, shaders);
+                if (streamDims === undefined) {
+                    return;
+                }
+                this.setDimensions(streamDims);
+            }
 
             this.prepareUI(shader);
 
-            //  first, render shader streams to textures
+            //  render stream to texture
             let shaderProgram = shader.getProgram();
 
             let gl = this.glContext;
 
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+
             gl.useProgram(shaderProgram);
 
             let aVertexPosition = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
-            gl.bindBuffer(gl.ARRAY_BUFFER, window.fullVertexPositionBuffer);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.fullVertexPositionBuffer);
             gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(aVertexPosition);
 
             let aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
-            gl.bindBuffer(gl.ARRAY_BUFFER, window.fullTextureCoordinateBuffer);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.fullTextureCoordinateBuffer);
             gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(aTextureCoord);
 
-            gl.bindTexture(gl.TEXTURE_2D, this.outputTexture);
-
-            gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
+            let inputStreamIds = [];
 
             if (this.shaderId == -1) {
+
                 gl.bindTexture(gl.TEXTURE_2D, this.getTexture(frameId));
-            } else {
+
+            } else if (this.shaderGraphId != -1) {
+
+                let shaderGraph = shaderGraphs[this.shaderGraphId];
+
+                let inputStreamId = -1;
                 for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
-                    let activeTexture = window.TextureUnits[inputId];
+                    if (this.inputStreamIds[inputId] < shaderGraph.inputStreamIds.length) {
+                        inputStreamId = shaderGraph.inputStreamIds[this.inputStreamIds[inputId]];
+                    } else {
+                        inputStreamId = this.inputStreamIds[inputId + shaderGraph.streamIdOffset];
+                    }
+
+                    inputStreamIds.push(inputStreamId);
+
+                    let activeTexture = this.TextureUnits[inputId];
                     gl.activeTexture(activeTexture);
+
+                    gl.bindTexture(gl.TEXTURE_2D, streams[inputStreamId].getTexture(frameId));
+                    gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
+                }
+
+            } else {
+
+                for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
+                    let activeTexture = this.TextureUnits[inputId];
+                    gl.activeTexture(activeTexture);
+
                     let inputStreamId = this.getInputStreamId(inputId);
 
-                    // if (!vbStreamHasWindow[inputStreamId]) {
-                    //     let inputStream = streams[inputStreamId];
-                    //     if (inputStream.shaderId != -1) {
-                    //         inputStream.backgroundRender(window, frameId, shaders, streams, vbStreamHasWindow);
-                    //         // console.log('input stream ' + inputStreamId + ' has no window...');
-                    //     }
-                    // }
+                    inputStreamIds.push(inputStreamId);
 
-                    if (this.getInputStreamId(inputId) !== undefined) {
-                        gl.bindTexture(gl.TEXTURE_2D, streams[this.getInputStreamId(inputId)].getTexture(frameId));
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
-                    }
+                    gl.bindTexture(gl.TEXTURE_2D, streams[inputStreamId].getTexture(frameId));
+                    gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
                 }
+
             }
+
+            // console.log('NvisStream.render()  stream ' + streamId + ' (' + this.shaderId + '): ' + JSON.stringify(inputStreamIds));
 
             let uTonemapper = gl.getUniformLocation(shaderProgram, 'uTonemapper');
             if (_settings.bGlobalTonemapping.value) {
@@ -4883,51 +4994,16 @@ var nvis = new function () {
                 gl.uniform1i(uTonemapper, -1);
             }
 
-            let streamDim = this.getDimensions();
-            if (streamDim === undefined) {
-                return;
-            }
-            gl.viewport(0, 0, streamDim.w, streamDim.h);
+            gl.viewport(0, 0, streamDims.w, streamDims.h);
 
-            this.setUniforms(shader);
+            gl.enable(gl.BLEND);
+            // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.blendFunc(gl.ONE, gl.ZERO);
+
+            this.setUniforms(shader, shaderGraphs);
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-
-            // //  next, render window to canvas
-            // // gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-            // gl.viewport(0, 0, 2048, 256);
-
-            // shaderProgram = shaders.textureShader.getProgram();
-            // gl.useProgram(shaderProgram);
-
-            // aVertexPosition = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
-            // gl.bindBuffer(gl.ARRAY_BUFFER, window.vertexPositionBuffer);
-            // gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
-            // gl.enableVertexAttribArray(aVertexPosition);
-
-            // aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
-            // gl.bindBuffer(gl.ARRAY_BUFFER, window.textureCoordinateBuffer);
-            // gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
-            // gl.enableVertexAttribArray(aTextureCoord);
-
-            // gl.activeTexture(gl.TEXTURE0);
-            // gl.bindTexture(gl.TEXTURE_2D, this.outputTexture);
-
-            // let uSampler = gl.getUniformLocation(shaderProgram, 'uSampler');
-            // gl.uniform1i(uSampler, 0);
-
-            // let uAlphaCheckerboard = gl.getUniformLocation(shaderProgram, 'uAlphaCheckerboard');
-            // gl.uniform1i(uAlphaCheckerboard, _settings.bAlphaCheckerboard.value);
-
-            // //  TODO: this shouldn't be necessary, can get dimensions directly in shader
-            // gl.uniform2f(gl.getUniformLocation(shaderProgram, 'uDimensions'), streamDim.w, streamDim.h);
-
-            // gl.enable(gl.BLEND);
-            // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-            // gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         }
 
 
@@ -5138,6 +5214,12 @@ var nvis = new function () {
         prepareUI(shader) {
             //  lazily get the UI JSON from the shader
             if (!this.bUIReady) {
+
+                if (this.shaderGraphId == -1) {
+                    this.bUIReady = true;
+                    return; 
+                }
+
                 let json = shader.json;
                 if (json === undefined) {
                     return;
@@ -5156,18 +5238,24 @@ var nvis = new function () {
         }
 
 
-        getUI(streamId, streams, shaders) {
-
-            // if (!this.bUIReady && this.shaderId != -1) {
-            //     this.prepareUI(shaders.shaders[this.shaderId]);
-            // }
+        getUI(streamId, streams, shaders, shaderGraphs) {
 
             //  streamId is needed since the stream itself does not know its id
-            // let ui = document.createDocumentFragment();
             let ui = document.createElement('div');
             ui.id = 'ui';
 
-            let fileName = streams[streamId].getName();
+            let shaderGraphId = streams[streamId].shaderGraphId;
+            let bShaderGraphUI = false;
+            let shaderGraph = undefined;
+            if (shaderGraphId != -1) {
+                shaderGraph = shaderGraphs[shaderGraphId];
+                if (shaderGraph.outputStreamId != streamId) {
+                    return undefined;
+                }
+                bShaderGraphUI = true;
+            }
+
+            let fileName = streams[streamId].getName(shaderGraphs);
             let arrowRight = '&#9658;';
             let arrowDown = '&#9660;';
 
@@ -5186,9 +5274,17 @@ var nvis = new function () {
 
                 for (let id = 0; id < streams.length; id++) {
 
+                    if (streams[id].shaderGraphId != -1) {
+                        if (id != shaderGraphs[streams[id].shaderGraphId].outputStreamId) {
+                            // if (!bShaderGraphUI) {
+                            //  don't include non-outputs of shader graph
+                            continue;
+                        }
+                    }
+
                     let streamTitle = document.getElementById('streamTitleUI-' + id);
                     streamTitle.innerHTML = (_state.ui.selectedStreamId == id ? arrowDown : arrowRight)
-                    streamTitle.innerHTML += (' stream ' + (id + 1) + ': ' + streams[id].getName());
+                    streamTitle.innerHTML += (' stream ' + (id + 1) + ': ' + streams[id].getName(shaderGraphs));
                     if (_state.ui.selectedStreamId == id) {
                         streamTitle.innerHTML = streamTitle.innerHTML.bold();
                     }
@@ -5211,43 +5307,97 @@ var nvis = new function () {
 
                 let shader = shaders.shaders[this.shaderId];
 
-                for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
-                    let eId = ('input-' + streamId + '-' + inputId);
-                    let label = document.createElement('label');
-                    label.setAttribute('for', eId);
-                    label.innerHTML = ('Input ' + (inputId + 1) + ': ');
+                if (shaderGraph !== undefined) {
 
-                    let sEl = document.createElement('select');
-                    sEl.id = eId;
-                    sEl.addEventListener('change', () => {
-                        nvis.uiStreamUpdateInput(streamId, inputId);
-                    });
-                    for (let otherStreamId = 0; otherStreamId < streams.length; otherStreamId++) {
-                        if (otherStreamId != streamId) {
+                    for (let inputId = 0; inputId < shaderGraph.json.inputs; inputId++) {
+                        let eId = ('input-' + streamId + '-' + inputId);
+                        let label = document.createElement('label');
+                        label.setAttribute('for', eId);
+                        label.innerHTML = ('Input ' + (inputId + 1) + ': ');
+
+                        let sEl = document.createElement('select');
+                        sEl.id = eId;
+                        sEl.addEventListener('change', () => {
+                            nvis.uiStreamUpdateInput(streamId, inputId);
+                        });
+                        for (let otherStreamId = 0; otherStreamId < streams.length; otherStreamId++) {
+
                             let otherStream = streams[otherStreamId];
- 
-                            if (!otherStream.bUIReady && otherStream.shaderId != -1) {
-                                let otherShader = shaders.shaders[otherStream.shaderId];
-                                otherStream.prepareUI(otherShader);
-                            }
 
-                            let sOp = document.createElement('option');
-                            sOp.innerHTML = otherStream.getName();
-                            if (this.inputStreamIds[inputId] == otherStreamId) {
-                                sOp.setAttribute('selected', true);
+                            let bValidStream = (otherStreamId != streamId);
+                            bValidStream &&= (otherStream.shaderGraphId == -1 || otherStreamId == shaderGraph.outputStreamId);
+
+                            if (bValidStream) {
+
+                                if (!otherStream.bUIReady && otherStream.shaderId != -1) {
+                                    let otherShader = shaders.shaders[otherStream.shaderId];
+                                    otherStream.prepareUI(otherShader);
+                                }
+
+                                let sOp = document.createElement('option');
+                                sOp.innerHTML = otherStream.getName(shaderGraphs);
+                                // if (this.inputStreamIds[inputId] == otherStreamId) {
+                                if (shaderGraph.inputStreamIds[inputId] == otherStreamId) {
+                                    sOp.setAttribute('selected', true);
+                                }
+                                sEl.appendChild(sOp);
                             }
-                            sEl.appendChild(sOp);
                         }
+                        let inputDiv = document.createElement('div');
+                        inputDiv.appendChild(label);
+                        inputDiv.appendChild(sEl);
+
+                        uiBody.appendChild(inputDiv);
                     }
-                    let inputDiv = document.createElement('div');
-                    inputDiv.appendChild(label);
-                    inputDiv.appendChild(sEl);
 
-                    uiBody.appendChild(inputDiv);
+                } else {
+
+                    for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
+                        let eId = ('input-' + streamId + '-' + inputId);
+                        let label = document.createElement('label');
+                        label.setAttribute('for', eId);
+                        label.innerHTML = ('Input ' + (inputId + 1) + ': ');
+
+                        let sEl = document.createElement('select');
+                        sEl.id = eId;
+                        sEl.addEventListener('change', () => {
+                            nvis.uiStreamUpdateInput(streamId, inputId);
+                        });
+                        for (let otherStreamId = 0; otherStreamId < streams.length; otherStreamId++) {
+                            if (otherStreamId != streamId) {
+                                let otherStream = streams[otherStreamId];
+
+                                if (!otherStream.bUIReady && otherStream.shaderId != -1) {
+                                    let otherShader = shaders.shaders[otherStream.shaderId];
+                                    otherStream.prepareUI(otherShader);
+                                }
+
+                                let sOp = document.createElement('option');
+                                sOp.innerHTML = otherStream.getName(shaderGraphs);
+                                if (this.inputStreamIds[inputId] == otherStreamId) {
+                                    sOp.setAttribute('selected', true);
+                                }
+                                sEl.appendChild(sOp);
+                            }
+                        }
+                        let inputDiv = document.createElement('div');
+                        inputDiv.appendChild(label);
+                        inputDiv.appendChild(sEl);
+
+                        uiBody.appendChild(inputDiv);
+                    }
+
                 }
-                if (shader !== undefined && shader.isReady()) {
-                    let shaderUI = this.buildShaderUI(this.shaderJSONObject.UI, streamId);
 
+                if (shader !== undefined && shader.isReady()) {
+
+                    let shaderUI = undefined;                    
+                    if (bShaderGraphUI) {
+                        shaderUI = this.buildShaderUI(shaderGraph.json.UI, streamId);
+                    } else {
+                        shaderUI = this.buildShaderUI(this.shaderJSONObject.UI, streamId);
+                    }
+                    
                     uiBody.appendChild(shaderUI);
                 }
 
@@ -5875,26 +6025,42 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
 
-        render(frameId, streams, shaders) {
+        render(frameId, streams, shaders, shaderGraphs) {
 
             let vbStreamsToRender = new Array(streams.length).fill(false);
-            let vStreamWindow = new Array(streams.length).fill(undefined);
+            let vStreamWindowIds = new Array(streams.length).fill(-1);
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
                 let window = this.windows[windowId];
                 let streamId = window.streamId;
-                vStreamWindow[streamId] = window;
+                vStreamWindowIds[streamId] = windowId;
                 this.findStreamsToRender(vbStreamsToRender, shaders, streams, streamId);
             }
-
-            for (let streamId = 0; streamId < vbStreamsToRender.length; streamId++) {
-                if (vbStreamsToRender[streamId] && vStreamWindow[streamId] === undefined) {
-                    // console.log('Would render stream ' + streamId);
-                    streams[streamId].render(this.windows[0], frameId, shaders, streams, []);
-                }
+            for (let streamId = 0; streamId < streams.length; streamId++) {
+                vStreamWindowIds[streamId] == -1
             }
 
+            // console.log('Need to render streams: ' + JSON.stringify(vbStreamsToRender));
+            // console.log('Stream windows: ' + JSON.stringify(vStreamWindowIds));
+
+            for (let streamId = 0; streamId < streams.length; streamId++) {
+            // for (let streamId = 0; streamId < streams.length; streamId++) {
+                // if (vbStreamsToRender[streamId] && vStreamWindowIds[streamId] == -1) {
+                    // console.log('Would render stream ' + streamId);
+                    streams[streamId].render(frameId, shaders, streams, shaderGraphs, streamId);
+                // }
+            }
+
+            // for (let streamId = vbStreamsToRender.length - 1; streamId >= 0; streamId--) {
+            //     //     // for (let streamId = 0; streamId < streams.length; streamId++) {
+            //     //     if (vbStreamsToRender[streamId] && vStreamWindowIds[streamId] == -1) {
+            //     //         // console.log('Would render stream ' + streamId);
+            //     //         streams[streamId].render(frameId, shaders, streams);
+            //     //     }
+            //     streams[streamId].render(frameId, shaders, streams);
+            // }
+
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
-                this.windows[windowId].render(windowId, frameId, streams, shaders, []);
+                this.windows[windowId].render(windowId, frameId, streams, shaders);
             }
 
             if (_settings.bDrawPixel.value && _state.zoom.level >= 8.0) {
@@ -5991,31 +6157,31 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             //  TODO: only one of each of these needed (for shader streams), move elsewhere
 
-            let fullVertexPositions = new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
-            this.fullVertexPositionBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.fullVertexPositionBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, fullVertexPositions, gl.STATIC_DRAW);
+            // let fullVertexPositions = new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
+            // this.fullVertexPositionBuffer = gl.createBuffer();
+            // gl.bindBuffer(gl.ARRAY_BUFFER, this.fullVertexPositionBuffer);
+            // gl.bufferData(gl.ARRAY_BUFFER, fullVertexPositions, gl.STATIC_DRAW);
 
-            let fullTextureCoordinates = new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
-            this.fullTextureCoordinateBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.fullTextureCoordinateBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, fullTextureCoordinates, gl.STATIC_DRAW);
+            // let fullTextureCoordinates = new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
+            // this.fullTextureCoordinateBuffer = gl.createBuffer();
+            // gl.bindBuffer(gl.ARRAY_BUFFER, this.fullTextureCoordinateBuffer);
+            // gl.bufferData(gl.ARRAY_BUFFER, fullTextureCoordinates, gl.STATIC_DRAW);
 
             this.overlay = new NvisOverlay(this.canvas);
             document.body.appendChild(this.overlay.div);
 
             this.resize({ x: 0.0, y: 0.0 }, { w: 1.0, h: 1.0 });
 
-            this.TextureUnits = [
-                gl.TEXTURE0,
-                gl.TEXTURE1,
-                gl.TEXTURE2,
-                gl.TEXTURE3,
-                gl.TEXTURE4,
-                gl.TEXTURE5,
-                gl.TEXTURE6,
-                gl.TEXTURE7,
-            ];
+            // this.TextureUnits = [
+            //     gl.TEXTURE0,
+            //     gl.TEXTURE1,
+            //     gl.TEXTURE2,
+            //     gl.TEXTURE3,
+            //     gl.TEXTURE4,
+            //     gl.TEXTURE5,
+            //     gl.TEXTURE6,
+            //     gl.TEXTURE7,
+            // ];
         }
 
 
@@ -6050,7 +6216,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             gl.bufferData(gl.ARRAY_BUFFER, this.vertexPositions, gl.STATIC_DRAW);
         }
 
-
+        //  TODO: temporary duplicate from NvisStream class, make static elsewhere
         findStreamDimensions(streamId, streams, shaders) {
 
             //  for shader streams, we need to find dimensions by recursively searching inputs
@@ -6093,10 +6259,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
 
-        render(windowId, frameId, streams, shaders, vbStreamHasWindow) {
+        render(windowId, frameId, streams, shaders) {
             let gl = this.glContext;
 
-            //  below, a lot of checks are needed due to asynch file/shader loading
+            //  below, checks are needed due to asynch file/shader loading
 
             let streamDims = this.findStreamDimensions(this.streamId, streams, shaders);
             if (streamDims === undefined) {
@@ -6108,31 +6274,14 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 return;
             }
 
-            // let streamDim = stream.getDimensions();
             let shaderId = stream.getShaderId();
-            // let bStreamDimKnown = false;
-            // if (streamDim === undefined) {
-            //     if (shaderId != -1) {
-            //         //  dimensions unknown for a shader stream -> check inputs
-            //         streamDim = this.findStreamDimensions(this.streamId, streams, shaders);
-            //         let shader = shaders.shaders[shaderId];
-            //         if (shader !== undefined && shader.getNumInputs() != 0) {
-            //             let inputStream = streams[stream.getInputStreamId(0)];
-            //             if (inputStream !== undefined && inputStream.getDimensions() !== undefined) {
-            //                 streamDim = inputStream.getDimensions();
-            //                 stream.setDimensions(streamDim);
-            //                 bStreamDimKnown = true;
-            //             }
-            //         }
-            //     }
-            //     if (!bStreamDimKnown) {
-            //         return;
-            //     }
-            // }
 
             if (_state.input.mouse.showInfo && _state.input.mouse.streamCoords !== undefined) {
                 let loc = _state.input.mouse.streamCoords;
-                loc = { x: Math.floor(loc.x), y: Math.floor(loc.y) };
+                loc = {
+                    x: Math.floor(loc.x),
+                    y: Math.floor(loc.y)
+                };
                 let color = stream.getPixelValue(loc);
                 this.overlay.update(windowId, loc, color, stream.bFloat);
                 this.overlay.show();
@@ -6150,106 +6299,41 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 return;
             }
 
-            stream.prepareUI(shader);
+            //  render window to canvas
+            {
+                gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
-            //  first, render shader streams to textures
-            let shaderProgram = shader.getProgram();
+                let shaderProgram = shaders.textureShader.getProgram();
+                gl.useProgram(shaderProgram);
 
-            gl.useProgram(shaderProgram);
+                let aVertexPosition = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
+                gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(aVertexPosition);
 
-            let aVertexPosition = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.fullVertexPositionBuffer);
-            gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(aVertexPosition);
+                let aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+                gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(aTextureCoord);
 
-            let aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.fullTextureCoordinateBuffer);
-            gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(aTextureCoord);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, stream.outputTexture);
 
-            gl.bindFramebuffer(gl.FRAMEBUFFER, stream.frameBuffer);
+                let uSampler = gl.getUniformLocation(shaderProgram, 'uSampler');
+                gl.uniform1i(uSampler, 0);
 
-            if (shaderId == -1) {
-                gl.bindTexture(gl.TEXTURE_2D, stream.getTexture(frameId));
-            } else {
-                for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
-                    let activeTexture = this.TextureUnits[inputId];
-                    gl.activeTexture(activeTexture);
-                    let inputStreamId = stream.getInputStreamId(inputId);
+                let uAlphaCheckerboard = gl.getUniformLocation(shaderProgram, 'uAlphaCheckerboard');
+                gl.uniform1i(uAlphaCheckerboard, _settings.bAlphaCheckerboard.value);
 
-                    // if (!vbStreamHasWindow[inputStreamId]) {
-                    //     let inputStream = streams[inputStreamId];
-                    //     // if (inputStream.shaderId != -1) {
-                    //         //inputStream.backgroundRender(this, frameId, shaders, streams, vbStreamHasWindow);
-                    //         console.log('input stream ' + inputStreamId + ' has no window...');
-                    //     // }
-                    // }
+                //  TODO: this shouldn't be necessary, can get dimensions directly in shader
+                gl.uniform2f(gl.getUniformLocation(shaderProgram, 'uDimensions'), streamDims.w, streamDims.h);
 
-                    if (inputStreamId !== undefined) {
-                        gl.bindTexture(gl.TEXTURE_2D, streams[inputStreamId].getTexture(frameId));
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
-                    }
-                }
+                gl.enable(gl.BLEND);
+                // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                gl.blendFunc(gl.ONE, gl.ZERO);
+
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
             }
-
-            let uTonemapper = gl.getUniformLocation(shaderProgram, 'uTonemapper');
-            if (_settings.bGlobalTonemapping.value) {
-                gl.uniform1i(uTonemapper, _settings.tonemapper.value);
-                if (_settings.tonemapper.value == 0) {
-                    let uGamma = gl.getUniformLocation(shaderProgram, 'uGamma');
-                    gl.uniform1f(uGamma, _settings.gamma.value);
-                    let uExposure = gl.getUniformLocation(shaderProgram, 'uExposure');
-                    gl.uniform1f(uExposure, _settings.exposure.value);
-                }
-            } else {
-                gl.uniform1i(uTonemapper, -1);
-            }
-
-            gl.viewport(0, 0, streamDims.w, streamDims.h);
-
-            gl.enable(gl.BLEND);
-            // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            gl.blendFunc(gl.ONE, gl.ZERO);
-
-            stream.setUniforms(shader);
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-
-            //  next, render window to canvas
-            gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-
-            shaderProgram = shaders.textureShader.getProgram();
-            gl.useProgram(shaderProgram);
-
-            aVertexPosition = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
-            gl.vertexAttribPointer(aVertexPosition, 2, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(aVertexPosition);
-
-            aTextureCoord = gl.getAttribLocation(shaderProgram, 'aTextureCoord');
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
-            gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(aTextureCoord);
-
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, stream.outputTexture);
-
-            let uSampler = gl.getUniformLocation(shaderProgram, 'uSampler');
-            gl.uniform1i(uSampler, 0);
-
-            let uAlphaCheckerboard = gl.getUniformLocation(shaderProgram, 'uAlphaCheckerboard');
-            gl.uniform1i(uAlphaCheckerboard, _settings.bAlphaCheckerboard.value);
-
-            //  TODO: this shouldn't be necessary, can get dimensions directly in shader
-            gl.uniform2f(gl.getUniformLocation(shaderProgram, 'uDimensions'), streamDims.w, streamDims.h);
-
-            gl.enable(gl.BLEND);
-            // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            gl.blendFunc(gl.ONE, gl.ZERO);
-
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
             //  TODO: move elsewhere, optimize (redoing several calculations now)
             let layout = _state.layout;
@@ -6983,11 +7067,6 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.fileInput = undefined;
             this.performanceInfo = undefined;
 
-            this.streams = [];
-            this.windows = undefined;
-            this.shaders = undefined;
-            this.shaderGraphs = undefined;
-
             this.uiHtml = '';
 
             this.settingsUI = new NvisUI('settings', _settings, this);
@@ -7006,9 +7085,11 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.glContext.getExtension('EXT_color_buffer_float')
             this.glContext.getExtension('EXT_float_blend');
 
+            this.streams = [];
             this.windows = new NvisWindows(this.glContext, this.canvas);
             this.shaders = new NvisShaders(this.glContext);
             this.shaderGraphDescriptions = [];
+            this.shaderGraphQueue = [];
             this.shaderGraphs = [];
 
             this.helpPopup = document.createElement('div');
@@ -7155,8 +7236,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             streamsDiv.className = 'tabContent';
             streamsDiv.style.display = (_state.ui.tabId == 'tabStreams' ? 'block' : 'none');
             for (let streamId = 0; streamId < this.streams.length; streamId++) {
-                let ui = this.streams[streamId].getUI(streamId, this.streams, this.shaders);
-                streamsDiv.appendChild(ui);
+                let ui = this.streams[streamId].getUI(streamId, this.streams, this.shaders, this.shaderGraphs);
+                if (ui !== undefined) {
+                    streamsDiv.appendChild(ui);
+                }
             }
 
 
@@ -7173,9 +7256,15 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
                 let windowStreamId = this.windows.getWindow(windowId).streamId;
                 for (let streamId = 0; streamId < this.streams.length; streamId++) {
-                    let fileName = this.streams[streamId].getName();
+
+                    if (this.streams[streamId].shaderGraphId != -1) {
+                        //  XXXXX
+                    }
+
+                    let fileName = this.streams[streamId].getName(this.shaderGraphs);
                     let option = document.createElement('option');
                     option.innerHTML = fileName;
+                    option.value = streamId;
                     if (streamId == windowStreamId) {
                         option.setAttribute('selected', true);
                     }
@@ -7831,7 +7920,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 return;
             }
 
-            this.windows.render(_state.animation.frameId, this.streams, this.shaders);
+            this.windows.render(_state.animation.frameId, this.streams, this.shaders, this.shaderGraphs);
         }
 
         shaderLoaded() {
@@ -7844,66 +7933,101 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             return this.shaders.load(jsonFileName, () => this.shaderLoaded());
         }
 
-        parseShaderGraph(shaderGraphId, argument) {
+        parseShaderGraph(argument) {
 
             let json = this.shaderGraphDescriptions[argument.shaderGraphDescriptionId];
+
+            let shaderGraph = new NvisShaderGraph();
+            shaderGraph.id = this.shaderGraphs.length;
+            shaderGraph.descriptionId = argument.shaderGraphDescriptionId;
+            shaderGraph.argument = argument;
+            shaderGraph.json = json;
+            shaderGraph.inputStreamIds = (argument.inputs === undefined ? [] : argument.inputs);
+
+            if (argument.inputs.length != json.inputs) {
+                //  all external inputs must be accounted for
+                return;
+            }
 
             let shaderIds = [];
             for (let i = 0; i < json.shaders.length; i++) {
                 shaderIds.push(this.loadShader(json.shaders[i]));
             }
-            console.log('shader IDs: ' + JSON.stringify(shaderIds));
 
-            let externalInputs = (argument.inputs === undefined ? [] : argument.inputs);
-            let numStreamsOffset = this.streams.length - externalInputs.length;
+            let numGraphInputs = (json.inputs === undefined ? 0 : json.inputs);
+            let graphInputIds = (argument.inputs === undefined ? [] : argument.inputs);
+            let streamIdOffset = this.streams.length - graphInputIds.length;
+            shaderGraph.streamIdOffset = streamIdOffset;
+            
             for (let i = 0; i < json.graph.length; i++) {
+
                 let shader = json.graph[i];
+                let shaderParameters = (shader.parameters === undefined ? {} : shader.parameters);
                 //  shader ids are relative the shaderIds array
                 let newStream = this.addShaderStream(shaderIds[shader.shaderId]);
-                newStream.shaderGraphId = shaderGraphId;
-                newStream.bFloat = (shader.parameters['float'] === undefined ? true : shader.parameters['float']);
-                delete shader.parameters['float'];
+                let streamId = this.streams.length - 1;
 
-                let inputStreamIds = (shader.inputs === undefined ? [] : shader.inputs);
+                shaderGraph.streamIds.push(streamId);
+                newStream.shaderGraphId = shaderGraph.id;
+                // newStream.shaderGraph.json = json;
+                // newStream.shaderGraph.inputStreams = graphInputIds;
+                // console.log(' ' + i + ': ' + JSON.stringify(newStream.inputStreams));
+                newStream.bFloat = (shaderParameters['float'] === undefined ? true : shaderParameters['float']);
+                // delete shaderParameters['float'];
 
-                if (inputStreamIds.length == 0) {
+                let shaderInputIds = (shader.inputs === undefined ? [] : shader.inputs);
+
+                if (shaderInputIds.length == 0) {
                     //  generator
                     let dimensions = {
-                        w: shader.parameters.width,
-                        h: shader.parameters.height
+                        w: shaderParameters.width,
+                        h: shaderParameters.height
                     };
                     newStream.setDimensions(dimensions);
                 } else {
-                    for (let i = 0; i < inputStreamIds.length; i++) {
-                        if (inputStreamIds[i] < externalInputs.length) {
-                            inputStreamIds[i] = externalInputs[inputStreamIds[i]];
+
+                    let inputStreamIds = [];
+                    for (let i = 0; i < shaderInputIds.length; i++) {
+
+                        let inputStreamId = shaderInputIds[i];
+                        if (inputStreamId < numGraphInputs) {
+                            //  external input
+                            inputStreamId = graphInputIds[inputStreamId];
                         } else {
-                            inputStreamIds[i] += numStreamsOffset;
+                            inputStreamId += streamIdOffset;
                         }
+                        inputStreamIds.push(inputStreamId);
                     }
+
                     newStream.setInputStreamIds(inputStreamIds);
                 }
-                if (shader.parameters !== undefined) {
-                    for (let key of Object.keys(shader.parameters)) {
-                        newStream.apiParameters[key] = shader.parameters[key];
-                    }
+
+                if (shader.output !== undefined && shader.output && shaderGraph.outputStreamId == -1) {
+                    shaderGraph.outputStreamId = streamId;
                 }
-                if (shader.window) {
-                    this.addWindow(this.streams.length - 1);
+
+                for (let key of Object.keys(shaderParameters)) {
+                    newStream.apiParameters[key] = shaderParameters[key];
                 }
                     
             }
 
-            // console.log('Done parsing shader graph...');
+            this.shaderGraphs.push(shaderGraph);
+
+            if (argument.window === undefined || argument.window) {
+                this.addWindow(this.streams.length - 1);
+            }
+
+            console.log('Done parsing shader graph...');
             // console.log('parsing shader graph ' + shaderGraphId + ': ' + JSON.stringify(json));
-            console.log('argument: ' + JSON.stringify(argument));
+            console.log('shaderGraphs: ' + JSON.stringify(this.shaderGraphs));
         }
 
         loadShaderGraphDescription(jsonFileName) {
             let shaderGraphDescriptionId = this.shaderGraphDescriptions.length;
             this.shaderGraphDescriptions.push(undefined);
 
-            fetch(jsonFileName)
+            fetch(jsonFileName, { cache: "no-store" })
             .then(response => {
                 if (response.ok) {
                     return response.json()
@@ -7916,14 +8040,15 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 // console.log('Loaded shader graph: ' + JSON.stringify(json));
 
                 //  handle queued graph invocations
-                for (let shaderGraphId = 0; shaderGraphId < this.shaderGraphs.length; shaderGraphId++) {
-                    if (this.shaderGraphs[shaderGraphId].shaderGraphDescriptionId == shaderGraphDescriptionId) {
-                        console.log('Invoking shader graph ' + shaderGraphId + ' with shader graph description ' + shaderGraphDescriptionId);
-                        this.parseShaderGraph(shaderGraphId, this.shaderGraphs[shaderGraphId]);
+                for (let i = 0; i < this.shaderGraphQueue.length; i++) {
+                    if (this.shaderGraphQueue[i].shaderGraphDescriptionId == shaderGraphDescriptionId) {
+                        console.log('Invoking shader graph with shader graph description ' + shaderGraphDescriptionId);
+                        this.parseShaderGraph(this.shaderGraphQueue[i]);
                     }
                 }
-            })
-            .catch(error => console.log(error));
+                //  TODO: empty shader graph queue
+            });
+            // .catch(error => console.log(error));
 
         }
 
@@ -8158,24 +8283,54 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
     let _uiStreamUpdateParameter = function (streamId, elementId, bUpdateUI) {
         // console.log('uiStreamUpdateParamter(' + streamId + ', ' + elementId + ')');
-        _renderer.streams[streamId].uiUpdate(elementId);
+        _renderer.streams[streamId].uiUpdate(elementId, _renderer.shaderGraphs);
         if (bUpdateUI) {
             _renderer.updateUIPopup();
         }
     }
 
     let _uiStreamUpdateInput = function (streamId, inputId) {
-        //console.log('uiStreamUpdateInput(' + streamId + ', ' + inputId + ')');
         let elementId = ('input-' + streamId + '-' + inputId);
+        let el = document.getElementById(elementId);
         let inputStreamId = document.getElementById(elementId).selectedIndex;
-        //  we have to account for 'unselectable' streams, i.e., feedback loops
+
+        //  search shader graph for external inputs
+        let stream = _renderer.streams[streamId];
+        let shaderGraphId = stream.shaderGraphId;
+        if (shaderGraphId != -1) {
+            let shaderGraph = _renderer.shaderGraphs[shaderGraphId];
+            let inputStreams = shaderGraph.inputStreamIds;
+            // console.log('Here... 1: ' + inputId + ' / ' + numInputs);
+            if (inputId < shaderGraph.inputStreamIds.length) {
+                shaderGraph.inputStreamIds[inputId] = inputStreamId;
+                // console.log('Here... 2');
+
+                for (let otherStreamId = 0; otherStreamId < shaderGraph.streamIds.length; otherStreamId++) {
+                    let otherStream = _renderer.streams[otherStreamId];
+                    for (let i = 0; i < otherStream.inputStreamIds.length; i++) {
+                        if (otherStream.inputStreamIds[i] == inputId) {
+                            otherStream.setInputStreamId(inputId, inputStreams[inputId]);
+                        }
+                    }
+                    // console.log('stream ' + otherStreamId + ': ' + JSON.stringify(otherStream.inputStreamIds));
+                }
+
+                // console.log('inputStreams: ' + JSON.stringify(inputStreams));
+                return;
+            }
+        }
+
+        //  we have to account for 'unselectable' streams, i.e., feedback loops and shader graphs
         let correctStreamId = inputStreamId;
         for (let otherStreamId = 0; otherStreamId < _renderer.streams.length && otherStreamId <= inputStreamId; otherStreamId++) {
-            if (otherStreamId == streamId) {
-                //  TODO:  could we break here?
+            let otherStream = _renderer.streams[otherStreamId];
+            if (otherStreamId == streamId || (otherStream.shaderGraphId != -1 && !otherStream.shaderGraph.bOutput)) {
                 correctStreamId++;
             }
         }
+
+        console.log('uiStreamUpdateInput(' + streamId + ', ' + inputId + '): ' + inputStreamId + ' (' + correctStreamId + ')');
+
         _renderer.streams[streamId].setInputStreamId(inputId, correctStreamId);
     }
 
