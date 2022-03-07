@@ -8,3 +8,6 @@ nvis.shaders([
     "glsl/ssim.json",
     "glsl/tiling.json"
 ]);
+nvis.graphs([
+    "glsl/flip.json"
+])

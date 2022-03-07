@@ -718,6 +718,7 @@ var nvis = new function () {
 
         } else if (command == 'video') {
 
+            let fileName = argument.fileName;
             let videoParser = new NvisVideoParser((fileName, frames) => _renderer.setupVideo(fileName, frames));
             videoParser.fromFile(argument.fileName);
             // console.log('#frames: ' + frames.length);
@@ -771,7 +772,7 @@ var nvis = new function () {
 
             if (_renderer.shaderGraphDescriptions[shaderGraphDescriptionId] === undefined) {
                 //  shader graph description not loaded yet --> queue shader graph
-                console.log('queueing shader graph: ' + JSON.stringify(argument));
+                // console.log('queueing shader graph: ' + JSON.stringify(argument));
                 argument.shaderGraphId = shaderGraphId;
                 _renderer.shaderGraphQueue.push(argument);
             } else {
@@ -932,7 +933,7 @@ var nvis = new function () {
             xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, max-age=0');
             xhr.onload = function () {
                 if (this.status == 200 && this.response !== null) {
-                    self.fromBlob(this.response);
+                    self.fromBlob(this.response, fileName);
                 }
             }
             xhr.send();
@@ -970,7 +971,7 @@ var nvis = new function () {
         // }
 
 
-        fromBlob(videoFile) {
+        fromBlob(videoFile, fileName = '') {
             let self = this;
 
             // if (!(videoFile instanceof Blob))
@@ -1014,7 +1015,8 @@ var nvis = new function () {
                 }
                 // console.log('#frames: ' + self.frames.length);
 
-                self.callback(videoFile.name, self.frames);
+                let name = (videoFile.name === undefined ? fileName : videoFile.name);
+                self.callback(name, self.frames);
                 //resolve(frames);
             });
 
@@ -1876,6 +1878,7 @@ var nvis = new function () {
             this.name = undefined;
             this.fileName = undefined;
             this.numInputs = undefined;
+            this.bHidden = (parameters.hidden === undefined ? false : parameters.hidden);
 
             let gl = this.glContext;
             this.vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -2084,7 +2087,7 @@ var nvis = new function () {
             this.shaders = [];
         }
 
-        load(jsonFileName, callback) {
+        load(jsonFileName, callback, bHidden = false) {
             let self = this;
 
             let xhr = new XMLHttpRequest();
@@ -2097,7 +2100,11 @@ var nvis = new function () {
             xhr.onload = function () {
                 if (this.status == 200 && this.responseText !== null) {
                     //  set position of shader, filled in later
-                    self.shaders[shaderId] = new NvisShader(self.glContext, { json: this.responseText, callback: callback });
+                    self.shaders[shaderId] = new NvisShader(self.glContext, {
+                        json: this.responseText,
+                        callback: callback,
+                        hidden: bHidden
+                    });
                 }
             };
             xhr.send();
@@ -4262,6 +4269,7 @@ var nvis = new function () {
 
 
     class NvisShaderGraph {
+
         constructor() {
             this.id = -1;
             this.descriptionId = -1;
@@ -4274,6 +4282,7 @@ var nvis = new function () {
             // this.bOutput = false;
             this.outputStreamId = -1;
         }
+
     }
 
 
@@ -5215,7 +5224,7 @@ var nvis = new function () {
             //  lazily get the UI JSON from the shader
             if (!this.bUIReady) {
 
-                if (this.shaderGraphId == -1) {
+                if (this.shaderGraphId != -1) {
                     this.bUIReady = true;
                     return; 
                 }
@@ -7166,6 +7175,19 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.popupInfo('zoom = ' + level.toFixed(1) + 'x');
         }
 
+
+        getValidStreams() {
+            let streamIds = [];
+            for (let i = 0; i < this.streams.length; i++) {
+                let shaderGraphId = this.streams[i].shaderGraphId;
+                if (shaderGraphId == -1 || this.shaderGraphs[shaderGraphId].outputStreamId != i) {
+                    streamIds.push(i);
+                }
+            }
+            return streamIds;
+        }
+
+
         updateUIPopup() {
 
             this.uiPopup.innerHTML = '';
@@ -7252,13 +7274,18 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
                 let select = document.createElement('select');
                 select.id = 'windowStream-' + windowId;
-                select.addEventListener('change', () => { nvis.uiSetWindowStreamId(windowId); });
+                select.addEventListener('change', () => {
+                    nvis.uiSetWindowStreamId(windowId);
+                });
 
                 let windowStreamId = this.windows.getWindow(windowId).streamId;
                 for (let streamId = 0; streamId < this.streams.length; streamId++) {
 
-                    if (this.streams[streamId].shaderGraphId != -1) {
-                        //  XXXXX
+                    let shaderGraphId = this.streams[streamId].shaderGraphId;
+                    if (shaderGraphId != -1) {
+                        if (this.shaderGraphs[shaderGraphId].outputStreamId != streamId) {
+                            continue;
+                        }
                     }
 
                     let fileName = this.streams[streamId].getName(this.shaderGraphs);
@@ -7301,7 +7328,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             //  shaders
             let validShaders = [];
             for (let shaderId = 0; shaderId < this.shaders.shaders.length; shaderId++) {
-                if (this.shaders.shaders[shaderId].numInputs <= this.streams.length) {
+                let shader = this.shaders.shaders[shaderId];
+                if (shader.numInputs <= this.streams.length && !shader.bHidden) {
                     validShaders.push(shaderId);
                 }
             }
@@ -7316,7 +7344,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             let select = document.createElement('select');
             select.id = 'shaderStream';
             select.addEventListener('change', (event) => {
-                let shaderId = document.getElementById('shaderStream').selectedIndex - 1;
+                let shaderId = parseInt(document.getElementById('shaderStream').value);
                 document.getElementById('buttonCreate').disabled = !validShaders.includes(shaderId);
             });
 
@@ -7325,8 +7353,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             button.innerHTML = 'Create';
             button.disabled = true;
             button.addEventListener('click', () => {
-                let shaderId = document.getElementById('shaderStream').selectedIndex - 1;
-                // console.log('Click: ' + shaderId);
+                let shaderId = parseInt(document.getElementById('shaderStream').value);
+                
                 let newStream = this.addShaderStream(shaderId);
                 let numInputs = this.shaders.shaders[shaderId].numInputs;
                 let inputStreams = [];
@@ -7339,6 +7367,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     //  generator, need to set size
                     newStream.setDimensions(_renderer.windows.streamPxDimensions);
                 }
+                console.log('Click: ' + (this.streams.length - 1));
                 this.addWindow(this.streams.length - 1);
                 this.closeUIPopup();
             });
@@ -7347,9 +7376,14 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             option.innerHTML = '--- Select shader stream ---';
             select.appendChild(option);
             for (let shaderId = 0; shaderId < this.shaders.shaders.length; shaderId++) {
-                let numInputs = this.shaders.shaders[shaderId].numInputs;
+                let shader = this.shaders.shaders[shaderId];
+                if (shader.bHidden) {
+                    continue;
+                }
+                let numInputs = shader.numInputs;
                 option = document.createElement('option');
-                option.innerHTML = this.shaders.shaders[shaderId].name;
+                option.innerHTML = shader.name;
+                option.value = shaderId;
                 if (numInputs > this.streams.length) {
                     option.disabled = true;
                     option.innerHTML += ' (requires ' + numInputs + ' input' + (numInputs == 1 ? '' : 's') + ')';
@@ -7802,7 +7836,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         setWindowStreamId(windowId) {
             let elementId = ('windowStream-' + windowId);
-            let newStreamId = document.getElementById(elementId).selectedIndex;
+            let newStreamId = document.getElementById(elementId).value;
             this.windows.getWindow(windowId).streamId = newStreamId;
         }
 
@@ -7812,7 +7846,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             let newStream = new NvisStream(this.glContext);
             newStream.fileNames[0] = fileName;
 
-            let dimensions = { w: frames[0].width, h: frames[0].height };
+            let dimensions = {
+                w: frames[0].width,
+                h: frames[0].height
+            };
             for (let frameId = 0; frameId < frames.length; frameId++) {
                 let frame = frames[frameId];
                 let texture = gl.createTexture();
@@ -7928,9 +7965,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.windows.adjust();  //  TODO: is this needed?
         }
 
-        loadShader(jsonFileName) {
+        loadShader(jsonFileName, bHidden = false) {
             // this.shaders.load(jsonFileName, function () { this.shaderLoaded(); });
-            return this.shaders.load(jsonFileName, () => this.shaderLoaded());
+            return this.shaders.load(jsonFileName, () => this.shaderLoaded(), bHidden);
         }
 
         parseShaderGraph(argument) {
@@ -7951,7 +7988,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             let shaderIds = [];
             for (let i = 0; i < json.shaders.length; i++) {
-                shaderIds.push(this.loadShader(json.shaders[i]));
+                shaderIds.push(this.loadShader(json.shaders[i], true));
             }
 
             let numGraphInputs = (json.inputs === undefined ? 0 : json.inputs);
@@ -8018,9 +8055,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 this.addWindow(this.streams.length - 1);
             }
 
-            console.log('Done parsing shader graph...');
+            // console.log('Done parsing shader graph...');
             // console.log('parsing shader graph ' + shaderGraphId + ': ' + JSON.stringify(json));
-            console.log('shaderGraphs: ' + JSON.stringify(this.shaderGraphs));
+            // console.log('shaderGraphs: ' + JSON.stringify(this.shaderGraphs));
         }
 
         loadShaderGraphDescription(jsonFileName) {
@@ -8042,7 +8079,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 //  handle queued graph invocations
                 for (let i = 0; i < this.shaderGraphQueue.length; i++) {
                     if (this.shaderGraphQueue[i].shaderGraphDescriptionId == shaderGraphDescriptionId) {
-                        console.log('Invoking shader graph with shader graph description ' + shaderGraphDescriptionId);
+                        // console.log('Invoking shader graph with shader graph description ' + shaderGraphDescriptionId);
                         this.parseShaderGraph(this.shaderGraphQueue[i]);
                     }
                 }
