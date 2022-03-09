@@ -84,6 +84,7 @@ var nvis = new function () {
             },
             keyboard: {
                 shift: false,
+                shiftDown: false,  //  records shift state for fileInput event
                 control: false
             }
         },
@@ -445,7 +446,10 @@ var nvis = new function () {
         addStylesheetRules(`.uiPopup button {
             font: 20px Arial;
         }`);
-        addStylesheetRules(`.uiPopup button#buttonCreate {
+        addStylesheetRules(`.uiPopup button#shaderCreate {
+            margin-left: 5px;
+        }`);
+        addStylesheetRules(`.uiPopup button#graphCreate {
             margin-left: 5px;
         }`);
         addStylesheetRules(`.uiPopup input[type=range] {
@@ -614,6 +618,8 @@ var nvis = new function () {
     }
 
     let _parseConfig = function (jsonObject) {
+
+        //  TODO: complete all API commands
 
         //  convert top-level keys to lowercase
         let config = {};
@@ -3088,10 +3094,21 @@ var nvis = new function () {
                 for (let y = 0; y < this.dimensions.h; y++) {
                     for (let x = 0; x < this.dimensions.w; x++) {
                         let dstLoc = ((this.dimensions.h - y - 1) * this.dimensions.w + x) * dstChannels;
-                        this.data[dstLoc] = this.buffer.readFloat32();
+                        this.data[dstLoc + 0] = this.buffer.readFloat32();
                         this.data[dstLoc + 1] = this.buffer.readFloat32();
                         this.data[dstLoc + 2] = this.buffer.readFloat32();
                         this.data[dstLoc + 3] = 1.0;
+                    }
+                }
+            } else if (this.type == 'PF4') {
+                //  color
+                for (let y = 0; y < this.dimensions.h; y++) {
+                    for (let x = 0; x < this.dimensions.w; x++) {
+                        let dstLoc = ((this.dimensions.h - y - 1) * this.dimensions.w + x) * dstChannels;
+                        this.data[dstLoc + 0] = this.buffer.readFloat32();
+                        this.data[dstLoc + 1] = this.buffer.readFloat32();
+                        this.data[dstLoc + 2] = this.buffer.readFloat32();
+                        this.data[dstLoc + 3] = this.buffer.readFloat32();
                     }
                 }
             } else {
@@ -3100,7 +3117,7 @@ var nvis = new function () {
                     for (let x = 0; x < this.dimensions.w; x++) {
                         let dstLoc = ((this.dimensions.h - y - 1) * this.dimensions.w + x) * dstChannels;
                         let color = this.buffer.readFloat32();
-                        this.data[dstLoc] = color;
+                        this.data[dstLoc + 0] = color;
                         this.data[dstLoc + 1] = color;
                         this.data[dstLoc + 2] = color;
                         this.data[dstLoc + 3] = 1.0;
@@ -4620,7 +4637,7 @@ var nvis = new function () {
                     xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, max-age=0');
                     xhr.responseType = 'arraybuffer';
                     xhr.onload = function () {
-                        console.log("xhr.onload()");
+                        // console.log("xhr.onload()");
                         if (this.status == 200 && this.response !== null) {
                             numFilesLoaded++;
 
@@ -7339,23 +7356,35 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             shadersDiv.className = 'tabContent';
             shadersDiv.style.display = (_state.ui.tabId == 'tabShaders' ? 'block' : 'none');
 
-            let label = document.createElement('label');
-            label.innerHTML = 'Shader: ';
-            let select = document.createElement('select');
-            select.id = 'shaderStream';
-            select.addEventListener('change', (event) => {
+            let formatLabel = document.createElement('label');
+            formatLabel.innerHTML = 'Float output: ';
+            let formatCheckbox = document.createElement('input');
+            formatCheckbox.setAttribute('id', 'bFloatOutput');
+            formatCheckbox.setAttribute('type', 'checkbox');
+            formatCheckbox.setAttribute('checked', true);
+            let formatDiv = document.createElement('div');
+            formatDiv.appendChild(formatLabel);
+            formatDiv.appendChild(formatCheckbox);
+
+            let shaderLabel = document.createElement('label');
+            shaderLabel.innerHTML = 'Shader: ';
+            let shaderSelect = document.createElement('select');
+            shaderSelect.id = 'shaderStream';
+            shaderSelect.addEventListener('change', (event) => {
                 let shaderId = parseInt(document.getElementById('shaderStream').value);
-                document.getElementById('buttonCreate').disabled = !validShaders.includes(shaderId);
+                document.getElementById('shaderCreate').disabled = !validShaders.includes(shaderId);
             });
 
-            let button = document.createElement('button');
-            button.id = 'buttonCreate';
-            button.innerHTML = 'Create';
-            button.disabled = true;
-            button.addEventListener('click', () => {
+            let shaderButton = document.createElement('button');
+            shaderButton.id = 'shaderCreate';
+            shaderButton.innerHTML = 'Create';
+            shaderButton.disabled = true;
+            shaderButton.addEventListener('click', () => {
                 let shaderId = parseInt(document.getElementById('shaderStream').value);
                 
                 let newStream = this.addShaderStream(shaderId);
+                newStream.bFloat = document.getElementById('bFloatOutput').checked;
+
                 let numInputs = this.shaders.shaders[shaderId].numInputs;
                 let inputStreams = [];
                 if (numInputs > 0) {
@@ -7367,14 +7396,14 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     //  generator, need to set size
                     newStream.setDimensions(_renderer.windows.streamPxDimensions);
                 }
-                console.log('Click: ' + (this.streams.length - 1));
+                // console.log('Click: ' + (this.streams.length - 1));
                 this.addWindow(this.streams.length - 1);
                 this.closeUIPopup();
             });
 
             let option = document.createElement('option');
-            option.innerHTML = '--- Select shader stream ---';
-            select.appendChild(option);
+            option.innerHTML = '--- Select shader ---';
+            shaderSelect.appendChild(option);
             for (let shaderId = 0; shaderId < this.shaders.shaders.length; shaderId++) {
                 let shader = this.shaders.shaders[shaderId];
                 if (shader.bHidden) {
@@ -7391,13 +7420,80 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     option.disabled = true;
                     option.innerHTML += ' (requires known dimensions)';
                 }
-                select.appendChild(option);
+                shaderSelect.appendChild(option);
             }
-            let selectDiv = document.createElement('div');
-            selectDiv.appendChild(label);
-            selectDiv.appendChild(select);
-            selectDiv.appendChild(button);
-            shadersDiv.appendChild(selectDiv);
+            let selectShaderDiv = document.createElement('div');
+            selectShaderDiv.appendChild(shaderLabel);
+            selectShaderDiv.appendChild(shaderSelect);
+            selectShaderDiv.appendChild(shaderButton);
+
+
+            let validGraphs = [];
+            for (let graphId = 0; graphId < this.shaderGraphDescriptions.length; graphId++) {
+                let graph = this.shaderGraphDescriptions[graphId];
+                if (graph.inputs <= this.streams.length) {
+                    validGraphs.push(graphId);
+                }
+            }
+
+            let graphLabel = document.createElement('label');
+            graphLabel.innerHTML = 'Shader graph: ';
+            let graphSelect = document.createElement('select');
+            graphSelect.id = 'graphStream';
+            graphSelect.addEventListener('change', (event) => {
+                let shaderId = parseInt(document.getElementById('graphStream').value);
+                document.getElementById('graphCreate').disabled = !validGraphs.includes(shaderId);
+            });
+
+            let graphButton = document.createElement('button');
+            graphButton.id = 'graphCreate';
+            graphButton.innerHTML = 'Create';
+            graphButton.disabled = true;
+            graphButton.addEventListener('click', () => {
+                let graphId = parseInt(document.getElementById('graphStream').value);
+                
+                let argument = {
+                    shaderGraphDescriptionId: graphId,
+                    parameters: {},
+                    inputs: [0, 1],
+                    window: true
+                };
+                this.parseShaderGraph(argument);
+
+                // let newStream = this.addShaderStream(shaderId);
+                // newStream.bFloat = document.getElementById('bFloatOutput').checked;
+
+                // this.addWindow(this.streams.length - 1);
+                this.closeUIPopup();
+            });
+
+            option = document.createElement('option');
+            option.innerHTML = '--- Select shader graph ---';
+            graphSelect.appendChild(option);
+            for (let graphId = 0; graphId < this.shaderGraphDescriptions.length; graphId++) {
+                let graphDescription = this.shaderGraphDescriptions[graphId];
+                let numInputs = graphDescription.inputs;
+                option = document.createElement('option');
+                option.innerHTML = graphDescription.name;
+                option.value = graphId;
+                if (numInputs > this.streams.length) {
+                    option.disabled = true;
+                    option.innerHTML += ' (requires ' + numInputs + ' input' + (numInputs == 1 ? '' : 's') + ')';
+                } else if (numInputs == 0 && this.streams.length == 0) {
+                    option.disabled = true;
+                    option.innerHTML += ' (requires known dimensions)';
+                }
+                graphSelect.appendChild(option);
+            }
+            let selectGraphDiv = document.createElement('div');
+            selectGraphDiv.appendChild(graphLabel);
+            selectGraphDiv.appendChild(graphSelect);
+            selectGraphDiv.appendChild(graphButton);
+
+
+            shadersDiv.appendChild(formatDiv);
+            shadersDiv.appendChild(selectShaderDiv);
+            shadersDiv.appendChild(selectGraphDiv);
 
             //  annotations
             let annotationsDiv = document.createElement('div');
@@ -7683,6 +7779,11 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     this.updateUIPopup();
                     break;
                 case 'l':
+                    _state.input.keyboard.shiftDown = false;
+                    document.getElementById('fileInput').click();
+                    break;
+                case 'L':
+                    _state.input.keyboard.shiftDown = true;
                     document.getElementById('fileInput').click();
                     break;
                 case 'i':
@@ -7878,6 +7979,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             //     return;
             // }
 
+            let shiftDown = _state.input.keyboard.shiftDown;
+            _state.input.keyboard.shiftDown = false;
+
             //  first, try file input
             let files = Array.from(document.getElementById('fileInput').files);
             if (files.length == 0) {
@@ -7903,11 +8007,21 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 files.sort(function (a, b) {
                     return a.name.localeCompare(b.name);
                 });
-                let newStream = new NvisStream(this.glContext);
-                newStream.drop(files, this.windows);
-                this.streams.push(newStream);
-                _state.animation.setNumFrames(newStream.getNumImages());  //  TODO: check
-                this.addWindow(this.streams.length - 1);
+                if (shiftDown) {
+                    let newStream = new NvisStream(this.glContext);
+                    newStream.drop(files, this.windows);
+                    this.streams.push(newStream);
+                    _state.animation.setNumFrames(newStream.getNumImages());  //  TODO: check
+                    this.addWindow(this.streams.length - 1);
+                } else {
+                    for (let i = 0; i < files.length; i++) {
+                        let newStream = new NvisStream(this.glContext);
+                        newStream.drop([files[i]], this.windows);
+                        this.streams.push(newStream);
+                        this.addWindow(this.streams.length - 1);
+                    }
+                    // _state.animation.setNumFrames(newStream.getNumImages());  //  TODO: check
+                }
                 this.windows.adjust();
             }
 

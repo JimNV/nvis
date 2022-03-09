@@ -14,7 +14,7 @@ zip.exe -q -9 -j ${ChromeZipFileName} js/nvis.js
 zip.exe -q -9 -r ${ChromeZipFileName} glsl/*.*
 pushd extensions > /dev/null
 zip.exe -q -9 ../${ChromeZipFileName} loadShaders.js
-zip.exe -q -9 -r ../${ChromeZipFileName} icons/*.* 
+zip.exe -q -9 -r ../${ChromeZipFileName} icons/nvis-logo-*.png
 zip.exe -q -9 ../${ChromeZipFileName} index.html
 pushd chrome > /dev/null
 zip.exe -q -9 ../../${ChromeZipFileName} manifest.json
@@ -29,7 +29,7 @@ zip.exe -q -9 -j ${FirefoxZipFileName} js/nvis.js
 zip.exe -q -9 -r ${FirefoxZipFileName} glsl/*.*
 pushd extensions > /dev/null
 zip.exe -q -9 ../${FirefoxZipFileName} loadShaders.js
-zip.exe -q -9 -r ../${FirefoxZipFileName} icons/*.* 
+zip.exe -q -9 -r ../${FirefoxZipFileName} icons/nvis-logo-*.png 
 zip.exe -q -9 ../${FirefoxZipFileName} index.html
 pushd firefox > /dev/null
 zip.exe -q -9 ../../${FirefoxZipFileName} manifest.json

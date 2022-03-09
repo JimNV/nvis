@@ -10,9 +10,9 @@
         "default_title": "Click to start nvis!"
     },
     "icons": {
-        "16": "/icons/nvis16.png",
-        "32": "/icons/nvis32.png",
-        "48": "/icons/nvis48.png",
-        "128": "/icons/nvis128.png"
+        "16": "/icons/nvis-logo-16.png",
+        "32": "/icons/nvis-logo-32.png",
+        "48": "/icons/nvis-logo-48.png",
+        "128": "/icons/nvis-logo-128.png"
     }
 }
