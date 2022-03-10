@@ -1351,7 +1351,7 @@ var nvis = new function () {
             //  bottom-right
             this.textureCoordinates[6] = 1.0;
             this.textureCoordinates[7] = 1.0;
-            
+
             gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, this.textureCoordinates, gl.STATIC_DRAW);
         }
@@ -1677,7 +1677,7 @@ var nvis = new function () {
                 if (!boundingBox.inside(o)) {
                     return;
                 }
-        
+
                 let s = this.size * (ps.w / 3.0);
                 if (!this.zoom) {
                     s /= _state.zoom.level;
@@ -1766,7 +1766,7 @@ var nvis = new function () {
                 r.push({ x: dw + hw, y: dh + hw });  //  5
                 r.push({ x: dw - hw, y: dh - hw });  //  6
                 r.push({ x: -dw - hw, y: dh + hw });  //  7
-                r.push({ x: -dw + hw, y: dh - hw });  //  8                
+                r.push({ x: -dw + hw, y: dh - hw });  //  8
                 r.push({ x: -dw - hw, y: -dh - hw });  //  9
                 r.push({ x: -dw + hw, y: -dh + hw });  //  10
 
@@ -1817,7 +1817,7 @@ var nvis = new function () {
                 r.push(this.rotate({ x: dw + hw, y: dh + hw }, this.rotation));  //  5
                 r.push(this.rotate({ x: dw - hw, y: dh - hw }, this.rotation));  //  6
                 r.push(this.rotate({ x: -dw - hw, y: dh + hw }, this.rotation));  //  7
-                r.push(this.rotate({ x: -dw + hw, y: dh - hw }, this.rotation));  //  8                
+                r.push(this.rotate({ x: -dw + hw, y: dh - hw }, this.rotation));  //  8
                 r.push(this.rotate({ x: -dw - hw, y: -dh - hw }, this.rotation));  //  9
                 r.push(this.rotate({ x: -dw + hw, y: -dh + hw }, this.rotation));  //  10
 
@@ -2039,7 +2039,7 @@ var nvis = new function () {
 
                 vec4 c = texture(uSampler, vTextureCoord);
                 color = vec4(c.r, c.g, c.b, 1.0);
-                
+
                 //  gray checkerboard for background
                 if (uAlphaCheckerboard && c.a < 1.0)
                 {
@@ -2679,7 +2679,7 @@ var nvis = new function () {
             for (let position = 0; position < inputLength;) {
                 let blockArray = input.subarray(position, position + 0xffff);
                 position += blockArray.length;
-                
+
                 this.deflateBlock(output, blockArray, (position === inputLength));
             }
 
@@ -2695,7 +2695,7 @@ var nvis = new function () {
 
             return output;
         };
-          
+
         static deflateBlock(output, vBlock, isFinalBlock) {
             //  header
             let bfinal = (isFinalBlock ? 1 : 0);
@@ -3904,7 +3904,12 @@ var nvis = new function () {
         toFloatArray() {
             let data = new Float32Array(new ArrayBuffer(this.dimensions.w * this.dimensions.h * 4 * 4));  //  w x h x RGBA x float
 
-            const ChannelMap = { 'R': 0, 'G': 1, 'B': 2, 'A': 3 };
+            const ChannelMap = {
+                'R': 0,
+                'G': 1,
+                'B': 2,
+                'A': 3
+            };
             let channels = this.attributes.channels.values;
 
             const dstChannels = 4;
@@ -4333,7 +4338,7 @@ var nvis = new function () {
             //     bInput: false,
             //     bOutput: false
             // };
-            
+
             this.inputStreamIds = [];
             this.shaderJSONObject = undefined;
             this.bUIReady = false;
@@ -4461,7 +4466,7 @@ var nvis = new function () {
             if (this.shaderGraphId != -1 && shaderGraphs[this.shaderGraphId].json === undefined) {
                 return;
             }
-            
+
             let uiObject = (this.shaderGraphId == -1 ? this.shaderJSONObject.UI : shaderGraphs[this.shaderGraphId].json.UI);
             if (uiObject === undefined) {
                 return;
@@ -4977,13 +4982,20 @@ var nvis = new function () {
                     if (this.inputStreamIds[inputId] < shaderGraph.inputStreamIds.length) {
                         inputStreamId = shaderGraph.inputStreamIds[this.inputStreamIds[inputId]];
                     } else {
-                        inputStreamId = this.inputStreamIds[inputId + shaderGraph.streamIdOffset];
+                        // inputStreamId = this.inputStreamIds[inputId + shaderGraph.streamIdOffset];
+                        inputStreamId = this.inputStreamIds[inputId];
                     }
 
                     inputStreamIds.push(inputStreamId);
 
                     let activeTexture = this.TextureUnits[inputId];
                     gl.activeTexture(activeTexture);
+
+                    let stream = streams[inputStreamId];
+                    if (stream === undefined) {
+                        console.log('XXX streamId: ' + inputStreamId + '  ' + shaderGraph.streamIdOffset);
+                        continue;
+                    }
 
                     gl.bindTexture(gl.TEXTURE_2D, streams[inputStreamId].getTexture(frameId));
                     gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
@@ -5243,7 +5255,7 @@ var nvis = new function () {
 
                 if (this.shaderGraphId != -1) {
                     this.bUIReady = true;
-                    return; 
+                    return;
                 }
 
                 let json = shader.json;
@@ -5266,20 +5278,17 @@ var nvis = new function () {
 
         getUI(streamId, streams, shaders, shaderGraphs) {
 
-            //  streamId is needed since the stream itself does not know its id
-            let ui = document.createElement('div');
-            ui.id = 'ui';
-
-            let shaderGraphId = streams[streamId].shaderGraphId;
             let bShaderGraphUI = false;
-            let shaderGraph = undefined;
-            if (shaderGraphId != -1) {
-                shaderGraph = shaderGraphs[shaderGraphId];
-                if (shaderGraph.outputStreamId != streamId) {
+            if (this.shaderGraphId != -1) {
+                if (shaderGraphs[this.shaderGraphId].outputStreamId != streamId) {
                     return undefined;
                 }
                 bShaderGraphUI = true;
             }
+
+            //  streamId is needed since the stream itself does not know its id
+            let ui = document.createElement('div');
+            ui.id = 'ui';
 
             let fileName = streams[streamId].getName(shaderGraphs);
             let arrowRight = '&#9658;';
@@ -5302,8 +5311,7 @@ var nvis = new function () {
 
                     if (streams[id].shaderGraphId != -1) {
                         if (id != shaderGraphs[streams[id].shaderGraphId].outputStreamId) {
-                            // if (!bShaderGraphUI) {
-                            //  don't include non-outputs of shader graph
+                            //  don't include non-outputs of shader graphs
                             continue;
                         }
                     }
@@ -5332,98 +5340,133 @@ var nvis = new function () {
             if (this.shaderId != -1) {
 
                 let shader = shaders.shaders[this.shaderId];
+                let shaderGraph = shaderGraphs[this.shaderGraphId];
+                let numInputs = (shaderGraph === undefined ? this.inputStreamIds.length : shaderGraph.inputStreamIds.length);
 
-                if (shaderGraph !== undefined) {
+                // console.log('stream ' + streamId + ': ' + numInputs);
+     
+                for (let inputId = 0; inputId < numInputs; inputId++) {
+                    let eId = ('input-' + streamId + '-' + inputId);
+                    let label = document.createElement('label');
+                    label.setAttribute('for', eId);
+                    label.innerHTML = ('Input ' + (inputId + 1) + ': ');
 
-                    for (let inputId = 0; inputId < shaderGraph.json.inputs; inputId++) {
-                        let eId = ('input-' + streamId + '-' + inputId);
-                        let label = document.createElement('label');
-                        label.setAttribute('for', eId);
-                        label.innerHTML = ('Input ' + (inputId + 1) + ': ');
+                    let sEl = document.createElement('select');
+                    sEl.id = eId;
+                    sEl.addEventListener('change', () => {
+                        nvis.uiStreamUpdateInput(streamId, inputId);
+                    });
 
-                        let sEl = document.createElement('select');
-                        sEl.id = eId;
-                        sEl.addEventListener('change', () => {
-                            nvis.uiStreamUpdateInput(streamId, inputId);
-                        });
-                        for (let otherStreamId = 0; otherStreamId < streams.length; otherStreamId++) {
+                    for (let otherStreamId = 0; otherStreamId < streams.length; otherStreamId++) {
 
-                            let otherStream = streams[otherStreamId];
+                        //  don't allow direct feedback for streams
+                        if (otherStreamId == streamId) {
+                            continue;
+                        }
 
-                            let bValidStream = (otherStreamId != streamId);
-                            bValidStream &&= (otherStream.shaderGraphId == -1 || otherStreamId == shaderGraph.outputStreamId);
+                        let otherStream = streams[otherStreamId];
 
-                            if (bValidStream) {
+                        //  don't allow direct feedback for shader graphs
+                        if (this.shaderGraphId != -1 && otherStream.shaderGraphId == this.shaderGraphId) {
+                            continue;
+                        }
+                        //  skip non-outputs from shader graphs
+                        if (otherStream.shaderGraphId != -1 && shaderGraphs[otherStream.shaderGraphId].outputStreamId != otherStreamId) {
+                            continue;
+                        }
 
-                                if (!otherStream.bUIReady && otherStream.shaderId != -1) {
-                                    let otherShader = shaders.shaders[otherStream.shaderId];
-                                    otherStream.prepareUI(otherShader);
-                                }
+                        //  lazily fill UI components
+                        if (!otherStream.bUIReady && otherStream.shaderId != -1) {
+                            let otherShader = shaders.shaders[otherStream.shaderId];
+                            otherStream.prepareUI(otherShader);
+                        }
 
-                                let sOp = document.createElement('option');
-                                sOp.innerHTML = otherStream.getName(shaderGraphs);
-                                // if (this.inputStreamIds[inputId] == otherStreamId) {
-                                if (shaderGraph.inputStreamIds[inputId] == otherStreamId) {
-                                    sOp.setAttribute('selected', true);
-                                }
-                                sEl.appendChild(sOp);
+                        console.log('Checking  ' + otherStreamId);
+
+                        let sOp = document.createElement('option');
+                        sOp.innerHTML = (otherStreamId + 1) + ': ' + otherStream.getName(shaderGraphs);
+                        sOp.value = otherStreamId;
+                        if (this.shaderGraphId != -1) {
+                            // console.log('Here... 1: ' + shaderGraphs[otherStream.shaderGraphId].inputStreamIds[inputId] + ', ' + otherStreamId);
+                            if (shaderGraphs[this.shaderGraphId].inputStreamIds[inputId] == otherStreamId) {
+                                sOp.setAttribute('selected', true);
+                            }
+                        } else {
+                            console.log('Here... 2');
+                            if (this.inputStreamIds[inputId] == otherStreamId) {
+                                sOp.setAttribute('selected', true);
                             }
                         }
-                        let inputDiv = document.createElement('div');
-                        inputDiv.appendChild(label);
-                        inputDiv.appendChild(sEl);
+                        sEl.appendChild(sOp);
 
-                        uiBody.appendChild(inputDiv);
+
+                        // let bValidStream = (otherStream.shaderGraphId == -1);
+                        // let bValidShaderGraph = (otherStream.shaderGraphId != -1 && shaderGraphs[otherStream.shaderGraphId].outputStreamId == otherStreamId);
+
+                        // // bValidStream = (otherShaderGraph === undefined || otherShaderGraph.outputStreamId == otherStreamId);
+                        // // bValidStream &&= bValidShaderGraph;
+
+                        // // if (shaderGraph !== undefined) {
+
+                        // //     bValidStream &&= (otherStream.shaderGraphId == -1 || otherStreamId == shaderGraph.outputStreamId);
+
+                        // // console.log('id: ' + otherStreamId + ', stream: ' + bValidStream + ', graph: ' + bValidShaderGraph)
+                        // if (bValidStream || bValidShaderGraph) {
+
+                        //     if (!otherStream.bUIReady && otherStream.shaderId != -1) {
+                        //         let otherShader = shaders.shaders[otherStream.shaderId];
+                        //         otherStream.prepareUI(otherShader);
+                        //     }
+
+                        //     let sOp = document.createElement('option');
+                        //     sOp.innerHTML = otherStream.getName(shaderGraphs) + ' ' + otherStreamId;
+                        //     sOp.value = otherStreamId;
+
+                        //     let sourceId = (bValidStream ? this.inputStreamIds[inputId] : shaderGraphs[otherStream.shaderGraphId].inputStreamIds[inputId]);
+                        //     // if (this.inputStreamIds[inputId] == otherStreamId) {
+                        //     if (sourceId == otherStreamId) {
+                        //         sOp.setAttribute('selected', true);
+                        //     }
+                        //     sEl.appendChild(sOp);
+                        // }
+
+                        // } else {
+
+                        //     if (bValidStream) {
+
+                        //         if (!otherStream.bUIReady && otherStream.shaderId != -1) {
+                        //             let otherShader = shaders.shaders[otherStream.shaderId];
+                        //             otherStream.prepareUI(otherShader);
+                        //         }
+
+                        //         let sOp = document.createElement('option');
+                        //         sOp.innerHTML = otherStream.getName(shaderGraphs) + ' ' + otherStreamId;
+                        //         sOp.value = otherStreamId;
+                        //         if (this.inputStreamIds[inputId] == otherStreamId) {
+                        //             sOp.setAttribute('selected', true);
+                        //         }
+                        //         sEl.appendChild(sOp);
+                        //     }
+
+                        // }
                     }
 
-                } else {
+                    let inputDiv = document.createElement('div');
+                    inputDiv.appendChild(label);
+                    inputDiv.appendChild(sEl);
 
-                    for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
-                        let eId = ('input-' + streamId + '-' + inputId);
-                        let label = document.createElement('label');
-                        label.setAttribute('for', eId);
-                        label.innerHTML = ('Input ' + (inputId + 1) + ': ');
-
-                        let sEl = document.createElement('select');
-                        sEl.id = eId;
-                        sEl.addEventListener('change', () => {
-                            nvis.uiStreamUpdateInput(streamId, inputId);
-                        });
-                        for (let otherStreamId = 0; otherStreamId < streams.length; otherStreamId++) {
-                            if (otherStreamId != streamId) {
-                                let otherStream = streams[otherStreamId];
-
-                                if (!otherStream.bUIReady && otherStream.shaderId != -1) {
-                                    let otherShader = shaders.shaders[otherStream.shaderId];
-                                    otherStream.prepareUI(otherShader);
-                                }
-
-                                let sOp = document.createElement('option');
-                                sOp.innerHTML = otherStream.getName(shaderGraphs);
-                                if (this.inputStreamIds[inputId] == otherStreamId) {
-                                    sOp.setAttribute('selected', true);
-                                }
-                                sEl.appendChild(sOp);
-                            }
-                        }
-                        let inputDiv = document.createElement('div');
-                        inputDiv.appendChild(label);
-                        inputDiv.appendChild(sEl);
-
-                        uiBody.appendChild(inputDiv);
-                    }
-
+                    uiBody.appendChild(inputDiv);
                 }
 
                 if (shader !== undefined && shader.isReady()) {
 
-                    let shaderUI = undefined;                    
+                    let shaderUI = undefined;
                     if (bShaderGraphUI) {
                         shaderUI = this.buildShaderUI(shaderGraph.json.UI, streamId);
                     } else {
                         shaderUI = this.buildShaderUI(this.shaderJSONObject.UI, streamId);
                     }
-                    
+
                     uiBody.appendChild(shaderUI);
                 }
 
@@ -6013,22 +6056,26 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
 
-        incStream(canvasPxCoords, streams) {
+        incStream(canvasPxCoords, streams, shaderGraphs) {
             let windowId = this.getWindowId(canvasPxCoords);
             if (windowId !== undefined) {
-                let streamId = this.windows[windowId].streamId;
-                let nextStreamId = (streamId + 1) % streams.length;
-                this.windows[windowId].streamId = nextStreamId;
+                let streamId = (this.windows[windowId].streamId + 1) % streams.length;
+                while (streams[streamId].shaderGraphId != -1 && shaderGraphs[streams[streamId].shaderGraphId].outputStreamId != streamId) {
+                    streamId = (streamId + 1) % streams.length;
+                }
+                this.windows[windowId].streamId = streamId;
             }
         }
 
 
-        decStream(canvasPxCoords, streams) {
+        decStream(canvasPxCoords, streams, shaderGraphs) {
             let windowId = this.getWindowId(canvasPxCoords);
             if (windowId !== undefined) {
-                let streamId = this.windows[windowId].streamId;
-                let nextStreamId = (streamId + streams.length - 1) % streams.length;
-                this.windows[windowId].streamId = nextStreamId;
+                let streamId = (this.windows[windowId].streamId + streams.length - 1) % streams.length;
+                while (streams[streamId].shaderGraphId != -1 && shaderGraphs[streams[streamId].shaderGraphId].outputStreamId != streamId) {
+                    streamId = (streamId + streams.length - 1) % streams.length;
+                }
+                this.windows[windowId].streamId = streamId;
             }
         }
 
@@ -6037,11 +6084,11 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             vStreamIds[streamId] = true;
             let stream = streams[streamId];
             let shader = shaders.shaders[stream.shaderId];
-            
+
             if (shader === undefined) {
                 return;
             }
-            
+
             for (let inputId = 0; inputId < shader.getNumInputs(); inputId++) {
                 let inputStreamId = stream.getInputStreamId(inputId);
                 if (!vStreamIds[inputStreamId]) {
@@ -6476,7 +6523,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
                 vec4 c = texture(uSampler, vTextureCoord);
                 color = vec4(c.r, c.g, c.b, 1.0);
-                
+
                 //  gray checkerboard for background
                 if (uAlphaCheckerboard && c.a < 1.0)
                 {
@@ -7381,7 +7428,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             shaderButton.disabled = true;
             shaderButton.addEventListener('click', () => {
                 let shaderId = parseInt(document.getElementById('shaderStream').value);
-                
+
                 let newStream = this.addShaderStream(shaderId);
                 newStream.bFloat = document.getElementById('bFloatOutput').checked;
 
@@ -7451,7 +7498,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             graphButton.disabled = true;
             graphButton.addEventListener('click', () => {
                 let graphId = parseInt(document.getElementById('graphStream').value);
-                
+
                 let argument = {
                     shaderGraphDescriptionId: graphId,
                     parameters: {},
@@ -7694,18 +7741,34 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     this.popupInfo('Frame: ' + (_state.animation.frameId + 1) + ' / ' + _state.animation.numFrames);
                     break;
                 case 'ArrowUp':  //  ArrowUp
-                    this.windows.incStream(_state.input.mouse.canvasCoords, this.streams);
+                    this.windows.incStream(_state.input.mouse.canvasCoords, this.streams, this.shaderGraphs);
                     break;
                 case 'ArrowRight':  //  ArrowRight
                     _state.animation.inc();
                     this.popupInfo('Frame: ' + (_state.animation.frameId + 1) + ' / ' + _state.animation.numFrames);
                     break;
                 case 'ArrowDown':  //  ArrowDown
-                    this.windows.decStream(_state.input.mouse.canvasCoords, this.streams);
+                    this.windows.decStream(_state.input.mouse.canvasCoords, this.streams, this.shaderGraphs);
                     break;
                 case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
-                    let streamId = parseInt(key) - 1;
+                    let targetStreamId = parseInt(key) - 1;
+                    let streamId = 0;
+                    let numStreams = 0;
+                    while (streamId < this.streams.length) {
+                        if (this.streams[streamId].shaderGraphId == -1 || this.shaderGraphs[this.streams[streamId].shaderGraphId].outputStreamId == streamId) {
+                            numStreams++;
+                            console.log('Skipping ' + streamId);
+                            // if (numStreams == targetStreamId) {
+                            //     break;
+                            // }
+                        }
+                        if (numStreams == targetStreamId) {
+                            break;
+                        }
+                        streamId++;
+                    }
                     if (streamId < this.streams.length) {
+                        console.log('Setting ' + streamId);
                         this.windows.setWindowStreamId(this.windows.getWindowId(_state.input.mouse.canvasCoords), streamId);
                     }
                     break;
@@ -7749,7 +7812,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
                                 let blob = new Blob([ dataView ], { mimeType });
                                 let clipboardData = new ClipboardItem({ [ mimeType ]: blob });
-                    
+
                                 let aBlob = new Blob([ "Hello World!" ], { type: 'text/text' });
                                 let asdf = new ClipboardItem({ [ aBlob.type ]: aBlob });
                                 navigator.clipboard.writeText([asdf]).then(function(result) {
@@ -8109,7 +8172,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             let graphInputIds = (argument.inputs === undefined ? [] : argument.inputs);
             let streamIdOffset = this.streams.length - graphInputIds.length;
             shaderGraph.streamIdOffset = streamIdOffset;
-            
+
             for (let i = 0; i < json.graph.length; i++) {
 
                 let shader = json.graph[i];
@@ -8160,7 +8223,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 for (let key of Object.keys(shaderParameters)) {
                     newStream.apiParameters[key] = shaderParameters[key];
                 }
-                    
+
             }
 
             this.shaderGraphs.push(shaderGraph);
@@ -8443,46 +8506,18 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
     let _uiStreamUpdateInput = function (streamId, inputId) {
         let elementId = ('input-' + streamId + '-' + inputId);
         let el = document.getElementById(elementId);
-        let inputStreamId = document.getElementById(elementId).selectedIndex;
+        let inputStreamId = parseInt(el.value);
 
-        //  search shader graph for external inputs
+        // console.log('uiStreamUpdateInput(' + streamId + ', ' + inputId + '): ' + inputStreamId);
+
         let stream = _renderer.streams[streamId];
         let shaderGraphId = stream.shaderGraphId;
-        if (shaderGraphId != -1) {
-            let shaderGraph = _renderer.shaderGraphs[shaderGraphId];
-            let inputStreams = shaderGraph.inputStreamIds;
-            // console.log('Here... 1: ' + inputId + ' / ' + numInputs);
-            if (inputId < shaderGraph.inputStreamIds.length) {
-                shaderGraph.inputStreamIds[inputId] = inputStreamId;
-                // console.log('Here... 2');
 
-                for (let otherStreamId = 0; otherStreamId < shaderGraph.streamIds.length; otherStreamId++) {
-                    let otherStream = _renderer.streams[otherStreamId];
-                    for (let i = 0; i < otherStream.inputStreamIds.length; i++) {
-                        if (otherStream.inputStreamIds[i] == inputId) {
-                            otherStream.setInputStreamId(inputId, inputStreams[inputId]);
-                        }
-                    }
-                    // console.log('stream ' + otherStreamId + ': ' + JSON.stringify(otherStream.inputStreamIds));
-                }
-
-                // console.log('inputStreams: ' + JSON.stringify(inputStreams));
-                return;
-            }
+        if (shaderGraphId == -1) {
+            _renderer.streams[streamId].setInputStreamId(inputId, inputStreamId);
+        } else {
+            _renderer.shaderGraphs[shaderGraphId].inputStreamIds[inputId] = inputStreamId;
         }
-
-        //  we have to account for 'unselectable' streams, i.e., feedback loops and shader graphs
-        let correctStreamId = inputStreamId;
-        for (let otherStreamId = 0; otherStreamId < _renderer.streams.length && otherStreamId <= inputStreamId; otherStreamId++) {
-            let otherStream = _renderer.streams[otherStreamId];
-            if (otherStreamId == streamId || (otherStream.shaderGraphId != -1 && !otherStream.shaderGraph.bOutput)) {
-                correctStreamId++;
-            }
-        }
-
-        console.log('uiStreamUpdateInput(' + streamId + ', ' + inputId + '): ' + inputStreamId + ' (' + correctStreamId + ')');
-
-        _renderer.streams[streamId].setInputStreamId(inputId, correctStreamId);
     }
 
     let _uiSetWindowStreamId = function (windowId) {
