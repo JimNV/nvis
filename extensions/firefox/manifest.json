@@ -1,7 +1,7 @@
 {
     "name": "NVIDIA nvis",
-    "description": "A image/stream viewer extension by NVIDIA!",
-    "version": "0.6",
+    "description": "An image/stream viewer extension by NVIDIA!",
+    "version": "0.7",
     "manifest_version": 2,
     "icons": {
         "16": "icons/nvis-logo-16.png",
