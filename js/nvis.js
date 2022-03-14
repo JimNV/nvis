@@ -7757,18 +7757,13 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     while (streamId < this.streams.length) {
                         if (this.streams[streamId].shaderGraphId == -1 || this.shaderGraphs[this.streams[streamId].shaderGraphId].outputStreamId == streamId) {
                             numStreams++;
-                            console.log('Skipping ' + streamId);
-                            // if (numStreams == targetStreamId) {
-                            //     break;
-                            // }
                         }
-                        if (numStreams == targetStreamId) {
+                        if (numStreams - 1 == targetStreamId) {
                             break;
                         }
                         streamId++;
                     }
                     if (streamId < this.streams.length) {
-                        console.log('Setting ' + streamId);
                         this.windows.setWindowStreamId(this.windows.getWindowId(_state.input.mouse.canvasCoords), streamId);
                     }
                     break;

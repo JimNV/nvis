@@ -11,23 +11,23 @@
     "streams": [
         {
             "name": "Input",
-            "window": false,
+            "window": true,
             "images": [
-                "images/exr/jeri-glass-input.exr"
+                "images/exr/glass-input.exr"
             ]
         },
         {
             "name": "Denoised",
-            "window": false,
+            "window": true,
             "images": [
-                "images/exr/jeri-glass-denoised.exr"
+                "images/exr/glass-denoised.exr"
             ]
         },
         {
             "name": "Reference",
             "window": false,
             "images": [
-                "images/exr/jeri-glass-reference.exr"
+                "images/exr/glass-reference.exr"
             ]
         },
         {
