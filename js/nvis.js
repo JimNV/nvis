@@ -5384,8 +5384,7 @@ var nvis = new function () {
                             otherStream.prepareUI(otherShader);
                         }
 
-                        console.log('Checking  ' + otherStreamId);
-
+                        // console.log('Checking  ' + otherStreamId);
                         let sOp = document.createElement('option');
                         sOp.innerHTML = (otherStreamId + 1) + ': ' + otherStream.getName(shaderGraphs);
                         sOp.value = otherStreamId;
@@ -5395,7 +5394,7 @@ var nvis = new function () {
                                 sOp.setAttribute('selected', true);
                             }
                         } else {
-                            console.log('Here... 2');
+                            // console.log('Here... 2');
                             if (this.inputStreamIds[inputId] == otherStreamId) {
                                 sOp.setAttribute('selected', true);
                             }
@@ -5940,9 +5939,30 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             //  determine layout width/height
             if (layout.bAutomatic) {
                 let canvasAspect = this.canvas.height / this.canvas.width;
-                layout.automaticDimensions.w = Math.round(Math.sqrt(Math.pow(2, Math.ceil(Math.log2(this.windows.length) / canvasAspect))));
-                layout.automaticDimensions.w = Math.max(Math.min(layout.automaticDimensions.w, this.windows.length), 1);
+                // layout.automaticDimensions.w = Math.round(Math.sqrt(Math.pow(2, Math.ceil(Math.log2(this.windows.length) / canvasAspect))));
+                // layout.automaticDimensions.w = Math.max(Math.min(layout.automaticDimensions.w, this.windows.length), 1);
+
+                let bestW = 1;
+                if (this.streamPxDimensions !== undefined) {
+                    let minAspectDifference = 1e30;
+                    for (let w = 1; w <= this.windows.length; w++) {
+                        let h = Math.ceil(this.windows.length / w);
+                        let aspect = (h * this.streamPxDimensions.h) / (w * this.streamPxDimensions.w);
+                        // console.log('aspect: ' + aspect);
+                        let diff = Math.abs(canvasAspect - aspect);
+                        // console.log('   diff: ' + diff + '    minAspectDiff: ' + minAspectDifference);
+                        if (diff < minAspectDifference) {
+                            minAspectDifference = diff;
+                            bestW = w;
+                        }
+                    }
+                    // console.log('Best W: ' + bestW);
+                }
+
+                layout.automaticDimensions.w = bestW;
+
                 layout.automaticDimensions.h = Math.ceil(this.windows.length / layout.automaticDimensions.w);
+
             } else {
                 layout.dimensions.w = Math.max(Math.min(layout.dimensions.w, this.windows.length), 1);
                 layout.dimensions.h = Math.ceil(this.windows.length / layout.dimensions.w);
