@@ -1,6 +1,7 @@
 nvis.shaders([
     "glsl/difference.json",
     "glsl/gaussian.json",
+    "glsl/loss.json",
     "glsl/mixer.json",
     "glsl/pixelate.json",
     "glsl/sharpness.json",

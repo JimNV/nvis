@@ -1,5 +1,5 @@
 {
-    "name": "Sobel",
+    "name": "Edge detection",
     "fileName": "glsl/sobel.glsl",
     "inputs": 1,
     "UI": {

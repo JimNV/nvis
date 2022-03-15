@@ -62,6 +62,8 @@ var nvis = new function () {
         zoom: {
             LowFactor: Math.pow(Math.E, Math.log(2) / 8.0),
             HighFactor: Math.pow(Math.E, Math.log(2) / 4.0),
+            MinLevel: 0.125,
+            MaxLevel: 256.0,
             level: 1.0,
             winAspectRatio: 1.0,
             mouseWinCoords: {  //  mouse position at zoom [0, 1]
@@ -378,6 +380,7 @@ var nvis = new function () {
             margin: 0px;
             padding: 0px;
             display: block;
+            background-color: black;
         }`);
 
         addStylesheetRules(`input[type=file] {
@@ -686,7 +689,7 @@ var nvis = new function () {
 
         } else if (command == 'zoom') {
 
-            _state.zoom.level = Math.min(Math.max(argument, 1.0), 256.0);
+            _state.zoom.level = Math.min(Math.max(argument, _state.zoom.MinLevel), _state.zoom.MaxLevel);
             _renderer.windows.updateTextureCoordinates();
             return _state.zoom.level;
 
@@ -6035,7 +6038,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
                 let factor = (bHigh ? _state.zoom.HighFactor : _state.zoom.LowFactor);
                 _state.zoom.level *= (direction > 0 ? factor : 1.0 / factor);
-                _state.zoom.level = Math.min(Math.max(_state.zoom.level, 1.0), 256.0);  //  TODO: is this what we want?
+                _state.zoom.level = Math.min(Math.max(_state.zoom.level, _state.zoom.MinLevel), _state.zoom.MaxLevel);  //  TODO: is this what we want?
                 _state.zoom.mouseWinCoords = winRelCoords;
 
                 let newStreamCoords = this.getStreamCoordinates(canvasPxCoords);
