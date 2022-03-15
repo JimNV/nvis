@@ -7818,6 +7818,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     _settings.bPingPong.value = _state.animation.pingPong;
                     this.popupInfo('Animation ping-pong: ' + (_state.animation.pingPong ? 'on' : 'off'));
                     break;
+                case 'z':
+                    _state.zoom.level = 1.0;
+                    this.windows.adjust();
+                    break;
                 case 'c':
                     // this.writeClipImg();
                     if (false && _state.input.keyboard.control) {
