@@ -64,6 +64,7 @@ var nvis = new function () {
             HighFactor: Math.pow(Math.E, Math.log(2) / 4.0),
             MinLevel: 0.125,
             MaxLevel: 256.0,
+            bLock: false,
             level: 1.0,
             winAspectRatio: 1.0,
             mouseWinCoords: {  //  mouse position at zoom [0, 1]
@@ -178,6 +179,11 @@ var nvis = new function () {
         },
         bLockTranslation: {
             name: 'Lock translation',
+            type: 'bool',
+            value: false
+        },
+        bLockZoom: {
+            name: 'Lock minimum zoom level to 1.0',
             type: 'bool',
             value: false
         },
@@ -689,7 +695,8 @@ var nvis = new function () {
 
         } else if (command == 'zoom') {
 
-            _state.zoom.level = Math.min(Math.max(argument, _state.zoom.MinLevel), _state.zoom.MaxLevel);
+            let minLevel = (_settings.bLockZoom,value ? 1.0 : _state.zoom.MinLevel);
+            _state.zoom.level = Math.min(Math.max(argument, minLevel), _state.zoom.MaxLevel);
             _renderer.windows.updateTextureCoordinates();
             return _state.zoom.level;
 
@@ -6057,8 +6064,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 let oldStreamCoords = this.getStreamCoordinates(canvasPxCoords);
 
                 let factor = (bHigh ? _state.zoom.HighFactor : _state.zoom.LowFactor);
+                let minLevel = (_settings.bLockZoom.value ? 1.0 : _state.zoom.MinLevel);
                 _state.zoom.level *= (direction > 0 ? factor : 1.0 / factor);
-                _state.zoom.level = Math.min(Math.max(_state.zoom.level, _state.zoom.MinLevel), _state.zoom.MaxLevel);  //  TODO: is this what we want?
+                _state.zoom.level = Math.min(Math.max(_state.zoom.level, minLevel), _state.zoom.MaxLevel);
                 _state.zoom.mouseWinCoords = winRelCoords;
 
                 let newStreamCoords = this.getStreamCoordinates(canvasPxCoords);
@@ -8394,12 +8402,12 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
     }
 
     let _uiUpdateParameter = function (objectId, elementId, rowId, bAllConditionsMet, bUpdateUI) {
-        // console.log('uiUpdateParameter(' + objectId + ', ' + elementId + ', ' + bUpdateUI + ')');
-
         let key = elementId.replace(/^.*\-/, '');
         let element = document.getElementById(elementId);
         let object = _settings[key];
         let type = object.type;
+
+        // console.log('uiUpdateParameter(' + objectId + ', ' + elementId + ', ' + bUpdateUI + ')');
 
         if (type == 'bool') {
             object.value = element.checked;
@@ -8413,6 +8421,13 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         if (key == 'bAutomaticLayout') {
             _state.layout.bAutomatic = object.value;
+            _renderer.windows.adjust();
+        }
+
+        if (key == 'bLockZoom') {
+            if (_settings.bLockZoom) {
+                _state.zoom.level = Math.max(1.0, _state.zoom.level);
+            }
             _renderer.windows.adjust();
         }
 
