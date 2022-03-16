@@ -331,8 +331,16 @@ var nvis = new function () {
             max: 240,
             step: 1
         },
-        videoMaxFrames: {
-            name: 'Video decoding max frames',
+        videoStartFrame: {
+            name: 'Video decoding start frame',
+            type: 'int',
+            value: 1,
+            min: 1,
+            max: 300,
+            step: 1
+        },
+        videoNumFrames: {
+            name: 'Video decoding # frames',
             type: 'int',
             value: 30,
             min: 1,
@@ -863,7 +871,7 @@ var nvis = new function () {
     }
 
     let _apiCommand = function (apiCommand) {
-        console.log('API: ' + JSON.stringify(apiCommand));
+        // console.log('API: ' + JSON.stringify(apiCommand));
         if (_renderer === undefined) {
             _APIQueue.push(apiCommand);
         } else {
@@ -1021,10 +1029,13 @@ var nvis = new function () {
                     totalFrames = self.duration * self.amount;
                 }
                 let frameRate = _settings.videoFPS.value;
-                totalFrames = self.duration * frameRate;  //  TODO: figure out frame rate of video (assuming 30 FPS for now)
+                totalFrames = self.duration * frameRate;  //  TODO: figure out frame rate of video, if possible (assuming 30 FPS for now)
                 let frameTime = 1.0 / frameRate;
                 let numFrames = 0;
-                for (let time = 0; time < self.duration && numFrames < _settings.videoMaxFrames.value; time += frameTime) {
+                let targetNumFrames = _settings.videoNumFrames.value;
+                let beginFrame = _settings.videoStartFrame.value;
+                // let endFrame = beginFrame + targetNumFrames;
+                for (let time = frameTime * beginFrame; time < self.duration && numFrames < targetNumFrames; time += frameTime) {
                     let frame = await self.getVideoFrame(self.video, NvisVideoParser.context, time);
                     self.frames.push(frame);
                     numFrames++;
@@ -1983,7 +1994,7 @@ var nvis = new function () {
             xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, max-age=0');
             xhr.onload = function (event) {
                 if (this.status == 200 && this.responseText !== null) {
-                    console.log('=====  Shader loaded (' + fileName + ')');
+                    // console.log('=====  Shader loaded (' + fileName + ')');
                     self.fragmentSource = this.responseText;
                     self.bFragmentReady = self.compile(self.fragmentShader, self.fragmentSource);
                     self.attach();
@@ -8036,6 +8047,11 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         setupVideo(fileName, frames) {
             let gl = this.glContext;
+
+            if (frames.length == 0) {
+                this.windows.adjust();
+                return;
+            }
 
             let newStream = new NvisStream(this.glContext);
             newStream.fileNames[0] = fileName;
