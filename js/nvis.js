@@ -8116,7 +8116,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 files.sort(function (a, b) {
                     return a.name.localeCompare(b.name);
                 });
-                if (shiftDown) {
+                if (!shiftDown) {
                     let newStream = new NvisStream(this.glContext);
                     newStream.drop(files, this.windows);
                     this.streams.push(newStream);
