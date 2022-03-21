@@ -8360,13 +8360,13 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             requestAnimationFrame((t) => this.animate(t));
 
             const elapsed = timeStamp - _state.animation.time;
-            _state.animation.time = timeStamp;
 
             if (_state.animation.performance) {
                 document.getElementById('performanceInfo').innerHTML = 'FPS: ' + (1000 / elapsed).toFixed(1);
             }
 
             if (elapsed >= 1000.0 / _state.animation.fps) {
+                _state.animation.time = timeStamp;
                 _state.animation.update();
                 this.render();
             }
