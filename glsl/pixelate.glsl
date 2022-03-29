@@ -75,7 +75,7 @@ void main()
         {
             ivec2 pos = tlPosition + ivec2(x, y);
             if (pos.x >=0 && pos.x < dimensions.x && pos.y >= 0 && pos.y < dimensions.y) {
-                colorSum += texelFetch(uTexture0, tlPosition + ivec2(x, y), 0);
+                colorSum += texelFetch(uTexture0, pos, 0);
                 numTerms++;
             }
         }

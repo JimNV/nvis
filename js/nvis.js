@@ -162,7 +162,7 @@ var nvis = new function () {
         }
     }
 
-    let _settings = {
+    let _settingsUI = {
         title: 'Settings',
         bAutomaticLayout: {
             name: 'Automatic layout',
@@ -349,6 +349,72 @@ var nvis = new function () {
         }
     };
 
+    let _streamsUI = {
+        title: 'Streams',
+        bShowInternalShaders: {
+            name: 'Show internal shader graph streams',
+            type: 'bool',
+            value: false
+        },
+        ruler: {
+            type: 'ruler'
+        },
+    }
+
+    let _windowsUI = {
+        title: 'Windows',
+        bStreamNames: {
+            name: 'Display stream names',
+            type: 'bool',
+            value: true
+        },
+        streamNameSize: {
+            name: 'Font size',
+            type: 'int',
+            value: 14,
+            min: 8,
+            max: 32,
+            step: 1,
+            condition: 'bStreamNames'
+        },
+        streamNamePlacementHorizontal: {
+            name: 'Horizontal placement',
+            type: 'dropdown',
+            value: 0,
+            alternatives: [
+                'Left',
+                'Middle',
+                'Right'
+            ],
+            condition: 'bStreamNames'
+        },
+        streamNamePlacementVertical: {
+            name: 'Vertical placement',
+            type: 'dropdown',
+            value: 0,
+            alternatives: [
+                'Top',
+                'Middle',
+                'Bottom'
+            ],
+            condition: 'bStreamNames'
+        },
+        ruler: {
+            type: 'ruler'
+        }
+    }
+
+    let _shadersUI = {
+        title: 'Shaders',
+        bFloatOutput: {
+            name: 'Float output',
+            type: 'bool',
+            value: true
+        },
+        ruler: {
+            type: 'ruler'
+        }
+    }
 
     function addStylesheetRules(rules) {
         let styleElement = document.createElement('style');
@@ -401,7 +467,7 @@ var nvis = new function () {
             display: none;
         }`);
 
-        addStylesheetRules(`.helpPopup {
+        addStylesheetRules(`div#helpPopup {
             color: black;
             background-color: #f0f0f0;
             border: 3px solid #808080;
@@ -415,7 +481,8 @@ var nvis = new function () {
         }`);
 
         //  UI popup
-        addStylesheetRules(`.uiPopup {
+        addStylesheetRules(`div#uiPopup {
+            z-index: 1;
             user-select: false;
             color: black;
             background-color: white;
@@ -428,14 +495,14 @@ var nvis = new function () {
             left: 20px;
             top: 20px;
         }`);
-        addStylesheetRules(`.uiPopup div.titleBar {
+        addStylesheetRules(`div#uiPopup div.titleBar {
             display: flex;
             margin-bottom: 15px;
         }`);
-        addStylesheetRules(`.uiPopup span.title {
+        addStylesheetRules(`div#uiPopup span.title {
             margin-right: 15px;
         }`);
-        addStylesheetRules(`.uiPopup div.titleBarBar {
+        addStylesheetRules(`div#uiPopup div.titleBarBar {
             flex-grow: 1;
             background: repeating-linear-gradient(
                 135deg,
@@ -445,31 +512,31 @@ var nvis = new function () {
                 #808080 20px
             );
         }`);
-        addStylesheetRules(`.uiPopup div.uiTitle:hover{
+        addStylesheetRules(`div#uiPopup div.uiTitle:hover{
             color: blue;
         }`);
-        addStylesheetRules(`.uiPopup div.uiBody {
+        addStylesheetRules(`div#uiPopup div.uiBody {
             margin-left: 50px;
         }`);
         // addStylesheetRules(`.uiPopup table {
         //     margin-left: 50px;
         // }`);
-        addStylesheetRules(`.uiPopup select {
+        addStylesheetRules(`div#uiPopup select {
             font: 20px Arial;
         }`);
-        addStylesheetRules(`.uiPopup label {
+        addStylesheetRules(`div#uiPopup label {
             margin-left: 5px;
         }`);
-        addStylesheetRules(`.uiPopup button {
+        addStylesheetRules(`div#uiPopup button {
             font: 20px Arial;
         }`);
-        addStylesheetRules(`.uiPopup button#shaderCreate {
+        addStylesheetRules(`div#uiPopup button#shaderCreate {
             margin-left: 5px;
         }`);
-        addStylesheetRules(`.uiPopup button#graphCreate {
+        addStylesheetRules(`div#uiPopup button#graphCreate {
             margin-left: 5px;
         }`);
-        addStylesheetRules(`.uiPopup input[type=range] {
+        addStylesheetRules(`div#uiPopup input[type=range] {
             width: 300px;
         }`);
 
@@ -512,7 +579,8 @@ var nvis = new function () {
         }`);
 
         //  info popup
-        addStylesheetRules(`.infoPopup {
+        addStylesheetRules(`div#infoPopup {
+            pointer-events: none;
             width: 100%;
             text-align: right;
             font: 42px Arial;
@@ -524,8 +592,22 @@ var nvis = new function () {
             text-shadow: 5px 5px 10px black;
         }`);
 
+        //  window info
+        addStylesheetRules(`div#windowInfo {
+            display: block;
+            pointer-events: none;
+            font: 18px Arial;
+            color: white;
+            opacity: 1.0;
+            position: absolute;
+            padding: 5px;
+            text-shadow: -2px -2px 2px black, 2px -2px 2px black, -2px 2px 2px black, 2px 2px 2px black;
+            //text-shadow: -5px -5px 15px black;
+        }`);
+
         //  performance info
-        addStylesheetRules(`#performanceInfo {
+        addStylesheetRules(`div#performanceInfo {
+            pointer-events: none;
             font: 16px Arial;
             color: white;
             opacity: 1.0;
@@ -538,6 +620,7 @@ var nvis = new function () {
         //  pixel info overlay
         addStylesheetRules(`div.overlay {
             display: none;
+            pointer-events: none;
             padding: 10px;
             margin: 20px;
             position: absolute;
@@ -551,6 +634,7 @@ var nvis = new function () {
         }`);
         addStylesheetRules(`div.overlay span {
             display: inline-block;
+            pointer-events: none;
             padding: 0px;
             margin: 0px 15px 0px 15px;
             width: 15px;
@@ -563,75 +647,174 @@ var nvis = new function () {
     //  API handling
 
     let _apiClear = function () {
-        return _apiCommand({ command: 'clear', argument: undefined });
+        return _apiCommand({
+            command: 'clear',
+            argument: undefined
+        });
     }
 
     let _apiZoom = function (level) {
-        return _apiCommand({ command: 'zoom', argument: level })
+        return _apiCommand({
+            command: 'zoom',
+            argument: level
+        });
     }
 
     let _apiPosition = function (x, y) {
-        return _apiCommand({ command: 'position', argument: { x: x, y: y } })
+        return _apiCommand({
+            command: 'position',
+            argument: {
+                x: x,
+                y: y
+            }
+        });
     }
 
     let _apiTranslate = function (x, y) {
-        return _apiCommand({ command: 'translate', argument: { x: x, y: y } })
+        return _apiCommand({
+            command: 'translate',
+            argument: {
+                x: x,
+                y: y
+            }
+        });
     }
 
     let _apiAnnotation = function (target, id, type, parameters) {
-        return _apiCommand({ command: 'annotation', argument: { target: target, id: id, type: type, parameters: parameters } });
+        return _apiCommand({
+            command: 'annotation',
+            argument: {
+                target: target,
+                id: id,
+                type: type,
+                parameters: parameters
+            }
+        });
     }
 
-    let _apiStream = function (images, bWindow = true) {
+    let _apiStream = function (images, parameters = {}, bWindow = true) {
         images = (Array.isArray(images) ? images : [images]);
-        return _apiCommand({ command: 'stream', argument: { name: images[0], images: images, window: bWindow } });
+        let name = (parameters.name === undefined ? images[0] : parameters.name);
+        return _apiCommand({
+            command: 'stream',
+            argument: {
+                name: name,
+                images: images,
+                window: bWindow
+            }
+        });
     }
 
-    let _apiVideo = function (fileName, bWindow = true) {
-        return _apiCommand({ command: 'video', argument: { name: fileName, fileName: fileName, window: bWindow } });
+    let _apiVideo = function (fileName, parameters = {}, bWindow = true) {
+        let name = (parameters.name === undefined ? fileName : parameters.name);
+        return _apiCommand({
+            command: 'video',
+            argument: {
+                name: name,
+                fileName: fileName,
+                window: bWindow
+            }
+        });
     }
 
     let _apiShaders = function (fileNames) {
         fileNames = (Array.isArray(fileNames) ? fileNames : [fileNames]);
         for (let i = 0; i < fileNames.length; i++) {
-            _apiCommand({ command: 'loadShader', argument: fileNames[i] });
+            _apiCommand({
+                command: 'loadShader',
+                argument: fileNames[i]
+            });
         }
     }
 
     let _apiShader = function (fileNameOrId, inputs = undefined, parameters = {}, bWindow = true) {
+        let name = (parameters.name === undefined ? "TODO" : parameters.name);
         if (typeof fileNameOrId == 'string') {
-            return _apiCommand({ command: 'shader', argument: { fileName: fileNameOrId, parameters: parameters, inputs: inputs, window: bWindow } });
+            return _apiCommand({
+                command: 'shader',
+                argument: {
+                    fileName: fileNameOrId,
+                    parameters: parameters,
+                    inputs: inputs,
+                    window: bWindow
+                }
+            });
         } else if (typeof fileNameOrId == 'number') {
-            return _apiCommand({ command: 'shader', argument: { shaderId: fileNameOrId, parameters: parameters, inputs: inputs, window: bWindow } });
+            return _apiCommand({
+                command: 'shader',
+                argument: {
+                    shaderId: fileNameOrId,
+                    parameters: parameters,
+                    inputs: inputs,
+                    window: bWindow
+                }
+            });
         }
     }
 
     let _apiGraphs = function (fileNames) {
         fileNames = (Array.isArray(fileNames) ? fileNames : [fileNames]);
         for (let i = 0; i < fileNames.length; i++) {
-            _apiCommand({ command: 'loadShaderGraphDescription', argument: fileNames[i] });
+            _apiCommand({
+                command: 'loadShaderGraphDescription',
+                argument: fileNames[i]
+            });
         }
     }
 
     let _apiGraph = function (fileNameOrId, inputs = undefined, parameters = {}, bWindow = true) {
         if (typeof fileNameOrId == 'string') {
-            return _apiCommand({ command: 'shaderGraph', argument: { fileName: fileNameOrId, parameters: parameters, inputs: inputs, window: bWindow } });
+            return _apiCommand({
+                command: 'shaderGraph',
+                argument: {
+                    fileName: fileNameOrId,
+                    parameters: parameters,
+                    inputs: inputs,
+                    window: bWindow
+                }
+            });
         } else if (typeof fileNameOrId == 'number') {
-            return _apiCommand({ command: 'shaderGraph', argument: { shaderGraphDescriptionId: fileNameOrId, parameters: parameters, inputs: inputs, window: bWindow } });
+            return _apiCommand({
+                command: 'shaderGraph',
+                argument: {
+                    shaderGraphDescriptionId: fileNameOrId,
+                    name: parameters.name,
+                    parameters: parameters,
+                    inputs: inputs,
+                    window: bWindow
+                }
+            });
         }
     }
 
     let _apiGenerator = function (fileNameOrId, parameters = {}, bWindow = true) {
         // return _apiCommand({ command: 'generator', argument: { fileName: fileName, width: width, height: height, window: bWindow } });
         if (typeof fileNameOrId == 'string') {
-            return _apiCommand({ command: 'generator', argument: { fileName: fileNameOrId, parameters: parameters, window: bWindow } });
+            return _apiCommand({
+                command: 'generator',
+                argument: {
+                    fileName: fileNameOrId,
+                    parameters: parameters,
+                    window: bWindow
+                }
+            });
         } else if (typeof fileNameOrId == 'number') {
-            return _apiCommand({ command: 'generator', argument: { shaderId: fileNameOrId, parameters: parameters, window: bWindow } });
+            return _apiCommand({
+                command: 'generator',
+                argument: {
+                    shaderId: fileNameOrId,
+                    parameters: parameters,
+                    window: bWindow
+                }
+            });
         }
     }
 
     let _apiWindow = function (streamId = 0) {
-        return _apiCommand({ command: 'window', argument: streamId });
+        return _apiCommand({
+            command: 'window',
+            argument: streamId
+        });
     }
 
     let _parseConfig = function (jsonObject) {
@@ -647,14 +830,20 @@ var nvis = new function () {
         //  Zoom
         let zoom = config.zoom;
         if (zoom !== undefined) {
-            _apiCommand({ command: 'zoom', argument: zoom });
+            _apiCommand({
+                command: 'zoom',
+                argument: zoom
+            });
         }
 
         //  shaders
         let shaders = config.shaders;
         if (shaders !== undefined) {
             for (let i = 0; i < shaders.length; i++) {
-                _apiCommand({ command: 'loadShader', argument: shaders[i] });
+                _apiCommand({
+                    command: 'loadShader',
+                    argument: shaders[i]
+                });
             }
         }
 
@@ -662,7 +851,10 @@ var nvis = new function () {
         let streams = config.streams;
         if (streams !== undefined) {
             for (let i = 0; i < streams.length; i++) {
-                _apiCommand({ command: 'stream', argument: streams[i] });
+                _apiCommand({
+                    command: 'stream',
+                    argument: streams[i]
+                });
             }
         }
 
@@ -670,7 +862,10 @@ var nvis = new function () {
         let streamIds = config.windows;
         if (streamIds !== undefined) {
             for (let i = 0; i < streamIds.length; i++) {
-                _apiCommand({ command: 'window', argument: streamIds[i] });
+                _apiCommand({
+                    command: 'window',
+                    argument: streamIds[i]
+                });
             }
         }
     }
@@ -703,7 +898,7 @@ var nvis = new function () {
 
         } else if (command == 'zoom') {
 
-            let minLevel = (_settings.bLockZoom,value ? 1.0 : _state.zoom.MinLevel);
+            let minLevel = (_settingsUI.bLockZoom,value ? 1.0 : _state.zoom.MinLevel);
             _state.zoom.level = Math.min(Math.max(argument, minLevel), _state.zoom.MaxLevel);
             _renderer.windows.updateTextureCoordinates();
             return _state.zoom.level;
@@ -751,14 +946,17 @@ var nvis = new function () {
 
             let streamId = undefined;
             if (argument.images !== undefined) {
-                streamId = _renderer.loadStream(Array.isArray(argument.images) ? argument.images : [argument.images]);
+                streamId = _renderer.loadStream(Array.isArray(argument.images) ? argument.images : [argument.images], argument.name);
             } else if (argument.shader !== undefined) {
                 let shaderId = argument.shader;
                 let newStream = _renderer.addShaderStream(shaderId);
                 let inputStreamIds = argument.inputs;
                 if (inputStreamIds === undefined) {
                     //  no inputs => generator => fetch dimensions from config
-                    let dimensions = { w: argument.width, h: argument.height };
+                    let dimensions = {
+                        w: argument.width,
+                        h: argument.height
+                    };
                     newStream.setDimensions(dimensions);
                     if (_renderer.windows.streamPxDimensions === undefined) {
                         _renderer.windows.streamPxDimensions = dimensions;
@@ -774,6 +972,8 @@ var nvis = new function () {
                 //     if (_renderer.windows.streamPxDimensions === undefined) {
                 //         _renderer.windows.streamPxDimensions = dimensions;
                 //     }
+                console.log('name 2: ' + argument.name);
+                newStream.name = argument.name;
             }
             if (argument.window || _renderer.windows.windows.length == 0) {
                 _renderer.addWindow(_renderer.streams.length - 1);
@@ -800,7 +1000,7 @@ var nvis = new function () {
                 argument.shaderGraphId = shaderGraphId;
                 _renderer.shaderGraphQueue.push(argument);
             } else {
-                _renderer.parseShaderGraph(shaderGraphId, argument);
+                _renderer.parseShaderGraph(argument);
             }
 
         } else if (command == 'shader') {
@@ -837,7 +1037,10 @@ var nvis = new function () {
             }
             let newStream = _renderer.addShaderStream(shaderId);
             newStream.bFloat = (argument.parameters.float === undefined ? true : argument.parameters.float);
-            let dimensions = { w: argument.parameters.width, h: argument.parameters.height };
+            let dimensions = {
+                w: argument.parameters.width,
+                h: argument.parameters.height
+            };
             newStream.setDimensions(dimensions);
             if (_renderer.windows.streamPxDimensions === undefined) {
                 _renderer.windows.streamPxDimensions = dimensions;
@@ -1028,12 +1231,12 @@ var nvis = new function () {
                 if (self.type === VideoToFramesMethod.fps) {
                     totalFrames = self.duration * self.amount;
                 }
-                let frameRate = _settings.videoFPS.value;
+                let frameRate = _settingsUI.videoFPS.value;
                 totalFrames = self.duration * frameRate;  //  TODO: figure out frame rate of video, if possible (assuming 30 FPS for now)
                 let frameTime = 1.0 / frameRate;
                 let numFrames = 0;
-                let targetNumFrames = _settings.videoNumFrames.value;
-                let beginFrame = _settings.videoStartFrame.value;
+                let targetNumFrames = _settingsUI.videoNumFrames.value;
+                let beginFrame = _settingsUI.videoStartFrame.value;
                 // let endFrame = beginFrame + targetNumFrames;
                 for (let time = frameTime * beginFrame; time < self.duration && numFrames < targetNumFrames; time += frameTime) {
                     let frame = await self.getVideoFrame(self.video, NvisVideoParser.context, time);
@@ -4316,6 +4519,7 @@ var nvis = new function () {
         constructor() {
             this.id = -1;
             this.descriptionId = -1;
+            this.name = '';
             this.arguments = undefined;
             this.json = undefined;
             this.streamIds = [];  //  participating streams
@@ -4343,6 +4547,7 @@ var nvis = new function () {
 
             this.dimensions = undefined;
 
+            this.name = undefined;
             this.fileNames = [];
 
             this.textures = [];
@@ -4351,14 +4556,6 @@ var nvis = new function () {
 
             this.shaderId = shaderId;  //  = -1 for file streams
             this.shaderGraphId = -1;
-            // this.shaderGraph = {
-            //     id: -1,
-            //     json: undefined,
-            //     streamIds: [],
-            //     inputStreams: [],
-            //     bInput: false,
-            //     bOutput: false
-            // };
 
             this.inputStreamIds = [];
             this.shaderJSONObject = undefined;
@@ -4389,12 +4586,6 @@ var nvis = new function () {
                 gl.TEXTURE6,
                 gl.TEXTURE7,
             ];
-
-            // let gl = this.glContext;
-            // this.outputTexture = gl.createTexture();
-            // this.frameBuffer = gl.createFramebuffer();
-            // gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer);
-            // gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.outputTexture, 0);
 
             this.numTextures = 1;
             this.currentTexture = 0;
@@ -4545,7 +4736,7 @@ var nvis = new function () {
 
 
         uiUpdate(elementId, shaderGraphs) {
-            //_object[key].value = value;
+
             let key = elementId.replace(/\-.*$/, '');
             let element = document.getElementById(elementId);
             let object = (this.shaderGraphId == -1 ? this.shaderJSONObject.UI[key] : shaderGraphs[this.shaderGraphId].json.UI[key]);
@@ -4798,7 +4989,7 @@ var nvis = new function () {
 
                     reader.onload = function (event) {
 
-                        //  TODO: allow streams of EXRs
+                        //  TODO: allow streams of PFMs
                         let file = new NvisPFMFile(files[0].name, reader.result);
 
                         if (file.bSuccess) {
@@ -4821,35 +5012,17 @@ var nvis = new function () {
         }
 
 
-        getShaderId() {
-            return this.shaderId;
-        }
-
-
-        setShaderId(shaderId) {
-            this.shaderId = shaderId;
-        }
-
-
         getDimensions() {
             return this.dimensions;
         }
 
 
         getInputStreamId(inputId) {
-            // if (this.shaderGraph.id == -1) {
-                return this.inputStreamIds[inputId];
-            // } else {
-            //     return this.shaderGraph.inputStreams[inputId];
-            // }
+            return this.inputStreamIds[inputId];
         }
 
         setInputStreamId(inputId, streamId) {
-            // if (this.shaderGraph.id == -1) {
-                this.inputStreamIds[inputId] = streamId;
-            // } else {
-            //     this.shaderGraph.inputStreams[inputId] = streamId;
-            // }
+            this.inputStreamIds[inputId] = streamId;
         }
 
 
@@ -4870,16 +5043,21 @@ var nvis = new function () {
 
 
         getName(shaderGraphs) {
-            //  TODO: fix
             let name = '';
-            if (this.fileNames.length > 0) {
+            if (this.name !== undefined) {
+                name = this.name;
+            } else if (this.fileNames.length > 0) {
                 name += this.fileNames[0];
                 if (this.fileNames.length > 1) {
                     name += (' (' + this.fileNames.length + ')');
                 }
             // } else if (this.shaderGraphId != -1 && this.shaderGraph.bOutput) {
             } else if (this.shaderGraphId != -1) {
-                name = shaderGraphs[this.shaderGraphId].json.name;
+                if (shaderGraphs === undefined) {
+                    return '';
+                }
+                let shaderGraph = shaderGraphs[this.shaderGraphId];
+                name = (shaderGraph.name === undefined ? shaderGraph.json.name : shaderGraph.name);
             } else if (this.bUIReady) {
                 name = this.shaderJSONObject.name;
             }
@@ -5038,16 +5216,14 @@ var nvis = new function () {
 
             }
 
-            // console.log('NvisStream.render()  stream ' + streamId + ' (' + this.shaderId + '): ' + JSON.stringify(inputStreamIds));
-
             let uTonemapper = gl.getUniformLocation(shaderProgram, 'uTonemapper');
-            if (_settings.bGlobalTonemapping.value) {
-                gl.uniform1i(uTonemapper, _settings.tonemapper.value);
-                if (_settings.tonemapper.value == 0) {
+            if (_settingsUI.bGlobalTonemapping.value) {
+                gl.uniform1i(uTonemapper, _settingsUI.tonemapper.value);
+                if (_settingsUI.tonemapper.value == 0) {
                     let uGamma = gl.getUniformLocation(shaderProgram, 'uGamma');
-                    gl.uniform1f(uGamma, _settings.gamma.value);
+                    gl.uniform1f(uGamma, _settingsUI.gamma.value);
                     let uExposure = gl.getUniformLocation(shaderProgram, 'uExposure');
-                    gl.uniform1f(uExposure, _settings.exposure.value);
+                    gl.uniform1f(uExposure, _settingsUI.exposure.value);
                 }
             } else {
                 gl.uniform1i(uTonemapper, -1);
@@ -5419,56 +5595,6 @@ var nvis = new function () {
                         }
                         sEl.appendChild(sOp);
 
-
-                        // let bValidStream = (otherStream.shaderGraphId == -1);
-                        // let bValidShaderGraph = (otherStream.shaderGraphId != -1 && shaderGraphs[otherStream.shaderGraphId].outputStreamId == otherStreamId);
-
-                        // // bValidStream = (otherShaderGraph === undefined || otherShaderGraph.outputStreamId == otherStreamId);
-                        // // bValidStream &&= bValidShaderGraph;
-
-                        // // if (shaderGraph !== undefined) {
-
-                        // //     bValidStream &&= (otherStream.shaderGraphId == -1 || otherStreamId == shaderGraph.outputStreamId);
-
-                        // // console.log('id: ' + otherStreamId + ', stream: ' + bValidStream + ', graph: ' + bValidShaderGraph)
-                        // if (bValidStream || bValidShaderGraph) {
-
-                        //     if (!otherStream.bUIReady && otherStream.shaderId != -1) {
-                        //         let otherShader = shaders.shaders[otherStream.shaderId];
-                        //         otherStream.prepareUI(otherShader);
-                        //     }
-
-                        //     let sOp = document.createElement('option');
-                        //     sOp.innerHTML = otherStream.getName(shaderGraphs) + ' ' + otherStreamId;
-                        //     sOp.value = otherStreamId;
-
-                        //     let sourceId = (bValidStream ? this.inputStreamIds[inputId] : shaderGraphs[otherStream.shaderGraphId].inputStreamIds[inputId]);
-                        //     // if (this.inputStreamIds[inputId] == otherStreamId) {
-                        //     if (sourceId == otherStreamId) {
-                        //         sOp.setAttribute('selected', true);
-                        //     }
-                        //     sEl.appendChild(sOp);
-                        // }
-
-                        // } else {
-
-                        //     if (bValidStream) {
-
-                        //         if (!otherStream.bUIReady && otherStream.shaderId != -1) {
-                        //             let otherShader = shaders.shaders[otherStream.shaderId];
-                        //             otherStream.prepareUI(otherShader);
-                        //         }
-
-                        //         let sOp = document.createElement('option');
-                        //         sOp.innerHTML = otherStream.getName(shaderGraphs) + ' ' + otherStreamId;
-                        //         sOp.value = otherStreamId;
-                        //         if (this.inputStreamIds[inputId] == otherStreamId) {
-                        //             sOp.setAttribute('selected', true);
-                        //         }
-                        //         sEl.appendChild(sOp);
-                        //     }
-
-                        // }
                     }
 
                     let inputDiv = document.createElement('div');
@@ -5564,7 +5690,7 @@ var nvis = new function () {
                 let g = color.g * factor;;
                 let b = color.b * factor;;
                 let a = color.a * factor;
-                let decimals = _settings.pixelValueDecimals.value;
+                let decimals = _settingsUI.pixelValueDecimals.value;
                 this.text += 'position: ' + Math.floor(coordinates.x) + ', ' + Math.floor(coordinates.y) + '<br/>';
                 this.text += '<span style=\'background-color: rgb(' + r + ',0,0)\'></span>R: ' + (bFloat ? color.r.toFixed(decimals) : color.r) + '<br/>';
                 this.text += '<span style=\'background-color: rgb(0,' + g + ',0)\'></span>G: ' + (bFloat ? color.g.toFixed(decimals) : color.g) + '<br/>';
@@ -5684,6 +5810,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         clear() {
             this.streamPxDimensions = undefined;
+            for (let i = 0; i < this.windows.length; i++) {
+                this.windows[i].clear();
+            }
             this.windows = [];
             this.welcome.show();
             this.adjust();
@@ -5829,8 +5958,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         delete(windowId) {
             if (this.windows.length > 1 && windowId !== undefined && windowId < this.windows.length) {
-                let overlayDiv = this.windows[windowId].overlay.div;
-                overlayDiv.parentElement.removeChild(overlayDiv);
+                // let window = this.windows[windowId];
+                this.windows[windowId].clear();
+                // let overlayDiv = this.windows[windowId].overlay.div;
+                // overlayDiv.parentElement.removeChild(overlayDiv);
                 this.windows.splice(windowId, 1);
                 this.adjust();
             }
@@ -5839,7 +5970,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         resize() {
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
-                let position = { x: (windowId % w) * size.w, y: Math.trunc(windowId / w) * size.h };
+                let position = {
+                    x: (windowId % w) * size.w,
+                    y: Math.trunc(windowId / w) * size.h
+                };
                 this.windows[windowId].resize(position, size);
             }
         }
@@ -6001,12 +6135,18 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.glContext.viewport(0, 0, this.canvas.width, this.canvas.height);
 
             //  determine window dimensions
-            let winDimensions = { w: 1.0 / w, h: 1.0 / h };
+            let winDimensions = {
+                w: 1.0 / w,
+                h: 1.0 / h
+            };
 
             //  use actual canvas border values
             let tw = this.canvas.width;
             let th = this.canvas.height;
-            this.winPxDimensions = { w: tw / w, h: th / h };
+            this.winPxDimensions = {
+                w: tw / w,
+                h: th / h
+            };
             _state.zoom.winAspectRatio = this.winPxDimensions.h / this.winPxDimensions.w;
 
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
@@ -6075,7 +6215,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 let oldStreamCoords = this.getStreamCoordinates(canvasPxCoords);
 
                 let factor = (bHigh ? _state.zoom.HighFactor : _state.zoom.LowFactor);
-                let minLevel = (_settings.bLockZoom.value ? 1.0 : _state.zoom.MinLevel);
+                let minLevel = (_settingsUI.bLockZoom.value ? 1.0 : _state.zoom.MinLevel);
                 _state.zoom.level *= (direction > 0 ? factor : 1.0 / factor);
                 _state.zoom.level = Math.min(Math.max(_state.zoom.level, minLevel), _state.zoom.MaxLevel);
                 _state.zoom.mouseWinCoords = winRelCoords;
@@ -6154,31 +6294,15 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 vStreamWindowIds[streamId] == -1
             }
 
-            // console.log('Need to render streams: ' + JSON.stringify(vbStreamsToRender));
-            // console.log('Stream windows: ' + JSON.stringify(vStreamWindowIds));
-
             for (let streamId = 0; streamId < streams.length; streamId++) {
-            // for (let streamId = 0; streamId < streams.length; streamId++) {
-                // if (vbStreamsToRender[streamId] && vStreamWindowIds[streamId] == -1) {
-                    // console.log('Would render stream ' + streamId);
-                    streams[streamId].render(frameId, shaders, streams, shaderGraphs, streamId);
-                // }
+                streams[streamId].render(frameId, shaders, streams, shaderGraphs, streamId);
             }
-
-            // for (let streamId = vbStreamsToRender.length - 1; streamId >= 0; streamId--) {
-            //     //     // for (let streamId = 0; streamId < streams.length; streamId++) {
-            //     //     if (vbStreamsToRender[streamId] && vStreamWindowIds[streamId] == -1) {
-            //     //         // console.log('Would render stream ' + streamId);
-            //     //         streams[streamId].render(frameId, shaders, streams);
-            //     //     }
-            //     streams[streamId].render(frameId, shaders, streams);
-            // }
 
             for (let windowId = 0; windowId < this.windows.length; windowId++) {
-                this.windows[windowId].render(windowId, frameId, streams, shaders);
+                this.windows[windowId].render(windowId, frameId, streams, shaders, shaderGraphs);
             }
 
-            if (_settings.bDrawPixel.value && _state.zoom.level >= 8.0) {
+            if (_settingsUI.bDrawPixel.value && _state.zoom.level >= 8.0) {
                 let canvasCoords = _state.input.mouse.canvasCoords;
                 let activeWindowId = this.getWindowId(canvasCoords);
 
@@ -6258,8 +6382,19 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             this.annotations = new NvisAnnotations(this.glContext);
 
-            this.position = { x: 0, y: 0 };
-            this.dimensions = { w: 0, h: 0 };
+            this.infoDiv = document.createElement('div');
+            this.infoDiv.id = 'windowInfo';
+            this.infoDiv.style.fontSize = (_windowsUI.streamNameSize.value + 'pt');
+            document.body.appendChild(this.infoDiv);
+
+            this.position = {
+                x: 0,
+                y: 0
+            };
+            this.dimensions = {
+                w: 0,
+                h: 0
+            };
 
             let gl = this.glContext;
 
@@ -6270,35 +6405,64 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, this.vertexPositions, gl.STATIC_DRAW);
 
-            //  TODO: only one of each of these needed (for shader streams), move elsewhere
-
-            // let fullVertexPositions = new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
-            // this.fullVertexPositionBuffer = gl.createBuffer();
-            // gl.bindBuffer(gl.ARRAY_BUFFER, this.fullVertexPositionBuffer);
-            // gl.bufferData(gl.ARRAY_BUFFER, fullVertexPositions, gl.STATIC_DRAW);
-
-            // let fullTextureCoordinates = new Float32Array([0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
-            // this.fullTextureCoordinateBuffer = gl.createBuffer();
-            // gl.bindBuffer(gl.ARRAY_BUFFER, this.fullTextureCoordinateBuffer);
-            // gl.bufferData(gl.ARRAY_BUFFER, fullTextureCoordinates, gl.STATIC_DRAW);
-
             this.overlay = new NvisOverlay(this.canvas);
             document.body.appendChild(this.overlay.div);
 
             this.resize({ x: 0.0, y: 0.0 }, { w: 1.0, h: 1.0 });
-
-            // this.TextureUnits = [
-            //     gl.TEXTURE0,
-            //     gl.TEXTURE1,
-            //     gl.TEXTURE2,
-            //     gl.TEXTURE3,
-            //     gl.TEXTURE4,
-            //     gl.TEXTURE5,
-            //     gl.TEXTURE6,
-            //     gl.TEXTURE7,
-            // ];
         }
 
+        clear() {
+            document.body.removeChild(this.infoDiv);
+            document.body.removeChild(this.overlay.div);
+        }
+
+
+        positionStreamNames() {
+            //  default top-left
+            let left = this.position.x;
+            let top = this.position.y;
+
+            let hp = _windowsUI.streamNamePlacementHorizontal.value;
+            let vp = _windowsUI.streamNamePlacementVertical.value;
+            if (hp == 1) {
+                //  middle
+                left += this.dimensions.w / 2;
+            } else if (hp == 2) {
+                //  right
+                left += this.dimensions.w;
+            }
+            if (vp == 1) {
+                //  middle
+                top += this.dimensions.h / 2;
+            } else if (vp == 2) {
+                //  bottom
+                top += this.dimensions.h;
+            }
+
+            left *= this.canvas.width;
+            top *= this.canvas.height;
+            left += _state.layout.border;
+            top += _state.layout.border;
+
+            if (hp == 1) {
+                //  middle
+                left -= this.infoDiv.clientWidth / 2;
+            } else if (hp == 2) {
+                //  right
+                left -= this.infoDiv.clientWidth;
+            }
+            if (vp == 1) {
+                //  middle
+                top -= this.infoDiv.clientHeight / 2;
+            } else if (vp == 2) {
+                //  bottom
+                top -= this.infoDiv.clientHeight;
+            }
+
+            this.infoDiv.style.left = left + 'px';
+            this.infoDiv.style.top = top + 'px';
+
+        }
 
         resize(position, dimensions) {
             this.position = position;
@@ -6329,7 +6493,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, this.vertexPositions, gl.STATIC_DRAW);
+
+            this.positionStreamNames();
         }
+
 
         //  TODO: temporary duplicate from NvisStream class, make static elsewhere
         findStreamDimensions(streamId, streams, shaders) {
@@ -6374,7 +6541,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
 
-        render(windowId, frameId, streams, shaders) {
+        render(windowId, frameId, streams, shaders, shaderGraphs) {
             let gl = this.glContext;
 
             //  below, checks are needed due to asynch file/shader loading
@@ -6389,7 +6556,9 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 return;
             }
 
-            let shaderId = stream.getShaderId();
+            this.infoDiv.innerHTML = (_windowsUI.bStreamNames.value ? stream.getName(shaderGraphs) : '');
+
+            let shaderId = stream.shaderId;
 
             if (_state.input.mouse.showInfo && _state.input.mouse.streamCoords !== undefined) {
                 let loc = _state.input.mouse.streamCoords;
@@ -6438,7 +6607,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 gl.uniform1i(uSampler, 0);
 
                 let uAlphaCheckerboard = gl.getUniformLocation(shaderProgram, 'uAlphaCheckerboard');
-                gl.uniform1i(uAlphaCheckerboard, _settings.bAlphaCheckerboard.value);
+                gl.uniform1i(uAlphaCheckerboard, _settingsUI.bAlphaCheckerboard.value);
 
                 //  TODO: this shouldn't be necessary, can get dimensions directly in shader
                 gl.uniform2f(gl.getUniformLocation(shaderProgram, 'uDimensions'), streamDims.w, streamDims.h);
@@ -6475,8 +6644,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             if (z > 10.0) {
                 let alpha = Math.min(1.0, (z - 16.0) / 16.0);
 
-                if (_settings.bDrawGrid.value) {
-
+                if (_settingsUI.bDrawGrid.value) {
                     this.gridDrawer.update(windowId, offset, pixelSize, alpha);
                     this.gridDrawer.render();
                 }
@@ -6646,7 +6814,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             gl.uniform1i(uSampler, 0);
 
             let uAlphaCheckerboard = gl.getUniformLocation(this.shaderProgram, 'uAlphaCheckerboard');
-            gl.uniform1i(uAlphaCheckerboard, _settings.bAlphaCheckerboard.value);
+            gl.uniform1i(uAlphaCheckerboard, _settingsUI.bAlphaCheckerboard.value);
 
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -7184,7 +7352,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             this.uiHtml = '';
 
-            this.settingsUI = new NvisUI('settings', _settings, this);
+            this.settingsUI = new NvisUI('settings', _settingsUI, this);
+            this.streamsUI = new NvisUI('streams', _streamsUI, this);
+            this.windowsUI = new NvisUI('windows', _windowsUI, this);
+            this.shadersUI = new NvisUI('shaders', _shadersUI, this);
 
             this.canvas = document.createElement('canvas');
 
@@ -7208,7 +7379,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.shaderGraphs = [];
 
             this.helpPopup = document.createElement('div');
-            this.helpPopup.className = 'helpPopup';
+            this.helpPopup.id = 'helpPopup';
             this.helpPopup.innerHTML = '<b><i>nvis</i><br/>';
             this.helpPopup.innerHTML += '<br/>';
             this.helpPopup.innerHTML += 'Drag-and-drop image or video files to this window...<br/>';
@@ -7226,15 +7397,15 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.helpPopup.innerHTML += 'l - open file load dialog<br/>';
             this.helpPopup.innerHTML += 'i - toggle per-pixel information<br/>';
             this.helpPopup.innerHTML += 'a - toggle automatic layout of windows<br/>';
+            this.helpPopup.innerHTML += 'z - reset zoom level to 1.0<br/>';
+            this.helpPopup.innerHTML += 't - toggle showing of stream names<br/>';
             this.helpPopup.innerHTML += '+/- - increase/decrease the window layout width<br/>';
 
             this.infoPopup = document.createElement('div');
             this.infoPopup.id = 'infoPopup';
-            this.infoPopup.className = 'infoPopup';
 
             this.uiPopup = document.createElement('div');
             this.uiPopup.id = 'uiPopup';
-            this.uiPopup.className = 'uiPopup';
             this.updateUIPopup();
 
             this.fileInput = document.createElement('input');
@@ -7263,7 +7434,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.canvas.addEventListener('mousemove', (event) => this.onMouseMove(event));
             this.canvas.addEventListener('mouseup', (event) => this.onMouseUp(event));
             this.canvas.addEventListener('mouseleave', (event) => this.onMouseUp(event));
-            this.canvas.addEventListener('wheel', (event) => this.onWheel(event));
+            this.canvas.addEventListener('wheel', (event) => this.onWheel(event), { passive: true });
 
             document.body.addEventListener('paste', (event) => this.onFileDrop(event));
             document.body.addEventListener('drop', (event) => this.onFileDrop(event));
@@ -7276,7 +7447,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         };
 
         onWheel(event) {
-            event.preventDefault();
+            // event.preventDefault();
             let level = this.windows.zoom(-Math.sign(event.deltaY), _state.input.mouse.canvasCoords, _state.input.keyboard.shift);
             this.popupInfo('zoom = ' + level.toFixed(1) + 'x');
         }
@@ -7359,10 +7530,13 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
 
             //  streams
+            this.streamsUI.build();
             let streamsDiv = document.createElement('div');
             streamsDiv.id = 'tabStreams';
             streamsDiv.className = 'tabContent';
+            // streamsDiv.appendChild(this.streamsUI.dom);
             streamsDiv.style.display = (_state.ui.tabId == 'tabStreams' ? 'block' : 'none');
+
             for (let streamId = 0; streamId < this.streams.length; streamId++) {
                 let ui = this.streams[streamId].getUI(streamId, this.streams, this.shaders, this.shaderGraphs);
                 if (ui !== undefined) {
@@ -7372,10 +7546,13 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
 
             //  windows
+            this.windowsUI.build();
             let windowsDiv = document.createElement('div');
             windowsDiv.id = 'tabWindows';
             windowsDiv.className = 'tabContent';
             windowsDiv.style.display = (_state.ui.tabId == 'tabWindows' ? 'block' : 'none');
+            windowsDiv.appendChild(this.windowsUI.dom);
+            
             for (let windowId = 0; windowId < this.windows.getNumWindows(); windowId++) {
 
                 let select = document.createElement('select');
@@ -7440,20 +7617,12 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 }
             }
 
+            this.shadersUI.build();
             let shadersDiv = document.createElement('div');
             shadersDiv.id = 'tabShaders';
             shadersDiv.className = 'tabContent';
             shadersDiv.style.display = (_state.ui.tabId == 'tabShaders' ? 'block' : 'none');
-
-            let formatLabel = document.createElement('label');
-            formatLabel.innerHTML = 'Float output: ';
-            let formatCheckbox = document.createElement('input');
-            formatCheckbox.setAttribute('id', 'bFloatOutput');
-            formatCheckbox.setAttribute('type', 'checkbox');
-            formatCheckbox.setAttribute('checked', true);
-            let formatDiv = document.createElement('div');
-            formatDiv.appendChild(formatLabel);
-            formatDiv.appendChild(formatCheckbox);
+            shadersDiv.appendChild(this.shadersUI.dom);
 
             let shaderLabel = document.createElement('label');
             shaderLabel.innerHTML = 'Shader: ';
@@ -7472,7 +7641,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 let shaderId = parseInt(document.getElementById('shaderStream').value);
 
                 let newStream = this.addShaderStream(shaderId);
-                newStream.bFloat = document.getElementById('bFloatOutput').checked;
+                newStream.bFloat = _shadersUI.bFloatOutput.value;
 
                 let numInputs = this.shaders.shaders[shaderId].numInputs;
                 let inputStreams = [];
@@ -7579,8 +7748,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             selectGraphDiv.appendChild(graphSelect);
             selectGraphDiv.appendChild(graphButton);
 
-
-            shadersDiv.appendChild(formatDiv);
+            // shadersDiv.appendChild(formatDiv);
             shadersDiv.appendChild(selectShaderDiv);
             shadersDiv.appendChild(selectGraphDiv);
 
@@ -7811,22 +7979,22 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     break;
                 case ' ':
                     _state.animation.toggleActive();
-                    _settings.bAnimate.value = _state.animation.active;
+                    _settingsUI.bAnimate.value = _state.animation.active;
                     this.popupInfo('Animation: ' + (_state.animation.active ? 'on' : 'off'));
                     break;
                 case 'a':
                     _state.layout.bAutomatic = !_state.layout.bAutomatic;
-                    _settings.bAutomaticLayout.value = _state.layout.bAutomatic;
+                    _settingsUI.bAutomaticLayout.value = _state.layout.bAutomatic;
                     this.popupInfo('Automatic window placement: ' + (_state.layout.bAutomatic ? 'on' : 'off'));
                     this.windows.adjust();
                     break;
                 case 'g':
-                    _settings.bDrawGrid.value = !_settings.bDrawGrid.value;
-                    this.popupInfo('Draw grid: ' + (_settings.bDrawGrid.value ? 'on' : 'off'));
+                    _settingsUI.bDrawGrid.value = !_settingsUI.bDrawGrid.value;
+                    this.popupInfo('Draw grid: ' + (_settingsUI.bDrawGrid.value ? 'on' : 'off'));
                     break;
                 case 'p':
                     _state.animation.togglePingPong();
-                    _settings.bPingPong.value = _state.animation.pingPong;
+                    _settingsUI.bPingPong.value = _state.animation.pingPong;
                     this.popupInfo('Animation ping-pong: ' + (_state.animation.pingPong ? 'on' : 'off'));
                     break;
                 case 'z':
@@ -7900,6 +8068,12 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                         //this.renderer.loadShader('glsl/difference.json');
                     }
                     break;
+                case 'F':
+                    if (this.streams.length > 1) {
+                        _apiGraph(0, [0, 1], {}, true);
+                        //this.renderer.loadShader('glsl/difference.json');
+                    }
+                    break;
                 case 'w':
                     this.windows.add();
                     this.updateUIPopup();
@@ -7923,6 +8097,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     document.body.removeChild(pom);
                     document.body.removeChild(_renderer.saveCanvas.canvas);
 
+                    break;
+                case 't':
+                    _windowsUI.bStreamNames.value = !_windowsUI.bStreamNames.value;
+                    console.log(_windowsUI.bStreamNames.value);
                     break;
                 case 'h':
                     this.helpPopup.style.display = 'block';
@@ -8029,7 +8207,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     x: _state.input.mouse.previousCanvasCoords.x - _state.input.mouse.canvasCoords.x,
                     y: _state.input.mouse.previousCanvasCoords.y - _state.input.mouse.canvasCoords.y
                 }
-                if (!_settings.bLockTranslation.value) {
+                if (!_settingsUI.bLockTranslation.value) {
                     this.windows.translate(canvasOffset);
                 }
             }
@@ -8128,6 +8306,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                         newStream.drop([files[i]], this.windows);
                         this.streams.push(newStream);
                         this.addWindow(this.streams.length - 1);
+                        console.log('streamId: ' + (this.streams.length - 1));
                     }
                     // _state.animation.setNumFrames(newStream.getNumImages());  //  TODO: check
                 }
@@ -8200,6 +8379,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             let shaderGraph = new NvisShaderGraph();
             shaderGraph.id = this.shaderGraphs.length;
             shaderGraph.descriptionId = argument.shaderGraphDescriptionId;
+            shaderGraph.name = argument.name;
             shaderGraph.argument = argument;
             shaderGraph.json = json;
             shaderGraph.inputStreamIds = (argument.inputs === undefined ? [] : argument.inputs);
@@ -8318,9 +8498,12 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.windows.adjust();
         }
 
-        loadStream(fileNames) {
+        loadStream(fileNames, name) {
             let newStream = new NvisStream(this.glContext);
 
+            if (name !== undefined) {
+                newStream.name = name;
+            }
             //newStream.load(fileNames, (dim) => this.newStreamCallback(dim));
             newStream.load(fileNames, this.windows);
 
@@ -8424,10 +8607,12 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
     let _uiUpdateParameter = function (objectId, elementId, rowId, bAllConditionsMet, bUpdateUI) {
         let key = elementId.replace(/^.*\-/, '');
         let element = document.getElementById(elementId);
-        let object = _settings[key];
+        let object = (objectId == 'settings' ?
+            _settingsUI[key] : (objectId == 'streams' ?
+                _streamsUI[key] : (objectId == 'shaders' ? _shadersUI[key] : _windowsUI[key])));  //  TODO: generalize
         let type = object.type;
 
-        // console.log('uiUpdateParameter(' + objectId + ', ' + elementId + ', ' + bUpdateUI + ')');
+        console.log('uiUpdateParameter(' + objectId + ', ' + elementId + ', ' + bUpdateUI + ')');
 
         if (type == 'bool') {
             object.value = element.checked;
@@ -8445,7 +8630,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
         if (key == 'bLockZoom') {
-            if (_settings.bLockZoom) {
+            if (_settingsUI.bLockZoom) {
                 _state.zoom.level = Math.max(1.0, _state.zoom.level);
             }
             _renderer.windows.adjust();
@@ -8508,7 +8693,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             // let frameId = Math.max(_state.animation.minFrameId, document.getElementById('settings-frameId').value - 1);
             let frameId = Math.max(_state.animation.minFrameId, _state.animation.frameId);
             _state.animation.frameId = frameId;
-            _settings.frameId.value = frameId + 1;
+            _settingsUI.frameId.value = frameId + 1;
             document.getElementById('settings-frameId').value = frameId + 1;
             document.getElementById('settings-frameId-value').innerHTML = frameId + 1;
             console.log('minFrameId: frameId = ' + frameId + ', min = ' + _state.animation.minFrameId + ', max = ' + _state.animation.maxFrameId)
@@ -8523,7 +8708,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             // let frameId = Math.min(_state.animation.maxFrameId, document.getElementById('settings-frameId').value - 1);
             let frameId = Math.min(_state.animation.maxFrameId, _state.animation.frameId);
             _state.animation.frameId = frameId;
-            _settings.frameId.value = frameId + 1;
+            _settingsUI.frameId.value = frameId + 1;
             document.getElementById('settings-frameId').value = frameId + 1;
             document.getElementById('settings-frameId-value').innerHTML = frameId + 1;
             console.log('maxFrameId: frameId = ' + frameId + ', min = ' + _state.animation.minFrameId + ', max = ' + _state.animation.maxFrameId)
@@ -8535,6 +8720,21 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             _state.animation.maxFrameId = 0;
             _apiClear();
             _renderer.closeUIPopup();
+        }
+
+        if (key == 'streamNameSize') {
+            for (let i = 0; i < _renderer.windows.windows.length; i++) {
+                let window = _renderer.windows.windows[i];
+                window.infoDiv.style.fontSize = (object.value + 'pt');
+                window.positionStreamNames();
+            }
+        }
+
+        if (key == 'streamNamePlacementHorizontal' || key == 'streamNamePlacementVertical') {
+            for (let i = 0; i < _renderer.windows.windows.length; i++) {
+                let window = _renderer.windows.windows[i];
+                window.positionStreamNames();
+            }
         }
 
         let elementValue = document.getElementById(elementId + '-value');
@@ -8590,6 +8790,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
     let _uiDeleteStream = function (deleteStreamId) {
 
         let numStreams = _renderer.streams.length;
+        let deleteStream = _renderer.streams[deleteStreamId];
 
         if (numStreams == 1) {
             _apiClear();
@@ -8605,6 +8806,19 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             }
         }
 
+        //  first, delete all shader graph internal streams
+        if (deleteStream.shaderGraphId != -1) {
+            let deleteGraphStreamIds = [];
+            let shaderGraph = _renderer.shaderGraphs[shaderGraphId];
+            for (let i = 0; i < shaderGraph.streamIds.length; i++) {
+                let stream = _renderer.streams[shaderGraph.streamIds[i]];
+                if (deleteStreamId != shaderGraph.outputStreamId) {
+                    //  delete stream
+                }
+            }
+        }
+        //  recount number of streams
+        numStreams = _renderer.streams.length;
 
         //  find replacement stream id as input, require one without inputs
         let replacementStreamId = undefined;
