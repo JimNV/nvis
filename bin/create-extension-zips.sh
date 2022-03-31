@@ -40,7 +40,7 @@ popd > /dev/null
 
 echo "Creating '${EdgeZipFileName}'"
 rm -f ${EdgeZipFileName}
-#powershell Compress-Archive -CompressionLevel "Optimal" -Path "extensions/index.html,extensions/chrome/manifest.json,glsl,extensions/icons,js/nvis.js,extensions/chrome/content.js" -DestinationPath $EdgeZipFileName -Force
+#powershell Compress-Archive -CompressionLevel "Optimal" -Path "extensions/index.html,extensions/edge/manifest.json,glsl,extensions/icons,js/nvis.js,extensions/edge/content.js" -DestinationPath $EdgeZipFileName -Force
 zip.exe -q -9 -j ${EdgeZipFileName} js/nvis.js
 zip.exe -q -9 -r ${EdgeZipFileName} glsl/*.*
 pushd extensions > /dev/null

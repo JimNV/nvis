@@ -3081,6 +3081,10 @@ var nvis = new function () {
             this.bitPointer %= 8;
         }
 
+        reset() {
+            this.seek(0);
+        }
+
         // helpers
 
         static bits(value, msb, lsb) {
@@ -3400,14 +3404,14 @@ var nvis = new function () {
             let versionField = b.readInt32();
             let version = {
                 version: (versionField & 0xf),
-                singleTile: (((versionField >> (9 - 1)) & 1) == 1),
-                longNames: (((versionField >> (10 - 1)) & 1) == 1),
-                nonImage: (((versionField >> (11 - 1)) & 1) == 1),
-                multiPart: (((versionField >> (12 - 1)) & 1) == 1),
+                singleTile: ((versionField & 0x200) > 0),
+                longNames: ((versionField & 0x400) > 0),
+                nonImage: ((versionField & 0x800) > 0),
+                multiPart: ((versionField & 0x1000) > 0),
             }
             if (bDebug) {
-                console.log('Magic number: ' + magicNumber);
-                console.log('Version field: ' + JSON.stringify(version));
+                console.log('[EXR] Magic number: ' + magicNumber);
+                console.log('[EXR] Version field: ' + JSON.stringify(version));
             }
 
             //  attributes
@@ -3419,14 +3423,18 @@ var nvis = new function () {
             b.skip();
 
             if (bDebug) {
-                console.log(JSON.stringify(this.attributes));
+                console.log('[EXR] ' + JSON.stringify(this.attributes));
             }
 
             //  offset table
             this.scanLinesPerChunk = EXR_NO_COMPRESSION_SCANLINES;
             this.offsetTable = [];
             let dataWindowBox = this.attributes.dataWindow.values;
-            let numOffsets = dataWindowBox.yMax - dataWindowBox.yMin + 1;
+            this.dimensions = {
+                w: dataWindowBox.xMax - dataWindowBox.xMin + 1,
+                h: dataWindowBox.yMax - dataWindowBox.yMin + 1
+            }
+            let numOffsets = (version.singleTile ? (Math.ceil(this.dimensions.w / this.attributes.tiles.values.sizeX) * Math.ceil(this.dimensions.h / this.attributes.tiles.values.sizeY)) : this.dimensions.h);
             let compression = this.attributes['compression'].value;
 
             //  TODO: implement missing compression methods
@@ -3454,7 +3462,7 @@ var nvis = new function () {
                     break;
             }
 
-            if (compression != EXR_NO_COMPRESSION) {
+            if (compression != EXR_NO_COMPRESSION && !version.singleTile) {
                 numOffsets = Math.floor(numOffsets / this.scanLinesPerChunk) + (numOffsets % this.scanLinesPerChunk > 0 ? 1 : 0);
             }
             for (let i = 0; i < numOffsets; i++) {
@@ -3490,19 +3498,15 @@ var nvis = new function () {
                 }
             }
 
-            this.dimensions = { w: 0, h: 0 };
-            let dataDimensions = this.attributes.dataWindow.values;
-            this.dimensions.w = (dataDimensions.xMax - dataDimensions.xMin + 1);
-            this.dimensions.h = (dataDimensions.yMax - dataDimensions.yMin + 1);
             let outputSize = this.dimensions.w * this.dimensions.h * this.pixelSize;
 
             this.outputBuffer = new NvisBitBuffer(new ArrayBuffer(outputSize));
-            // console.log('Total output buffer size: ' + outputSize);
 
             let channelValues = this.attributes.channels.values;
 
             if (compression == EXR_NO_COMPRESSION) {
 
+                //  TODO: handle tiled layout
                 for (let scanLine = 0; scanLine < numOffsets; scanLine++) {
                     // let scanLineLoc = this.outputBuffer.bytePointer;
                     b.seek(Number(this.offsetTable[scanLine].offset));
@@ -3552,25 +3556,46 @@ var nvis = new function () {
                 }
 
                 //  compressed data handled below
+                let tileCoordinates = undefined;
+                let yCoordinate = undefined;
+                let pixelDataSize = 0;
+                let chunkSize = (version.singleTile ? (this.attributes.tiles.values.sizeX * this.attributes.tiles.values.sizeY) : (this.scanLinesPerChunk * this.dimensions.h)) * this.pixelSize;
+                let chunkBuffer = new NvisBitBuffer(new ArrayBuffer(chunkSize));
                 for (let sl = 0; sl < numOffsets; sl++) {
+
+                    chunkBuffer.reset();
+
                     b.seek(Number(this.offsetTable[sl].offset));
 
-                    //  not really needed, but we have to consume them fom the input stream
-                    let storedScanLine = b.readUint32();
-                    let storedDataSize = b.readUint32();
+                    if (version.singleTile) {
+                        tileCoordinates = {
+                            tileX: b.readUint32(),
+                            tileY: b.readUint32(),
+                            levelX: b.readUint32(),
+                            levelY: b.readUint32()
+                        }
+                    } else {
+                        //  not really needed, but we have to consume them from the input stream
+                        yCoordinate = b.readUint32();
+                    }
+                    pixelDataSize = b.readUint32();
 
-                    //console.log('   scanLine: ' + scanLine + ', dataSize: ' + dataSize);
+                    if (bDebug) {
+                        if (version.singleTile) {
+                            console.log('[EXR] tile coordinates: ' + JSON.stringify(tileCoordinates));
+                        } else {
+                            console.log('[EXR] y coordinate: ' + yCoordinate);
+                        }
+                        console.log('[EXR]      pixel data size: ' + pixelDataSize);
+                    }
 
                     let z = {};
 
                     //  https://datatracker.ietf.org/doc/html/rfc1950
 
-                    // let atBit = (b.bytePointer * 8 + b.bitPointer);
-                    // console.log('at bit: ' + atBit);
-
                     let CMF = b.readUint8();
                     let FLG = b.readUint8();
-                    //console.log('CMF: ' + CMF + ', FLG: ' + FLG + ', next: 0x' + b.peekUint8().toString(16));
+
                     z.cmf = {};
                     z.cmf.cm = NvisBitBuffer.bits(CMF, 3, 0);  //  compression method, should be = 8
                     z.cmf.info = NvisBitBuffer.bits(CMF, 7, 4);  //   base-2 logarithm of the LZ77 window size, minus eight (CINFO=7 indicates a 32K window size)
@@ -3581,7 +3606,7 @@ var nvis = new function () {
                     z.dictId = (z.flg.fdict == 1 ? b.readUint32() : undefined);
 
                     if (bDebug) {
-                        console.log(JSON.stringify(z));
+                        console.log('[EXR]      ' + JSON.stringify(z));
                     }
 
                     //  https://datatracker.ietf.org/doc/html/rfc1951
@@ -3592,6 +3617,10 @@ var nvis = new function () {
                         bFinalBlock = (b.readBits(1) == 1);
                         let blockType = b.readBits(2);
 
+                        if (bDebug) {
+                            console.log('[EXR]      block type: ' + blockType + ', final: ' + bFinalBlock);
+                        }
+
                         if (blockType == 0) {
                             //  no compression
                             b.byteAlign();
@@ -3600,16 +3629,17 @@ var nvis = new function () {
                             let nlen = (0xFFFF ^ (b.readBits(8) | (b.readBits(8) << 8)));
                             if (len != nlen) {
                                 //  error
-                                console.log('ERROR: Raw block header LEN/NLEN mismatch!');
+                                console.log('[EXR] ERROR: Raw block header LEN/NLEN mismatch!');
                             }
 
                             this.outputBuffer.consume(b, len);
+                            // chunkBuffer.consume(b, len);
                             continue;
                         }
 
                         if (blockType == 3) {
                             //  reserved (error)
-                            console.log('ERROR: Reserved block type (3)');
+                            console.log('[EXR] ERROR: Reserved block type (3)');
                         }
 
                         let counter = 0;
@@ -3626,7 +3656,7 @@ var nvis = new function () {
                             if (blockType == 1) {
                                 //  compression with fixed Huffman codes
                                 //  TODO: this
-                                console.log('TODO: handle blocks compressed with fixed Huffman codes');
+                                console.log('[EXR] TODO: handle blocks compressed with fixed Huffman codes');
                             } else {
                                 //  compression with dynamic Huffman codes
                                 this.huffman.tableSizes = [
@@ -3663,7 +3693,7 @@ var nvis = new function () {
 
                                 if ((total != 65536) && (usedSymbols > 1)) {
                                     //  error
-                                    console.log('ERROR: Huffman table generation (1)');
+                                    console.log('[EXR] ERROR: Huffman table generation (1)');
                                 }
 
                                 let treeNext = -1;
@@ -3727,7 +3757,7 @@ var nvis = new function () {
                                         }
                                         if ((distance == 16) && (!counter)) {
                                             //  Error, TODO: handle
-                                            console.log('ERROR: Huffman table generation (2)')
+                                            console.log('[EXR] ERROR: Huffman table generation (2)')
                                         }
 
                                         let numExtra = [2, 3, 7][distance - 16];
@@ -3742,7 +3772,7 @@ var nvis = new function () {
                                     if ((this.huffman.tableSizes[0] + this.huffman.tableSizes[1]) != counter) {
                                         //TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
                                         //  Error, TODO: handle
-                                        console.log('ERROR: Huffman table generation (3)')
+                                        console.log('[EXR] ERROR: Huffman table generation (3)')
                                     }
 
                                     this.huffman.tables[0].codeSize = this.huffman.lengthCodes.slice(0, this.huffman.tableSizes[0]);
@@ -3756,32 +3786,41 @@ var nvis = new function () {
                         for (; ;) {
                             for (; ;) {
                                 if ((b.remainingBits() < 32 || this.outputBuffer.remainingBits() < 16)) {
+                                // if ((b.remainingBits() < 32 || chunkBuffer.remainingBits() < 16)) {
                                     //  TODO: this path not tested
+                                    if (bDebug) {
+                                        console.log('[EXR] TODO: Test trailing last bits path');
+                                    }
                                     counter = this.huffmanDecode(b, 0);
                                     if (counter >= 256)
                                         break;
                                     if (this.outputBuffer.bytePointer >= this.outputBuffer.buffer.byteLength) {
-                                        //  error: TODO: handle
-                                        console.log('Attempting to write outside output buffer!');
+                                    // if (chunkBuffer.bytePointer >= chunkBuffer.buffer.byteLength) {
+                                            //  error: TODO: handle
+                                        console.log('[EXR] ERROR: Attempting to write outside output buffer!');
                                     }
                                     this.outputBuffer.writeUint8(counter);
+                                    // chunkBuffer.writeUint8(counter);
                                 } else {
 
                                     let sym2 = this.huffmanDecode(b, 0, true);
 
                                     counter = sym2;
 
-                                    if (counter & 256)
+                                    if (counter & 256) {
                                         break;
+                                    }
 
                                     sym2 = this.huffmanDecode(b, 0, true);
 
                                     this.outputBuffer.writeUint8(counter & 255);
+                                    // chunkBuffer.writeUint8(counter & 255);
                                     if (sym2 & 256) {
                                         counter = sym2;
                                         break;
                                     }
                                     this.outputBuffer.writeUint8(sym2 & 255);
+                                    // chunkBuffer.writeUint8(sym2 & 255);
                                 }
                             }
 
@@ -3796,103 +3835,93 @@ var nvis = new function () {
                                 counter += extraBits;
                             }
 
-                            let dist = this.huffmanDecode(b, 1);
-                            numExtra = s_dist_extra[dist];
-                            dist = s_dist_base[dist];
+                            let distance = this.huffmanDecode(b, 1);
+                            numExtra = s_dist_extra[distance];
+                            distance = s_dist_base[distance];
                             if (numExtra > 0) {
                                 let extraBits = b.readBits(numExtra);
-                                dist += extraBits;
+                                distance += extraBits;
                             }
 
-                            let dist_from_out_buf_start = this.outputBuffer.bytePointer;
-                            // dist_from_out_buf_start = pOut_buf_cur - pOut_buf_start;
-                            // if ((dist > dist_from_out_buf_start) && (decomp_flags & TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF)) {
-                            //     TINFL_CR_RETURN_FOREVER(37, TINFL_STATUS_FAILED);
-                            // }
-
-                            let byteIndex = (dist_from_out_buf_start - dist);
-                            //                         pSrc = pOut_buf_start + ((dist_from_out_buf_start - dist) & out_buf_size_mask);
+                            let bufferOffset = this.outputBuffer.bytePointer;
+                            // let bufferOffset = chunkBuffer.bytePointer;
+                            let byteIndex = bufferOffset - distance;
 
                             if (Math.max(this.outputBuffer.bytePointer, byteIndex) > this.outputBuffer.buffer.byteLength - 1) {
+                            // if (Math.max(chunkBuffer.bytePointer, byteIndex) > chunkBuffer.buffer.byteLength - 1) {
                                 while (counter--) {
-                                    this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(dist_from_out_buf_start - dist));
-                                    dist_from_out_buf_start++;
+                                    this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(bufferOffset - distance));
+                                    // chunkBuffer.writeUint8(chunkBuffer.peekUint8(bufferOffset - distance));
+                                    bufferOffset++;
                                 }
                                 continue;
                             }
 
                             if (b.remainingBits() == 0) {
                                 if (bDebug) {
-                                    console.log('DONE!');
+                                    console.log('[EXR] DONE!');
                                 }
                             }
-                            //                         if ((MZ_MAX(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
-                            //                             while (counter--) {
-                            //                                 while (pOut_buf_cur >= pOut_buf_end) {
-                            //                                     TINFL_CR_RETURN(53, TINFL_STATUS_HAS_MORE_OUTPUT);
-                            //                                 }
-                            //                                 *pOut_buf_cur++ = pOut_buf_start[(dist_from_out_buf_start++ - dist) & out_buf_size_mask];
-                            //                             }
-                            //                             continue;
-                            //                         }
 
+                            //  TODO: is this ever needed?
+
+                            //  if ((MZ_MAX(pOut_buf_cur, pSrc) + counter) > pOut_buf_end) {
+                            //     while (counter--) {
+                            //        while (pOut_buf_cur >= pOut_buf_end) {
+                            //           TINFL_CR_RETURN(53, TINFL_STATUS_HAS_MORE_OUTPUT);
+                            //        }
+                            //        *pOut_buf_cur++ = pOut_buf_start[(bufferOffset++ - dist) & out_buf_size_mask];
+                            //     }
+                            //     continue;
+                            //  }
                             // #if MINIZ_USE_UNALIGNED_LOADS_AND_STORES
-                            //                         else if ((counter >= 9) && (counter <= dist)) {
-                            //                             const mz_uint8 * pSrc_end = pSrc + (counter & ~7);
-                            //                             do {
-                            //                                 ((mz_uint32 *)pOut_buf_cur)[0] = ((const mz_uint32 *)pSrc)[0];
-                            //                                 ((mz_uint32 *)pOut_buf_cur)[1] = ((const mz_uint32 *)pSrc)[1];
-                            //                                 pOut_buf_cur += 8;
-                            //                             } while ((pSrc += 8) < pSrc_end);
-                            //                             if ((counter &= 7) < 3) {
-                            //                                 if (counter) {
-                            //                                     pOut_buf_cur[0] = pSrc[0];
-                            //                                     if (counter > 1)
-                            //                                         pOut_buf_cur[1] = pSrc[1];
-                            //                                     pOut_buf_cur += counter;
-                            //                                 }
-                            //                                 continue;
-                            //                             }
-                            //                         }
+                            //  else if ((counter >= 9) && (counter <= distance)) {
+                            //     const mz_uint8 * pSrc_end = pSrc + (counter & ~7);
+                            //     do {
+                            //        ((mz_uint32 *)pOut_buf_cur)[0] = ((const mz_uint32 *)pSrc)[0];
+                            //        ((mz_uint32 *)pOut_buf_cur)[1] = ((const mz_uint32 *)pSrc)[1];
+                            //        pOut_buf_cur += 8;
+                            //     } while ((pSrc += 8) < pSrc_end);
+                            //     if ((counter &= 7) < 3) {
+                            //        if (counter) {
+                            //           pOut_buf_cur[0] = pSrc[0];
+                            //           if (counter > 1)
+                            //              pOut_buf_cur[1] = pSrc[1];
+                            //           pOut_buf_cur += counter;
+                            //        }
+                            //        continue;
+                            //     }
+                            //  }
                             // #endif
+
                             do {
                                 this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 0));
                                 this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
                                 this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 2));
+                                // chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 0));
+                                // chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 1));
+                                // chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 2));
                                 byteIndex += 3;
-                                // pOut_buf_cur[0] = pSrc[0];
-                                // pOut_buf_cur[1] = pSrc[1];
-                                // pOut_buf_cur[2] = pSrc[2];
-                                // pOut_buf_cur += 3;
-                                // pSrc += 3;
-                                // } while ((int)(counter -= 3) > 2);
                             } while ((counter -= 3) > 2);
 
                             if (counter > 0) {
                                 this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex));
+                                // chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex));
                                 if (counter > 1) {
                                     this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
+                                    // chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 1));
                                 }
                             }
-                            // if ((int)counter > 0) {
-                            //     pOut_buf_cur[0] = pSrc[0];
-                            //     if ((int)counter > 1)
-                            //         pOut_buf_cur[1] = pSrc[1];
-                            //     pOut_buf_cur += counter;
-                            // }
                         }
-
-
-                        // let s = '';
-                        // s += scanLine + ', ' + dataSize;
-                        // s += ', z: ' + JSON.stringify(z);
-                        // // for (let i = 0; i < 10; i++)
-                        // //     s += ', 0x' + b.readUint8().toString(16);
-                        // console.log(s);
-                        // console.log('bFinalBlock: ' + bFinalBlock + ', blockType: ' + blockType);
 
                     } while (!bFinalBlock);
 
+                    //  move data from chunk buffer to output buffer
+                    if (version.singleTile) {
+
+                    } else {
+                        // this.outputBuffer.consume(chunkBuffer, chunkBuffer.buffer.byteLength);
+                    }
                 }
 
                 //  EXR postprocess for ZIP and RLE
@@ -4081,7 +4110,14 @@ var nvis = new function () {
             }
 
             if (attrib.type == 'm33f') {
+                attrib.values = [];
+                for (let y = 0; y < 3; y++) {
+                    for (let x = 0; x < 3; x++) {
+                        attrib.values.push(b.readFloat32());
+                    }
+                }
             }
+
             if (attrib.type == 'm44f') {
                 attrib.values = [];
                 for (let y = 0; y < 4; y++) {
@@ -4090,6 +4126,7 @@ var nvis = new function () {
                     }
                 }
             }
+
             if (attrib.type == 'preview') {
             }
             if (attrib.type == 'rational') {
@@ -4098,8 +4135,15 @@ var nvis = new function () {
             }
             if (attrib.type == 'stringvector') {
             }
+
             if (attrib.type == 'tiledesc') {
+                attrib.values = {
+                    sizeX: b.readUint32(),
+                    sizeY: b.readUint32(),
+                    mode: b.readUint8(),
+                };
             }
+
             if (attrib.type == 'timecode') {
             }
 
@@ -4118,8 +4162,19 @@ var nvis = new function () {
             }
 
             if (attrib.type == 'v3i') {
+                attrib.values = {
+                    x: b.readInt32(),
+                    y: b.readInt32(),
+                    z: b.readInt32()
+                }
             }
+
             if (attrib.type == 'v3f') {
+                attrib.values = {
+                    x: b.readFloat32(),
+                    y: b.readFloat32(),
+                    z: b.readFloat32()
+                }
             }
 
             return attrib;
@@ -8306,7 +8361,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                         newStream.drop([files[i]], this.windows);
                         this.streams.push(newStream);
                         this.addWindow(this.streams.length - 1);
-                        console.log('streamId: ' + (this.streams.length - 1));
+                        // console.log('streamId: ' + (this.streams.length - 1));
                     }
                     // _state.animation.setNumFrames(newStream.getNumImages());  //  TODO: check
                 }
