@@ -60,8 +60,8 @@ var nvis = new function () {
             }
         },
         zoom: {
-            LowFactor: Math.pow(Math.E, Math.log(2) / 8.0),
-            HighFactor: Math.pow(Math.E, Math.log(2) / 4.0),
+            LowFactor: Math.pow(2.0, 1.0 / 8.0),
+            HighFactor: Math.pow(2.0, 1.0 / 4.0),
             MinLevel: 0.125,
             MaxLevel: 256.0,
             bLock: false,
@@ -75,13 +75,36 @@ var nvis = new function () {
                 x: 0.0,
                 y: 0.0
             },
+            box: {
+                active: false,
+                tl: {
+                    x: 0.0,
+                    y: 0.0
+                },
+                br: {
+                    x: 0.0,
+                    y: 0.0
+                }
+            },
+            set: function (level = _state.zoom.level) {
+                let minLevel = (_settingsUI.bLockZoom.value ? 1.0 : _state.zoom.MinLevel);
+                _state.zoom.level = Math.min(Math.max(level, minLevel), _state.zoom.MaxLevel);
+
+                //  round to nearest power of 2^(1/8)
+                let az = Math.round(Math.log(_state.zoom.level) / Math.log(_state.zoom.LowFactor));
+                _state.zoom.level = Math.pow(_state.zoom.LowFactor, az);
+                
+                // console.log('level: ' + _state.zoom.level + ',  az = ' + az);
+                _renderer.popupInfo('zoom = ' + _state.zoom.level.toFixed(1) + 'x');
+            }
         },
         input: {
             mouse: {
                 canvasCoords: { x: 0, y: 0 },
                 previousCanvasCoords: { x: 0, y: 0 },
                 streamCoords: undefined,
-                clickPosition: { x: 0, y: 0 },
+                clickStreamCoords: undefined,
+                // clickPosition: { x: 0, y: 0 },
                 down: false,
                 showInfo: false
             },
@@ -606,7 +629,7 @@ var nvis = new function () {
         }`);
 
         //  performance info
-        addStylesheetRules(`div#performanceInfo {
+        addStylesheetRules(`span#performanceInfo {
             pointer-events: none;
             font: 16px Arial;
             color: white;
@@ -891,15 +914,14 @@ var nvis = new function () {
 
         if (command == 'clear') {
 
-            _state.zoom.level = 1.0;
+            _state.zoom.set(1.0);
             _renderer.streams = [];
             _renderer.windows.clear();
             return true;
 
         } else if (command == 'zoom') {
 
-            let minLevel = (_settingsUI.bLockZoom,value ? 1.0 : _state.zoom.MinLevel);
-            _state.zoom.level = Math.min(Math.max(argument, minLevel), _state.zoom.MaxLevel);
+            _state.zoom.set(argument);
             _renderer.windows.updateTextureCoordinates();
             return _state.zoom.level;
 
@@ -2246,6 +2268,8 @@ var nvis = new function () {
             in vec2 vTextureCoord;
             uniform sampler2D uSampler;
             uniform bool uAlphaCheckerboard;
+            uniform bool bZoomBox;
+            uniform vec4 uZoomBox;
             out vec4 color;
 
             float modi(float a, float b) {
@@ -2277,6 +2301,10 @@ var nvis = new function () {
                     }
 
                     color = gridColor + vec4(color.rgb * color.a, 1.0);
+                }
+
+                if (bZoomBox && vTextureCoord.x > uZoomBox.x && vTextureCoord.x < uZoomBox.z && vTextureCoord.y > uZoomBox.y && vTextureCoord.y < uZoomBox.w) {
+                    color = mix(color, vec4(1.0, 1.0, 0.0, 1.0), 0.5);
                 }
             }`;
 
@@ -3091,6 +3119,7 @@ var nvis = new function () {
             return (value & ((1 << (msb + 1)) - 1)) >> lsb;
         }
 
+
         static halfBytes2Float32(bytes) {
             var sign = ((bytes & 0x8000) ? -1 : 1);
             var exponent = ((bytes >> 10) & 0x1F) - 15;
@@ -3113,6 +3142,39 @@ var nvis = new function () {
             return sign * significand * Math.pow(2, exponent);
         }
 
+
+        static float2HalfBytes(val) {
+            var floatView = new Float32Array(1);
+            var int32View = new Int32Array(floatView.buffer);
+
+            floatView[0] = val;
+            var x = int32View[0];
+       
+            var bits = (x >> 16) & 0x8000;  //  /* Get the sign */
+            var m = (x >> 12) & 0x07ff; /* Keep one extra bit for rounding */
+            var e = (x >> 23) & 0xff; /* Using int is faster here */
+       
+            if (e < 103) {
+              return bits;
+            }
+       
+            if (e > 142) {
+              bits |= 0x7c00;
+              bits |= ((e == 255) ? 0 : 1) && (x & 0x007fffff);
+              return bits;
+            }
+       
+            if (e < 113) {
+              m |= 0x0800;
+              bits |= (m >> (114 - e)) + ((m >> (113 - e)) & 1);
+              return bits;
+            }
+       
+            bits |= ((e - 112) << 10) | (m >> 1);
+            bits += m & 1;
+            return bits;
+        }
+       
         static floatBytes2Float32(bytes) {
             var sign = (bytes & 0x80000000) ? -1 : 1;
             var exponent = ((bytes >> 23) & 0xFF) - 127;
@@ -3251,15 +3313,31 @@ var nvis = new function () {
 
         //////////
 
-        readFloat16(location = this.bytePointer) {
+        readFloat16() {
             let value = NvisBitBuffer.halfBytes2Float32(this.view.getUint16(location, this.littleEndian));
             this.bytePointer += 2;
             return value;
         }
 
+        writeFloat16(value) {
+            let fValue = NvisBitBuffer.float2HalfBytes(value);
+            if (this.littleEndian) {
+                this.writeUint8(fValue & 0xff);
+                this.writeUint8((fValue >> 8) & 0xff);
+            } else {
+                this.writeUint8((fValue >> 8) & 0xff);
+                this.writeUint8(fValue & 0xff);
+            }
+        }
+
         getFloat16(byteIndex) {
             let value = this.view.getUint16(byteIndex, this.littleEndian);
             return NvisBitBuffer.halfBytes2Float32(value);
+        }
+
+        setFloat16(byteIndex, value) {
+            let fValue = NvisBitBuffer.float2HalfBytes(value);
+            this.setUint16(byteIndex, fValue);
         }
 
         //////////
@@ -3398,7 +3476,7 @@ var nvis = new function () {
             this.bSuccess = true;
             let b = this.buffer;
 
-            const bDebug = false;
+            const bDebug = true;
 
             let magicNumber = b.readInt32();  //  should be decimal 20000630
             let versionField = b.readInt32();
@@ -3434,6 +3512,10 @@ var nvis = new function () {
                 w: dataWindowBox.xMax - dataWindowBox.xMin + 1,
                 h: dataWindowBox.yMax - dataWindowBox.yMin + 1
             }
+            let tileDimensions = (version.singleTile ? {
+                w: this.attributes.tiles.values.sizeX,
+                h: this.attributes.tiles.values.sizeY,
+            } : undefined);
             let numOffsets = (version.singleTile ? (Math.ceil(this.dimensions.w / this.attributes.tiles.values.sizeX) * Math.ceil(this.dimensions.h / this.attributes.tiles.values.sizeY)) : this.dimensions.h);
             let compression = this.attributes['compression'].value;
 
@@ -3506,6 +3588,10 @@ var nvis = new function () {
 
             if (compression == EXR_NO_COMPRESSION) {
 
+                if (bDebug) {
+                    console.log('[EXR] TODO: check no compression path');
+                }
+    
                 //  TODO: handle tiled layout
                 for (let scanLine = 0; scanLine < numOffsets; scanLine++) {
                     // let scanLineLoc = this.outputBuffer.bytePointer;
@@ -3526,12 +3612,12 @@ var nvis = new function () {
                         //  TODO: fix more efficient copy method
                         for (let x = 0; x < this.dimensions.w; x++) {
                             //  here, we don't parse float values
-                            if (channel.pixelType == EXR_UINT || channel.pixelType == EXR_FLOAT) {
+                            if (channel.pixelType == EXR_UINT || channel.pixelType == EXR_HALF) {
                                 // this.outputBuffer.setUint32(scanLineLoc + x * this.pixelSize + channelOffset, b.readUint32());
                                 this.outputBuffer.writeUint16(b.readUint16());
-                            } else if (channel.pixelType == EXR_HALF) {
+                            } else if (channel.pixelType == EXR_FLOAT) {
                                 //this.outputBuffer.setUint16(scanLineLoc + x * this.pixelSize + channelOffset, b.readUint16());
-                                this.outputBuffer.writeUint16(b.readUint16());
+                                this.outputBuffer.writeFloat32(b.readFloat32());
                             }
                         }
                     }
@@ -3559,8 +3645,9 @@ var nvis = new function () {
                 let tileCoordinates = undefined;
                 let yCoordinate = undefined;
                 let pixelDataSize = 0;
-                let chunkSize = (version.singleTile ? (this.attributes.tiles.values.sizeX * this.attributes.tiles.values.sizeY) : (this.scanLinesPerChunk * this.dimensions.h)) * this.pixelSize;
+                let chunkSize = (version.singleTile ? (this.attributes.tiles.values.sizeX * this.attributes.tiles.values.sizeY) : (this.scanLinesPerChunk * this.dimensions.w)) * this.pixelSize;
                 let chunkBuffer = new NvisBitBuffer(new ArrayBuffer(chunkSize));
+                
                 for (let sl = 0; sl < numOffsets; sl++) {
 
                     chunkBuffer.reset();
@@ -3632,8 +3719,8 @@ var nvis = new function () {
                                 console.log('[EXR] ERROR: Raw block header LEN/NLEN mismatch!');
                             }
 
-                            this.outputBuffer.consume(b, len);
-                            // chunkBuffer.consume(b, len);
+                            // this.outputBuffer.consume(b, len);
+                            chunkBuffer.consume(b, len);
                             continue;
                         }
 
@@ -3770,7 +3857,6 @@ var nvis = new function () {
                                         counter += s;
                                     }
                                     if ((this.huffman.tableSizes[0] + this.huffman.tableSizes[1]) != counter) {
-                                        //TINFL_CR_RETURN_FOREVER(21, TINFL_STATUS_FAILED);
                                         //  Error, TODO: handle
                                         console.log('[EXR] ERROR: Huffman table generation (3)')
                                     }
@@ -3785,8 +3871,8 @@ var nvis = new function () {
 
                         for (; ;) {
                             for (; ;) {
-                                if ((b.remainingBits() < 32 || this.outputBuffer.remainingBits() < 16)) {
-                                // if ((b.remainingBits() < 32 || chunkBuffer.remainingBits() < 16)) {
+                                // if ((b.remainingBits() < 32 || this.outputBuffer.remainingBits() < 16)) {
+                                if ((b.remainingBits() < 32 || chunkBuffer.remainingBits() < 16)) {
                                     //  TODO: this path not tested
                                     if (bDebug) {
                                         console.log('[EXR] TODO: Test trailing last bits path');
@@ -3794,13 +3880,13 @@ var nvis = new function () {
                                     counter = this.huffmanDecode(b, 0);
                                     if (counter >= 256)
                                         break;
-                                    if (this.outputBuffer.bytePointer >= this.outputBuffer.buffer.byteLength) {
-                                    // if (chunkBuffer.bytePointer >= chunkBuffer.buffer.byteLength) {
+                                    // if (this.outputBuffer.bytePointer >= this.outputBuffer.buffer.byteLength) {
+                                    if (chunkBuffer.bytePointer >= chunkBuffer.buffer.byteLength) {
                                             //  error: TODO: handle
                                         console.log('[EXR] ERROR: Attempting to write outside output buffer!');
                                     }
-                                    this.outputBuffer.writeUint8(counter);
-                                    // chunkBuffer.writeUint8(counter);
+                                    // this.outputBuffer.writeUint8(counter);
+                                    chunkBuffer.writeUint8(counter);
                                 } else {
 
                                     let sym2 = this.huffmanDecode(b, 0, true);
@@ -3813,14 +3899,14 @@ var nvis = new function () {
 
                                     sym2 = this.huffmanDecode(b, 0, true);
 
-                                    this.outputBuffer.writeUint8(counter & 255);
-                                    // chunkBuffer.writeUint8(counter & 255);
+                                    // this.outputBuffer.writeUint8(counter & 255);
+                                    chunkBuffer.writeUint8(counter & 255);
                                     if (sym2 & 256) {
                                         counter = sym2;
                                         break;
                                     }
-                                    this.outputBuffer.writeUint8(sym2 & 255);
-                                    // chunkBuffer.writeUint8(sym2 & 255);
+                                    // this.outputBuffer.writeUint8(sym2 & 255);
+                                    chunkBuffer.writeUint8(sym2 & 255);
                                 }
                             }
 
@@ -3843,15 +3929,15 @@ var nvis = new function () {
                                 distance += extraBits;
                             }
 
-                            let bufferOffset = this.outputBuffer.bytePointer;
-                            // let bufferOffset = chunkBuffer.bytePointer;
+                            // let bufferOffset = this.outputBuffer.bytePointer;
+                            let bufferOffset = chunkBuffer.bytePointer;
                             let byteIndex = bufferOffset - distance;
 
-                            if (Math.max(this.outputBuffer.bytePointer, byteIndex) > this.outputBuffer.buffer.byteLength - 1) {
-                            // if (Math.max(chunkBuffer.bytePointer, byteIndex) > chunkBuffer.buffer.byteLength - 1) {
+                            // if (Math.max(this.outputBuffer.bytePointer, byteIndex) > this.outputBuffer.buffer.byteLength - 1) {
+                            if (Math.max(chunkBuffer.bytePointer, byteIndex) > chunkBuffer.buffer.byteLength - 1) {
                                 while (counter--) {
-                                    this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(bufferOffset - distance));
-                                    // chunkBuffer.writeUint8(chunkBuffer.peekUint8(bufferOffset - distance));
+                                    // this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(bufferOffset - distance));
+                                    chunkBuffer.writeUint8(chunkBuffer.peekUint8(bufferOffset - distance));
                                     bufferOffset++;
                                 }
                                 continue;
@@ -3895,34 +3981,90 @@ var nvis = new function () {
                             // #endif
 
                             do {
-                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 0));
-                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
-                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 2));
-                                // chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 0));
-                                // chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 1));
-                                // chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 2));
+                                // this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 0));
+                                // this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
+                                // this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 2));
+                                chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 0));
+                                chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 1));
+                                chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 2));
                                 byteIndex += 3;
                             } while ((counter -= 3) > 2);
 
                             if (counter > 0) {
-                                this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex));
-                                // chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex));
+                                // this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex));
+                                chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex));
                                 if (counter > 1) {
-                                    this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
-                                    // chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 1));
+                                    // this.outputBuffer.writeUint8(this.outputBuffer.peekUint8(byteIndex + 1));
+                                    chunkBuffer.writeUint8(chunkBuffer.peekUint8(byteIndex + 1));
                                 }
                             }
                         }
 
                     } while (!bFinalBlock);
 
-                    //  move data from chunk buffer to output buffer
+                    //  copy data from chunk buffer to output buffer
                     if (version.singleTile) {
+                        // this.outputBuffer.tileCopy(chunkBuffer, {
+                        //     x: tileCoordinates.tileX,
+                        //     y: tileCoordinates.tileY
+                        // }, tileDimensions, this.dimensions, this.pixelSize);
 
+                        const ChannelMap = {
+                            'R': 0,
+                            'G': 1,
+                            'B': 2,
+                            'A': 3
+                        };
+
+                        let tc = {
+                            x: tileCoordinates.tileX,
+                            y: tileCoordinates.tileY
+                        }
+                        let td = {
+                            w: Math.min(tileDimensions.w, (tc.x + 1) * tileDimensions.w - this.dimensions.w),
+                            h: Math.min(tileDimensions.h, (tc.y + 1) * tileDimensions.h - this.dimensions.h),
+                        }
+                        console.log('  td: ' + JSON.stringify(td));
+                        let tileOffset = (tc.y * tileDimensions.h * this.dimensions.w + tc.x * tileDimensions.w) * this.pixelSize;
+
+                        if (tc.x > 2 || tc.y > 2) {
+                            continue;
+                        }
+
+                        let stride = this.dimensions.w * this.pixelSize;
+
+                        chunkBuffer.reset();
+                        let channelValues = this.attributes.channels.values;
+                        
+                        let channelSizeSum = 0;
+                        for (let channelId = 0; channelId < 3; channelId++) {
+                            let channel = channelValues[channelId];
+                            let channelSize = (channel.pixelType == EXR_FLOAT ? 4 : 2);
+                            let stride = this.dimensions.w * channelSize;
+                            
+                            for (let y = 0; y < tileDimensions.h; y++) {
+                                for (let x = 0; x < tileDimensions.w; x++) {
+                                    let value = (channel.pixelType == EXR_FLOAT ? chunkBuffer.readUint32() : chunkBuffer.readUint16());
+                                    // let value = chunkBuffer.getUint16((y * tileDimensions.w + x) * this.pixelSize);
+                                    let dstOffset = tileOffset + (y * this.dimensions.w * this.pixelSize + x * channelSize);// * channelSize + ChannelMap[channel.name];
+                                    // dstOffset = tileOffset + x * 2;
+                                    // console.log('(' + x + ', ' + y + ', ' + channelId + '): ' + dstOffset + '  =  ' + NvisBitBuffer.halfBytes2Float32(value) + ', ' + NvisBitBuffer.halfBytes2Float32(((value & 0xff) << 8) | ((value >> 8) & 0xff)));
+                                    // this.outputBuffer.setUint16(dstOffset, value);
+                                    // this.outputBuffer.writeUint16(value);
+                                    // this.outputBuffer.setUint8(dstOffset, value & 0xff);
+                                    // this.outputBuffer.setUint8(dstOffset + 1, (value >> 8) & 0xff);
+                                }
+                            }
+
+                            channelSizeSum += channelSize;
+                        }
                     } else {
                         // this.outputBuffer.consume(chunkBuffer, chunkBuffer.buffer.byteLength);
+                        this.outputBuffer.copy(chunkBuffer, sl * chunkSize, chunkBuffer.buffer.byteLength);
                     }
                 }
+
+                // return;
 
                 //  EXR postprocess for ZIP and RLE
                 let numChunks = Math.round(this.dimensions.h / this.scanLinesPerChunk);
@@ -4128,7 +4270,20 @@ var nvis = new function () {
             }
 
             if (attrib.type == 'preview') {
+                let width = b.readUint32();
+                let height = b.readUint32();
+                attrib.values = {
+                    width: width,
+                    height: height,
+                    // pixels: new Uint8Array(4 * width * height)
+                }
+                let pixels = new Uint8Array(4 * width * height);
+                for (let i = 0; i < 4 * width * height; i++) {
+                //     attrib.values.pixels[i] = b.readUint8();
+                    pixels[i] = b.readUint8();
+                }
             }
+
             if (attrib.type == 'rational') {
             }
             if (attrib.type == 'string') {
@@ -5638,12 +5793,10 @@ var nvis = new function () {
                         sOp.innerHTML = (otherStreamId + 1) + ': ' + otherStream.getName(shaderGraphs);
                         sOp.value = otherStreamId;
                         if (this.shaderGraphId != -1) {
-                            // console.log('Here... 1: ' + shaderGraphs[otherStream.shaderGraphId].inputStreamIds[inputId] + ', ' + otherStreamId);
                             if (shaderGraphs[this.shaderGraphId].inputStreamIds[inputId] == otherStreamId) {
                                 sOp.setAttribute('selected', true);
                             }
                         } else {
-                            // console.log('Here... 2');
                             if (this.inputStreamIds[inputId] == otherStreamId) {
                                 sOp.setAttribute('selected', true);
                             }
@@ -6270,9 +6423,8 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 let oldStreamCoords = this.getStreamCoordinates(canvasPxCoords);
 
                 let factor = (bHigh ? _state.zoom.HighFactor : _state.zoom.LowFactor);
-                let minLevel = (_settingsUI.bLockZoom.value ? 1.0 : _state.zoom.MinLevel);
-                _state.zoom.level *= (direction > 0 ? factor : 1.0 / factor);
-                _state.zoom.level = Math.min(Math.max(_state.zoom.level, minLevel), _state.zoom.MaxLevel);
+                let level = _state.zoom.level * (direction > 0 ? factor : 1.0 / factor);
+                _state.zoom.set(level);
                 _state.zoom.mouseWinCoords = winRelCoords;
 
                 let newStreamCoords = this.getStreamCoordinates(canvasPxCoords);
@@ -6666,6 +6818,13 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
                 //  TODO: this shouldn't be necessary, can get dimensions directly in shader
                 gl.uniform2f(gl.getUniformLocation(shaderProgram, 'uDimensions'), streamDims.w, streamDims.h);
+
+                //  Testing zoom-box
+                // if (_state.input.mouse.down && _state.input.keyboard.shift && _state.input.mouse.clickStreamCoords !== undefined) {
+                gl.uniform1i(gl.getUniformLocation(shaderProgram, 'bZoomBox'), _state.zoom.box.active);
+                if (_state.zoom.box.active) {
+                    gl.uniform4f(gl.getUniformLocation(shaderProgram, 'uZoomBox'), _state.zoom.box.tl.x, _state.zoom.box.tl.y, _state.zoom.box.br.x, _state.zoom.box.br.y);
+                }
 
                 gl.enable(gl.BLEND);
                 // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -7502,9 +7661,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         };
 
         onWheel(event) {
-            // event.preventDefault();
-            let level = this.windows.zoom(-Math.sign(event.deltaY), _state.input.mouse.canvasCoords, _state.input.keyboard.shift);
-            this.popupInfo('zoom = ' + level.toFixed(1) + 'x');
+            this.windows.zoom(-Math.sign(event.deltaY), _state.input.mouse.canvasCoords, _state.input.keyboard.shift);
         }
 
 
@@ -8053,7 +8210,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     this.popupInfo('Animation ping-pong: ' + (_state.animation.pingPong ? 'on' : 'off'));
                     break;
                 case 'z':
-                    _state.zoom.level = 1.0;
+                    _state.zoom.set(1.0);
                     this.windows.adjust();
                     break;
                 case 'c':
@@ -8219,6 +8376,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
         onClick(event) {
+            // console.log('onClick(): ' + _state.input.keyboard.shift);
 
             //  TODO: pixel info should be triggered here...
 
@@ -8242,9 +8400,15 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
         onMouseDown(event) {
+            // console.log('onMouseDown(): ' + _state.input.keyboard.shift);
             _state.input.mouse.down = true;
-            _state.input.mouse.clickPosition = { x: event.clientX, y: event.clientY };
-            // console.log('mouse down');
+            let cc = {
+                x: event.clientX - _state.layout.border,
+                y: event.clientY - _state.layout.border
+            };
+            _state.input.mouse.clickStreamCoords = this.windows.getStreamCoordinates(cc, false);
+            // _state.zoom.box.tl = { x: 0.0, y: 0.0 };
+            // _state.zoom.box.br = { x: 0.0, y: 0.0 };
         }
 
         onMouseMove(event) {
@@ -8254,22 +8418,57 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 y: event.clientY - _state.layout.border
             };
             if (this.windows.streamPxDimensions !== undefined && this.windows.winPxDimensions !== undefined) {
+                _state.input.mouse.previousStreamCoords = _state.input.mouse.streamCoords;
                 _state.input.mouse.streamCoords = this.windows.getStreamCoordinates(_state.input.mouse.canvasCoords, true);
             }
 
             if (_state.input.mouse.down) {
-                let canvasOffset = {
-                    x: _state.input.mouse.previousCanvasCoords.x - _state.input.mouse.canvasCoords.x,
-                    y: _state.input.mouse.previousCanvasCoords.y - _state.input.mouse.canvasCoords.y
-                }
-                if (!_settingsUI.bLockTranslation.value) {
-                    this.windows.translate(canvasOffset);
+
+                let source = _state.input.mouse.clickStreamCoords;
+                if (_state.input.keyboard.shift && source !== undefined) {
+                    //  shift pressed: handle zoom-box
+                    let target = this.windows.getStreamCoordinates(_state.input.mouse.canvasCoords, false);
+                    if (target != undefined) {
+                        _state.zoom.box.active = true;
+                        _state.zoom.box.tl.x = Math.min(target.x, source.x);
+                        _state.zoom.box.tl.y = Math.min(target.y, source.y);
+                        _state.zoom.box.br.x = Math.max(target.x, source.x);
+                        _state.zoom.box.br.y = Math.max(target.y, source.y);
+                        // console.log('zoom box: ' + JSON.stringify(box));
+                    }
+                } else {
+                    //  no shift: translate
+                    let canvasOffset = {
+                        x: _state.input.mouse.previousCanvasCoords.x - _state.input.mouse.canvasCoords.x,
+                        y: _state.input.mouse.previousCanvasCoords.y - _state.input.mouse.canvasCoords.y
+                    }
+                    if (!_settingsUI.bLockTranslation.value) {
+                        this.windows.translate(canvasOffset);
+                        // console.log('translating: ' + JSON.stringify(canvasOffset));
+                    }
                 }
             }
         }
 
         onMouseUp(event) {
+
+            if (_state.zoom.box.active) {
+                let box = _state.zoom.box;
+
+                let canvasOffset = {
+                    x: box.tl.x,
+                    y: box.tl.y
+                }
+                let level = 2.0 / Math.max((box.br.x - box.tl.x), (box.br.y - box.tl.y));
+                _state.zoom.set(level);
+
+                this.windows.position(canvasOffset, false);
+            }
+
             _state.input.mouse.down = false;
+            _state.input.mouse.clickStreamCoords = undefined;
+            _state.input.mouse.previousCanvasCoords = undefined;
+            _state.zoom.box.active = false;
         }
 
         setWindowStreamId(windowId) {
@@ -8638,15 +8837,24 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         //event.stopPropagation();
         //event.preventDefault();
         _state.ui.mouseDown = true;
-        _state.ui.clickPosition = { x: event.clientX, y: event.clientY };
+        _state.ui.clickPosition = {
+            x: event.clientX,
+            y: event.clientY
+        };
         // console.log('uiOnMouseDown: ' + JSON.stringify(_state.ui.clickPosition));
         document.body.addEventListener('mousemove', nvis.uiOnMouseMove);
         document.body.addEventListener('mouseup', nvis.uiOnMouseUp);
     }
 
     let _uiOnMouseMove = function (event) {
-        let dist = { x: event.clientX - _state.ui.clickPosition.x, y: event.clientY - _state.ui.clickPosition.y };
-        _state.ui.position = { x: _state.ui.previousPosition.x + dist.x, y: _state.ui.previousPosition.y + dist.y };
+        let dist = {
+            x: event.clientX - _state.ui.clickPosition.x,
+            y: event.clientY - _state.ui.clickPosition.y
+        };
+        _state.ui.position = {
+            x: _state.ui.previousPosition.x + dist.x,
+            y: _state.ui.previousPosition.y + dist.y
+        };
         _renderer.updateUiPosition();
         // console.log('uiOnMouseMove: position: ' + JSON.stringify(_state.ui.position));
     }
@@ -8685,9 +8893,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
         if (key == 'bLockZoom') {
-            if (_settingsUI.bLockZoom) {
-                _state.zoom.level = Math.max(1.0, _state.zoom.level);
-            }
+            _state.zoom.set();
             _renderer.windows.adjust();
         }
 
