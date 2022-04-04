@@ -6096,13 +6096,17 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
 
-        getStreamCoordinates(canvasPxCoords, bToPixels = false) {
+        getStreamCoordinates(canvasPxCoords, bToPixels = false, bPartial = false) {
 
-            if (!this.insideWindow(canvasPxCoords)) {
+            if (!bPartial && !this.insideWindow(canvasPxCoords)) {
                 return undefined;
             }
 
             let wpc = this.getWindowCoordinates(canvasPxCoords, true);
+            if (wpc === undefined) {
+                return undefined;
+            }
+            
             let z = _state.zoom.level;
             let ox = _state.zoom.streamOffset.x;
             let oy = _state.zoom.streamOffset.y;
@@ -6128,14 +6132,16 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 y: yy
             };
 
-            if (xx < 0.0 || xx >= sw) {
+            if (!bPartial && (xx < 0.0 || xx >= sw)) {
                 return undefined;
-            } else if (!bToPixels) {
+            }
+            if (!bToPixels) {
                 coords.x = coords.x / sw;
             }
-            if (yy < 0.0 || yy >= sh) {
+            if (!bPartial && (yy < 0.0 || yy >= sh)) {
                 return undefined;
-            } else if (!bToPixels) {
+            }
+            if (!bToPixels) {
                 coords.y = coords.y / sh;
             }
 
@@ -8406,12 +8412,13 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 x: event.clientX - _state.layout.border,
                 y: event.clientY - _state.layout.border
             };
-            _state.input.mouse.clickStreamCoords = this.windows.getStreamCoordinates(cc, false);
+            _state.input.mouse.clickStreamCoords = this.windows.getStreamCoordinates(cc, false, _state.input.keyboard.shift);
             // _state.zoom.box.tl = { x: 0.0, y: 0.0 };
             // _state.zoom.box.br = { x: 0.0, y: 0.0 };
         }
 
         onMouseMove(event) {
+            // console.log('NvisRenderer.onMouseMove(): ' + JSON.stringify(event));
             _state.input.mouse.previousCanvasCoords = _state.input.mouse.canvasCoords;
             _state.input.mouse.canvasCoords = {
                 x: event.clientX - _state.layout.border,
@@ -8427,13 +8434,17 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 let source = _state.input.mouse.clickStreamCoords;
                 if (_state.input.keyboard.shift && source !== undefined) {
                     //  shift pressed: handle zoom-box
-                    let target = this.windows.getStreamCoordinates(_state.input.mouse.canvasCoords, false);
+                    let target = this.windows.getStreamCoordinates(_state.input.mouse.canvasCoords, false, true);
+                    // console.log('target: ' + JSON.stringify(target));
                     if (target != undefined) {
-                        _state.zoom.box.active = true;
-                        _state.zoom.box.tl.x = Math.min(target.x, source.x);
-                        _state.zoom.box.tl.y = Math.min(target.y, source.y);
-                        _state.zoom.box.br.x = Math.max(target.x, source.x);
-                        _state.zoom.box.br.y = Math.max(target.y, source.y);
+                        let box = _state.zoom.box;
+                        box.active = true;
+                        target.x = Math.max(0.0, Math.min(1.0, target.x));
+                        target.y = Math.max(0.0, Math.min(1.0, target.y));
+                        box.tl.x = Math.min(target.x, source.x);
+                        box.tl.y = Math.min(target.y, source.y);
+                        box.br.x = Math.max(target.x, source.x);
+                        box.br.y = Math.max(target.y, source.y);
                         // console.log('zoom box: ' + JSON.stringify(box));
                     }
                 } else {
