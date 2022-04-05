@@ -645,7 +645,6 @@ var nvis = new function () {
             display: none;
             pointer-events: none;
             padding: 10px;
-            margin: 20px;
             position: absolute;
             color: white;
             border-radius: 10px;
@@ -3517,11 +3516,11 @@ var nvis = new function () {
                 h: this.attributes.tiles.values.sizeY,
             } : undefined);
             let numOffsets = (version.singleTile ? (Math.ceil(this.dimensions.w / this.attributes.tiles.values.sizeX) * Math.ceil(this.dimensions.h / this.attributes.tiles.values.sizeY)) : this.dimensions.h);
-            let compression = this.attributes['compression'].value;
+            let compression = (this.attributes['compression'] === undefined ? EXR_NO_COMPRESSION : this.attributes['compression'].value);
 
             //  TODO: implement missing compression methods
             if (compression != EXR_NO_COMPRESSION && compression != EXR_ZIP_COMPRESSION) {
-                alert('EXR compression method not implemented!');
+                alert('EXR compression method (' + compression + ') not implemented!');
                 this.bSuccess = false;
                 return;
             }
@@ -3561,7 +3560,8 @@ var nvis = new function () {
             //  pixels
             this.pixelSize = 0;
             this.channelOffsets = [];
-            for (let c = 0; c < this.attributes.channels.values.length; c++) {
+            let numChannels =  this.attributes.channels.values.length;
+            for (let c = 0; c < numChannels; c++) {
                 let channel = this.attributes.channels.values[c];
 
                 this.channelOffsets.push(this.pixelSize);
@@ -4004,112 +4004,77 @@ var nvis = new function () {
 
                     //  copy data from chunk buffer to output buffer
                     if (version.singleTile) {
-                        // this.outputBuffer.tileCopy(chunkBuffer, {
-                        //     x: tileCoordinates.tileX,
-                        //     y: tileCoordinates.tileY
-                        // }, tileDimensions, this.dimensions, this.pixelSize);
-
-                        const ChannelMap = {
-                            'R': 0,
-                            'G': 1,
-                            'B': 2,
-                            'A': 3
-                        };
 
                         let tc = {
                             x: tileCoordinates.tileX,
                             y: tileCoordinates.tileY
                         }
                         let td = {
-                            w: Math.min(tileDimensions.w, (tc.x + 1) * tileDimensions.w - this.dimensions.w),
-                            h: Math.min(tileDimensions.h, (tc.y + 1) * tileDimensions.h - this.dimensions.h),
-                        }
-                        console.log('  td: ' + JSON.stringify(td));
-                        let tileOffset = (tc.y * tileDimensions.h * this.dimensions.w + tc.x * tileDimensions.w) * this.pixelSize;
-
-                        if (tc.x > 2 || tc.y > 2) {
-                            continue;
+                            w: ((tc.x + 1) * tileDimensions.w > this.dimensions.w ? this.dimensions.w % tileDimensions.w : tileDimensions.w),
+                            h: ((tc.y + 1) * tileDimensions.h > this.dimensions.h ? this.dimensions.h % tileDimensions.h : tileDimensions.h)
                         }
 
-                        let stride = this.dimensions.w * this.pixelSize;
-
-                        chunkBuffer.reset();
                         let channelValues = this.attributes.channels.values;
-                        
-                        let channelSizeSum = 0;
-                        for (let channelId = 0; channelId < 3; channelId++) {
-                            let channel = channelValues[channelId];
-                            let channelSize = (channel.pixelType == EXR_FLOAT ? 4 : 2);
-                            let stride = this.dimensions.w * channelSize;
-                            
-                            for (let y = 0; y < tileDimensions.h; y++) {
-                                for (let x = 0; x < tileDimensions.w; x++) {
-                                    let value = (channel.pixelType == EXR_FLOAT ? chunkBuffer.readUint32() : chunkBuffer.readUint16());
-                                    // let value = chunkBuffer.getUint16((y * tileDimensions.w + x) * this.pixelSize);
-                                    let dstOffset = tileOffset + (y * this.dimensions.w * this.pixelSize + x * channelSize);// * channelSize + ChannelMap[channel.name];
-                                    // dstOffset = tileOffset + x * 2;
-                                    // console.log('(' + x + ', ' + y + ', ' + channelId + '): ' + dstOffset + '  =  ' + NvisBitBuffer.halfBytes2Float32(value) + ', ' + NvisBitBuffer.halfBytes2Float32(((value & 0xff) << 8) | ((value >> 8) & 0xff)));
-                                    // this.outputBuffer.setUint16(dstOffset, value);
-                                    // this.outputBuffer.writeUint16(value);
-                                    // this.outputBuffer.setUint8(dstOffset, value & 0xff);
-                                    // this.outputBuffer.setUint8(dstOffset + 1, (value >> 8) & 0xff);
+                        let stride = this.dimensions.w * this.pixelSize;
+                        let tileOffset = tc.y * tileDimensions.h * stride + tc.x * tileDimensions.w * (channelValues[0].pixelType == EXR_HALF ? 2 : 4);
+
+                        let blockSize = td.w * td.h * this.pixelSize;
+                        this.shuffleAndSwizzle(chunkBuffer, blockSize)
+
+                        chunkBuffer.reset();                        
+                        for (let y = 0; y < td.h; y++) {
+                            let channelSizeSum = 0;
+                            for (let channelId = 0; channelId < numChannels; channelId++) {
+                                let channelSize = (channelValues[channelId].pixelType == EXR_HALF ? 2 : 4);
+                                let scanLineOffset = tileOffset + y * this.dimensions.w * this.pixelSize + this.dimensions.w * channelSizeSum;
+                                this.outputBuffer.seek(scanLineOffset);
+                                for (let i = 0; i < td.w * channelSize; i++) {
+                                    this.outputBuffer.writeUint8(chunkBuffer.readUint8());
                                 }
+                                channelSizeSum += channelSize;
                             }
 
-                            channelSizeSum += channelSize;
                         }
+                            
                     } else {
-                        // this.outputBuffer.consume(chunkBuffer, chunkBuffer.buffer.byteLength);
-                        this.outputBuffer.copy(chunkBuffer, sl * chunkSize, chunkBuffer.buffer.byteLength);
+
+                        this.shuffleAndSwizzle(chunkBuffer, chunkSize)
+                        this.outputBuffer.copy(chunkBuffer, sl * chunkSize, chunkSize);
+
                     }
                 }
-
-                // return;
-
-                //  EXR postprocess for ZIP and RLE
-                let numChunks = Math.round(this.dimensions.h / this.scanLinesPerChunk);
-                let trailingScanLines = this.dimensions.h % this.scanLinesPerChunk;
-                let trailingChunkSize = trailingScanLines * this.dimensions.w * this.pixelSize;
-                let baseChunkSize = this.scanLinesPerChunk * this.dimensions.w * this.pixelSize;
-                //let baseHalfChunkSize = Math.floor((baseChunkSize + 1) / 2);
-                let tmpBuffer = new NvisBitBuffer(new ArrayBuffer(baseChunkSize));
-
-                for (let chunkId = 0; chunkId < numChunks; chunkId++) {
-
-                    //  predictor
-                    let chunkIndex = chunkId * baseChunkSize;
-
-                    let chunkSize = (chunkId == numChunks - 1 && trailingChunkSize > 0 ? trailingChunkSize : baseChunkSize);
-                    let halfChunkSize = Math.floor((chunkSize + 1) / 2);
-
-                    for (let i = chunkIndex + 1; i < chunkIndex + chunkSize; i++) {
-                        let d = this.outputBuffer.getUint8(i - 1) + this.outputBuffer.getUint8(i) - 128;
-                        this.outputBuffer.setUint8(i, d);
-                    }
-
-                    //  swizzle
-                    let srcIndex = chunkIndex;
-                    for (let i = 0; i < chunkSize; i += 2) {
-                        let value1 = this.outputBuffer.getUint8(srcIndex);
-                        let value2 = this.outputBuffer.getUint8(srcIndex + halfChunkSize);
-                        tmpBuffer.setUint8(i, value1);
-                        tmpBuffer.setUint8(i + 1, value2);
-                        srcIndex++;
-                    }
-
-                    this.outputBuffer.copy(tmpBuffer, chunkIndex, chunkSize);
-                }
-                return;
             }
 
             if (compression == EXR_PIZ_COMPRESSION) {
                 //  Copyright (c) 2004, Industrial Light & Magic, a division of Lucas Digital Ltd. LLC)
                 //  (3-clause BSD license)
 
-
-
                 return;
             }
+        }
+
+        shuffleAndSwizzle(buffer, size) {
+
+            let halfSize = Math.trunc((size + 1) / 2);
+
+            let tmpBuffer = new NvisBitBuffer(new ArrayBuffer(size));
+            buffer.reset();
+            for (let i = 1; i < size; i++) {
+                let d = buffer.getUint8(i - 1) + buffer.getUint8(i) - 128;
+                buffer.setUint8(i, d);
+            }
+
+            //  swizzle
+            let srcIndex = 0;
+            for (let i = 0; i < size; i += 2) {
+                let value1 = buffer.getUint8(srcIndex);
+                let value2 = buffer.getUint8(srcIndex + halfSize);
+                tmpBuffer.setUint8(i, value1);
+                tmpBuffer.setUint8(i + 1, value2);
+                srcIndex++;
+            }
+                
+            buffer.copy(tmpBuffer, 0, size);
         }
 
         huffmanDecode(bitBuffer, tableId, bTest = false) {
@@ -4232,8 +4197,11 @@ var nvis = new function () {
             }
 
             if (attrib.type == 'double') {
+                alert('[EXR]  attribute "double" not handled!');
             }
+
             if (attrib.type == 'envmap') {
+                alert('[EXR]  attribute "envmap" not handled!');
             }
 
             if (attrib.type == 'float') {
@@ -4245,6 +4213,7 @@ var nvis = new function () {
             }
 
             if (attrib.type == 'keycode') {
+                alert('[EXR]  attribute "keycode" not handled!');
             }
 
             if (attrib.type == 'lineOrder') {
@@ -4285,10 +4254,28 @@ var nvis = new function () {
             }
 
             if (attrib.type == 'rational') {
+                alert('[EXR]  attribute "rational" not handled!');
             }
+
             if (attrib.type == 'string') {
+                attrib.value = '';
+                for (let i = 0; i < attrib.size; i++) {
+                    attrib.value += String.fromCharCode(b.readUint8());
+                }
             }
+
             if (attrib.type == 'stringvector') {
+                attrib.values = [];
+                let totalLength = attrib.name.length;
+                while (totalLength < attrib.size) {
+                    let string = '';
+                    let strLen = b.readUint32();
+                    for (let i = 0; i < strLen; i++) {
+                        string += String.fromCharCode(b.readUint8());
+                    }
+                    attrib.values.push(string);
+                    totalLength += string.length;
+                }
             }
 
             if (attrib.type == 'tiledesc') {
@@ -4300,6 +4287,7 @@ var nvis = new function () {
             }
 
             if (attrib.type == 'timecode') {
+                alert('[EXR]  attribute "timecode" not handled!');
             }
 
             if (attrib.type == 'v2i') {
@@ -5853,6 +5841,7 @@ var nvis = new function () {
 
         constructor(canvas) {
             this.canvas = canvas;
+            this.margin = 10;
             this.position = { x: 10, y: 10 };
             this.size = { w: 0, h: 0 };
             this.text = '';
@@ -5907,21 +5896,45 @@ var nvis = new function () {
             }
             this.div.innerHTML = this.text;
 
-            //  TODO: below can be used for fixed placement
-            // let w = window.getComputedStyle(this.div).getPropertyValue('width');
-            // let h = window.getComputedStyle(this.div).getPropertyValue('height');
-            // this.size = { w: Math.floor(w.substring(0, w.indexOf('px'))), h: Math.floor(h.substring(0, h.indexOf('px'))) };
+            let bb = this.div.getBoundingClientRect();
+            this.size = {
+                w: Math.floor(bb.width),
+                h: Math.floor(bb.height)
+            };
 
             let cCoords = _state.input.mouse.canvasCoords;
             let layoutDims = _state.layout.getDimensions();
-            let winPxDims = { w: this.canvas.width / layoutDims.w, h: this.canvas.height / layoutDims.h };
-            let topLeftWinCoords = { x: cCoords.x % winPxDims.w, y: cCoords.y % winPxDims.h };
-            let winPos = { x: windowId % layoutDims.w, y: Math.floor(windowId / layoutDims.w) };
-            let winCoords = { x: topLeftWinCoords.x + winPos.x * winPxDims.w, y: topLeftWinCoords.y + winPos.y * winPxDims.h };
+            let winPxDims = {
+                w: this.canvas.width / layoutDims.w,
+                h: this.canvas.height / layoutDims.h
+            };
+            let topLeftWinCoords = {
+                x: cCoords.x % winPxDims.w,
+                y: cCoords.y % winPxDims.h
+            };
+            let winPos = {
+                x: windowId % layoutDims.w,
+                y: Math.floor(windowId / layoutDims.w)
+            };
+            let winCoords = {
+                x: topLeftWinCoords.x + winPos.x * winPxDims.w,
+                y: topLeftWinCoords.y + winPos.y * winPxDims.h
+            };
 
-            let left = _state.layout.border + winCoords.x;
-            let top = _state.layout.border + winCoords.y;
-            this.position = { x: left, y: top };
+            let left = _state.layout.border + winCoords.x + this.margin;
+            let top = _state.layout.border + winCoords.y + this.margin;
+
+            if (top + this.size.h > this.canvas.height) {
+                top -= (this.size.h + 2 * this.margin);
+            }
+            if (left + this.size.w > this.canvas.width) {
+                left -= (this.size.w + 2 * this.margin);
+            }
+
+            this.position = {
+                x: left,
+                y: top
+            };
             this.div.style.left = left + 'px';
             this.div.style.top = top + 'px';
         }
@@ -6106,7 +6119,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             if (wpc === undefined) {
                 return undefined;
             }
-            
+
             let z = _state.zoom.level;
             let ox = _state.zoom.streamOffset.x;
             let oy = _state.zoom.streamOffset.y;
