@@ -1,0 +1,5 @@
+{
+    "name": "Sharpen (Luma)",
+    "fileName": "glsl/sharpen-luma.glsl",
+    "inputs": 1
+}

@@ -1,7 +1,5 @@
 {
   "name": "FLIP (sRGB -> YCxCz)",
   "fileName": "glsl/flip-colorspace.glsl",
-  "inputs": 1,
-  "UI": {
-  }
+  "inputs": 1
 }

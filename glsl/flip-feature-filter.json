@@ -2,48 +2,5 @@
   "name": "FLIP (Feature Filter)",
   "fileName": "glsl/flip-feature-filter.glsl",
   "inputs": 0,
-  "volatile": false,
-  "UI": {
-    "uFixedPPD": {
-      "name": "Fixed PPD",
-      "type": "bool",
-      "value": true
-    },
-    "uPPD": {
-      "name": "PPD",
-      "type": "float",
-      "value": 67.0,
-      "min": 0.0,
-      "max": 120.0,
-      "step": 1.0,
-      "condition": "uFixedPPD"
-    },
-    "uMonitorDistance": {
-      "name": "Monitor Distance [m]",
-      "type": "float",
-      "value": 0.7,
-      "min": 0.1,
-      "max": 2.0,
-      "step": 0.1,
-      "condition": "!uFixedPPD"
-    },
-    "uMonitorWidth": {
-      "name": "Monitor Width [m]",
-      "type": "float",
-      "value": 0.7,
-      "min": 0.1,
-      "max": 2.0,
-      "step": 0.1,
-      "condition": "!uFixedPPD"
-    },
-    "uMonitorResolutionX": {
-      "name": "Monitor X Resolution",
-      "type": "int",
-      "value": 3840,
-      "min": 640,
-      "max": 7680,
-      "step": 1,
-      "condition": "!uFixedPPD"
-    }
-  }
+  "volatile": false
 }

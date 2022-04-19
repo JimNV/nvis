@@ -127,6 +127,7 @@ var nvis = new function () {
             time: 0,
 
             setNumFrames: function (numFrames) {
+                console.log('Here... ' + numFrames);
                 this.numFrames = numFrames;
                 this.minFrameId = 0;
                 this.maxFrameId = numFrames - 1;
@@ -145,19 +146,22 @@ var nvis = new function () {
                 this.frameId++;
                 if (this.frameId > this.maxFrameId) {
                     this.frameId = this.minFrameId;
+                    return false;
                 }
                 document.getElementById('settings-frameId').value = (this.frameId + 1);
                 document.getElementById('settings-frameId-value').innerHTML = (this.frameId + 1);
+                return true;
             },
 
             dec: function () {
-                // this.frameId = (this.frameId + this.numFrames - 1) % this.numFrames;
                 this.frameId--;
                 if (this.frameId < this.minFrameId) {
                     this.frameId = this.maxFrameId;
+                    return false;
                 }
                 document.getElementById('settings-frameId').value = (this.frameId + 1);
                 document.getElementById('settings-frameId-value').innerHTML = (this.frameId + 1);
+                return true;
             },
 
             update: function () {
@@ -995,10 +999,13 @@ var nvis = new function () {
                 //     }
                 console.log('name 2: ' + argument.name);
                 newStream.name = argument.name;
+
             }
+
             if (argument.window || _renderer.windows.windows.length == 0) {
                 _renderer.addWindow(_renderer.streams.length - 1);
             }
+
             return streamId;
 
         } else if (command == 'loadShader') {
@@ -2212,6 +2219,8 @@ var nvis = new function () {
 
             this.bFragmentReady = false;
 
+            // console.log('Loading shader: ' + fileName);
+            
             let xhr = new XMLHttpRequest();
             xhr.open('GET', fileName);
             xhr.responseType = 'text';
@@ -3176,8 +3185,24 @@ var nvis = new function () {
 
                     if (blockType == 1) {
                         //  compression with fixed Huffman codes
-                        //  TODO: this
-                        console.log('[Deflate] TODO: handle blocks compressed with fixed Huffman codes');
+                        this.huffman.tableSizes[0] = 288;
+                        this.huffman.tableSizes[1] = 32;
+                        let i = 0;
+                        for (i = 0; i < 32; i++) {
+                            this.huffman.tables[1].codeSize[i] = 5;
+                        }
+                        for (i = 0; i <= 143; i++) {
+                            this.huffman.tables[0].codeSize[i] = 8;
+                        }
+                        for (; i <= 255; i++) {
+                            this.huffman.tables[0].codeSize[i] = 9;
+                        }
+                        for (; i <= 279; i++) {
+                            this.huffman.tables[0].codeSize[i] = 7;
+                        }
+                        for (; i <= 287; i++) {
+                            this.huffman.tables[0].codeSize[i] = 8;
+                        }
                     } else {
                         //  compression with dynamic Huffman codes
                         this.huffman.tableSizes = [
@@ -3898,6 +3923,17 @@ var nvis = new function () {
             const EXR_B44_COMPRESSION = 6;
             const EXR_B44A_COMPRESSION = 7;
         
+            const vCompressionTypes = [
+                'None',
+                'RLE',
+                'ZIP (single scanline)',
+                'ZIP',
+                'PIZ',
+                'PXR24',
+                'B44',
+                'B44A'
+            ]
+
             const EXR_NO_COMPRESSION_SCANLINES = 1;
             const EXR_RLE_COMPRESSION_SCANLINES = 1;
             const EXR_ZIPS_COMPRESSION_SCANLINES = 1;
@@ -3910,7 +3946,7 @@ var nvis = new function () {
             this.fileName = fileName;
             this.buffer = new NvisBitBuffer(buffer);
 
-            this.bSuccess = true;
+            this.bSuccess = false;
             let b = this.buffer;
 
             let magicNumber = b.readInt32();  //  should be decimal 20000630
@@ -3925,6 +3961,13 @@ var nvis = new function () {
             if (bDebug) {
                 console.log('[EXR] Magic number: ' + magicNumber);
                 console.log('[EXR] Version field: ' + JSON.stringify(version));
+            }
+
+            if (version.multiPart) {
+                if (bDebug) {
+                    console.log('[EXR] Multi-part files not supported!');
+                }
+                return;
             }
 
             //  attributes
@@ -3956,12 +3999,14 @@ var nvis = new function () {
 
             //  TODO: implement missing compression methods
             if (compression != EXR_NO_COMPRESSION && compression != EXR_ZIPS_COMPRESSION && compression != EXR_ZIP_COMPRESSION) {
-                alert('EXR compression method (' + compression + ') not implemented!');
-                this.bSuccess = false;
+                alert('EXR compression method (' + vCompressionTypes[compression] + ') not implemented!');
                 return;
             }
 
             switch (compression) {
+                case EXR_RLE_COMPRESSION:
+                    this.scanLinesPerChunk = EXR_RLE_COMPRESSION_SCANLINES;
+                    break;
                 case EXR_ZIPS_COMPRESSION:
                     this.scanLinesPerChunk = EXR_ZIPS_COMPRESSION_SCANLINES;
                     break;
@@ -3976,6 +4021,9 @@ var nvis = new function () {
                     break;
                 case EXR_B44_COMPRESSION:
                     this.scanLinesPerChunk = EXR_B44_COMPRESSION_SCANLINES;
+                    break;
+                case EXR_B44A_COMPRESSION:
+                    this.scanLinesPerChunk = EXR_B44A_COMPRESSION_SCANLINES;
                     break;
                 case EXR_NO_COMPRESSION:
                 default:
@@ -4053,10 +4101,15 @@ var nvis = new function () {
                     }
                 }
 
+                this.bSuccess = true;
                 return;
             }
 
-            if (compression == EXR_ZIP_COMPRESSION) {
+            if (compression == EXR_RLE_COMPRESSION) {
+                return;
+            }
+
+            if (compression == EXR_ZIPS_COMPRESSION || compression == EXR_ZIP_COMPRESSION) {
 
                 //  compressed data handled below
                 let tileCoordinates = undefined;
@@ -4066,6 +4119,10 @@ var nvis = new function () {
                 let chunkBuffer = new NvisBitBuffer(new ArrayBuffer(chunkSize));
                 
                 for (let sl = 0; sl < numOffsets; sl++) {
+
+                    if (bDebug) {
+                        console.log('[EXR] handling chunk ' + sl);
+                    }
 
                     chunkBuffer.reset();
 
@@ -4136,14 +4193,27 @@ var nvis = new function () {
 
                     }
                 }
+
+                this.bSuccess = true;
+                return;
             }
 
             if (compression == EXR_PIZ_COMPRESSION) {
-                //  Copyright (c) 2004, Industrial Light & Magic, a division of Lucas Digital Ltd. LLC)
-                //  (3-clause BSD license)
-
                 return;
             }
+
+            if (compression == EXR_PXR24_COMPRESSION) {
+                return;
+            }
+
+            if (compression == EXR_B44_COMPRESSION) {
+                return;
+            }
+
+            if (compression == EXR_B44A_COMPRESSION) {
+                return;
+            }
+
         }
 
 
@@ -5083,8 +5153,6 @@ var nvis = new function () {
                 //     continue;
                 // }
 
-                let texture = gl.createTexture();
-                this.textures.push(texture);
 
                 let fileName = fileNames[fileId];
                 this.fileNames.push(fileName);
@@ -5113,17 +5181,19 @@ var nvis = new function () {
                             }
 
                             if (file.bSuccess) {
+                                let texture = gl.createTexture();
+                                self.textures.push(texture);
+                
                                 self.setupTexture(texture, file.toFloatArray(), true, file.dimensions);
 
                                 if (numFilesLoaded == fileNames.length) {
                                     self.setDimensions(file.dimensions);
-                                    //callback(file.dimensions);
                                     windows.setStreamPxDimensions(file.dimensions);
                                     windows.adjust();
                                 }
                             }
                         } else {
-                            console.log('status: ' + this.status + ', response: ' + this.response);
+                            // console.log('status: ' + this.status + ', response: ' + this.response);
                         }
                     };
                     xhr.send();
@@ -5135,7 +5205,11 @@ var nvis = new function () {
 
                     image.onload = function () {
                         numFilesLoaded++;
+                        let texture = gl.createTexture();
+                        self.textures.push(texture);
                         self.setupTexture(texture, image);
+
+                        console.log(numFilesLoaded + ' = ' + fileNames.length);
 
                         if (numFilesLoaded == fileNames.length) {
                             let dimensions = { w: image.width, h: image.height };
@@ -5148,6 +5222,8 @@ var nvis = new function () {
 
                 }
             }
+
+            _state.animation.setNumFrames(numFilesLoaded);
         }
 
 
@@ -5223,6 +5299,8 @@ var nvis = new function () {
                                 windows.setStreamPxDimensions(file.dimensions);
                                 windows.adjust();
                             }
+                        } else {
+                            console.log('File drop failed for file "' + files[0].name) + '"';
                         }
 
                     }
@@ -5491,6 +5569,10 @@ var nvis = new function () {
         buildShaderUI(object, streamId) {
             let dom = document.createDocumentFragment();
 
+            // if (object === undefined) {
+            //     return dom;
+            // }
+
             let table = document.createElement('table');
             table.className = 'uiTable';
 
@@ -5706,6 +5788,10 @@ var nvis = new function () {
                     return;
                 }
                 this.shaderJSONObject = JSON.parse(json);
+
+                if (this.shaderJSONObject.UI === undefined) {
+                    return;
+                }
 
                 //  set default UI parameters from API call
                 for (let key of Object.keys(this.apiParameters)) {
@@ -6360,6 +6446,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             if (this.windows.length == 0) {
                 this.canvas.width = width;
                 this.canvas.height = height;
+                this.welcome.show();
                 return;
             }
 
@@ -7992,7 +8079,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 let argument = {
                     shaderGraphDescriptionId: graphId,
                     parameters: {},
-                    inputs: [0, 1],
+                    inputs: undefined,
                     window: true
                 };
                 this.parseShaderGraph(argument);
@@ -8226,15 +8313,17 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                     _state.input.keyboard.control = true;
                     break;
                 case 'ArrowLeft':  //  ArrowLeft
-                    _state.animation.dec();
-                    this.popupInfo('Frame: ' + (_state.animation.frameId + 1) + ' / ' + _state.animation.numFrames);
+                    if (_state.animation.dec()) {
+                        this.popupInfo('Frame: ' + (_state.animation.frameId + 1) + ' / ' + _state.animation.numFrames);
+                    }
                     break;
                 case 'ArrowUp':  //  ArrowUp
                     this.windows.incStream(_state.input.mouse.canvasCoords, this.streams, this.shaderGraphs);
                     break;
                 case 'ArrowRight':  //  ArrowRight
-                    _state.animation.inc();
-                    this.popupInfo('Frame: ' + (_state.animation.frameId + 1) + ' / ' + _state.animation.numFrames);
+                    if (_state.animation.inc()) {
+                        this.popupInfo('Frame: ' + (_state.animation.frameId + 1) + ' / ' + _state.animation.numFrames);
+                    }
                     break;
                 case 'ArrowDown':  //  ArrowDown
                     this.windows.decStream(_state.input.mouse.canvasCoords, this.streams, this.shaderGraphs);
@@ -8578,6 +8667,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             this.windows.adjust();
         }
 
+
         onFileDrop(event) {
             event.stopPropagation();
             event.preventDefault();
@@ -8632,9 +8722,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                         newStream.drop([files[i]], this.windows);
                         this.streams.push(newStream);
                         this.addWindow(this.streams.length - 1);
-                        // console.log('streamId: ' + (this.streams.length - 1));
                     }
-                    // _state.animation.setNumFrames(newStream.getNumImages());  //  TODO: check
                 }
                 this.windows.adjust();
             }
@@ -8689,18 +8777,34 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
         }
 
         shaderLoaded() {
-            //_shaders[shaderId] = shader;
             this.windows.adjust();  //  TODO: is this needed?
         }
 
         loadShader(jsonFileName, bHidden = false) {
-            // this.shaders.load(jsonFileName, function () { this.shaderLoaded(); });
             return this.shaders.load(jsonFileName, () => this.shaderLoaded(), bHidden);
         }
 
         parseShaderGraph(argument) {
 
             let json = this.shaderGraphDescriptions[argument.shaderGraphDescriptionId];
+
+            console.log('1: graph json (' + JSON.stringify(argument) + '): ' + JSON.stringify(json));
+
+            if (argument.inputs === undefined) {
+                //  try to find available inputs
+                argument.inputs = [];
+                for (let i = 0; i < json.inputs; i++) {
+                    argument.inputs.push(Math.max(i, this.streams.length - 1));
+                }
+            }
+
+            console.log('2: graph json (' + JSON.stringify(argument) + '): ' + JSON.stringify(json));
+
+            if (argument.inputs.length != json.inputs) {
+                //  all external inputs must be accounted for
+                //  TODO: as above, try to find available inputs?
+                return;
+            }
 
             let shaderGraph = new NvisShaderGraph();
             shaderGraph.id = this.shaderGraphs.length;
@@ -8709,11 +8813,6 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             shaderGraph.argument = argument;
             shaderGraph.json = json;
             shaderGraph.inputStreamIds = (argument.inputs === undefined ? [] : argument.inputs);
-
-            if (argument.inputs.length != json.inputs) {
-                //  all external inputs must be accounted for
-                return;
-            }
 
             let shaderIds = [];
             for (let i = 0; i < json.shaders.length; i++) {
@@ -8733,13 +8832,12 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 let newStream = this.addShaderStream(shaderIds[shader.shaderId]);
                 let streamId = this.streams.length - 1;
 
+                console.log('Adding shader stream ' + streamId + ': shader ' + shader.shaderId);
+
                 shaderGraph.streamIds.push(streamId);
                 newStream.shaderGraphId = shaderGraph.id;
-                // newStream.shaderGraph.json = json;
-                // newStream.shaderGraph.inputStreams = graphInputIds;
-                // console.log(' ' + i + ': ' + JSON.stringify(newStream.inputStreams));
+
                 newStream.bFloat = (shaderParameters['float'] === undefined ? true : shaderParameters['float']);
-                // delete shaderParameters['float'];
 
                 let shaderInputIds = (shader.inputs === undefined ? [] : shader.inputs);
 
@@ -8759,8 +8857,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                         if (inputStreamId < numGraphInputs) {
                             //  external input
                             inputStreamId = graphInputIds[inputStreamId];
+                            console.log('external input ' + i + ': ' + inputStreamId);
                         } else {
                             inputStreamId += streamIdOffset;
+                            console.log('internal input ' + i + ': ' + inputStreamId);
                         }
                         inputStreamIds.push(inputStreamId);
                     }
@@ -8830,7 +8930,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             if (name !== undefined) {
                 newStream.name = name;
             }
-            //newStream.load(fileNames, (dim) => this.newStreamCallback(dim));
+
             newStream.load(fileNames, this.windows);
 
             //  TODO: fix this
@@ -8869,13 +8969,13 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
             requestAnimationFrame((t) => this.animate(t));
 
             const elapsed = timeStamp - _state.animation.time;
-            _state.animation.time = timeStamp;
 
             if (_state.animation.performance) {
                 document.getElementById('performanceInfo').innerHTML = 'FPS: ' + (1000 / elapsed).toFixed(1);
             }
 
             if (elapsed >= 1000.0 / _state.animation.fps) {
+                _state.animation.time = timeStamp;
                 _state.animation.update();
                 this.render();
             }
