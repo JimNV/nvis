@@ -8788,7 +8788,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
             let json = this.shaderGraphDescriptions[argument.shaderGraphDescriptionId];
 
-            console.log('1: graph json (' + JSON.stringify(argument) + '): ' + JSON.stringify(json));
+            // console.log('1: graph json (' + JSON.stringify(argument) + '): ' + JSON.stringify(json));
 
             if (argument.inputs === undefined) {
                 //  try to find available inputs
@@ -8798,7 +8798,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 }
             }
 
-            console.log('2: graph json (' + JSON.stringify(argument) + '): ' + JSON.stringify(json));
+            // console.log('2: graph json (' + JSON.stringify(argument) + '): ' + JSON.stringify(json));
 
             if (argument.inputs.length != json.inputs) {
                 //  all external inputs must be accounted for
@@ -8832,7 +8832,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                 let newStream = this.addShaderStream(shaderIds[shader.shaderId]);
                 let streamId = this.streams.length - 1;
 
-                console.log('Adding shader stream ' + streamId + ': shader ' + shader.shaderId);
+                // console.log('Adding shader stream ' + streamId + ': shader ' + shader.shaderId);
 
                 shaderGraph.streamIds.push(streamId);
                 newStream.shaderGraphId = shaderGraph.id;
@@ -8857,10 +8857,10 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
                         if (inputStreamId < numGraphInputs) {
                             //  external input
                             inputStreamId = graphInputIds[inputStreamId];
-                            console.log('external input ' + i + ': ' + inputStreamId);
+                            // console.log('external input ' + i + ': ' + inputStreamId);
                         } else {
                             inputStreamId += streamIdOffset;
-                            console.log('internal input ' + i + ': ' + inputStreamId);
+                            // console.log('internal input ' + i + ': ' + inputStreamId);
                         }
                         inputStreamIds.push(inputStreamId);
                     }
