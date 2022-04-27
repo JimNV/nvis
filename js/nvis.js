@@ -969,11 +969,17 @@ var nvis = new function () {
         } else if (command == 'stream') {
 
             let streamId = undefined;
-            if (argument.images !== undefined) {
-                streamId = _renderer.loadStream(Array.isArray(argument.images) ? argument.images : [argument.images], argument.name);
+            if (argument.files !== undefined) {
+                streamId = _renderer.loadStream(Array.isArray(argument.files) ? argument.files : [argument.files], argument.name);
             } else if (argument.shader !== undefined) {
                 let shaderId = argument.shader;
                 let newStream = _renderer.addShaderStream(shaderId);
+                newStream.name = argument.name;
+                if (argument.parameters !== undefined) {
+                    for (let key of Object.keys(argument.parameters)) {
+                        newStream.apiParameters[key] = argument.parameters[key];
+                    }
+                }
                 let inputStreamIds = argument.inputs;
                 if (inputStreamIds === undefined) {
                     //  no inputs => generator => fetch dimensions from config
@@ -1036,6 +1042,7 @@ var nvis = new function () {
                 shaderId = _renderer.loadShader(argument.fileName);
             }
             let newStream = _renderer.addShaderStream(shaderId);
+            newStream.name = argument.parameters.name;
             newStream.bFloat = (argument.parameters['float'] === undefined ? true : argument.parameters['float']);
             delete argument.parameters['float'];
             if (argument.inputs !== undefined) {
@@ -1046,13 +1053,14 @@ var nvis = new function () {
             }
             if (argument.parameters !== undefined) {
                 for (let key of Object.keys(argument.parameters)) {
-                    // console.log('key: ' + key);
+                    console.log('key: ' + key);
                     newStream.apiParameters[key] = argument.parameters[key];
                 }
             }
             if (argument.window) {
                 _renderer.addWindow(_renderer.streams.length - 1);
             }
+
             return shaderId;
 
         } else if (command == 'generator') {
@@ -5135,11 +5143,6 @@ var nvis = new function () {
 
             for (let fileId = 0; fileId < fileNames.length; fileId++) {
 
-                // if (!files[fileId].type.match(/image.*/) && !files[0].name.match(/.exr$/)) {
-                //     continue;
-                // }
-
-
                 let fileName = fileNames[fileId];
                 this.fileNames.push(fileName);
 
@@ -5154,7 +5157,6 @@ var nvis = new function () {
                     xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, max-age=0');
                     xhr.responseType = 'arraybuffer';
                     xhr.onload = function () {
-                        // console.log("xhr.onload()");
                         if (this.status == 200 && this.response !== null) {
                             numFilesLoaded++;
 

@@ -1,0 +1,21 @@
+{
+    "name": "À-Trous Filter",
+    "fileName": "glsl/atrous.glsl",
+    "inputs": 1,
+    "UI": {
+        "uRate": {
+            "name": "Rate",
+            "type": "int",
+            "value": 0,
+            "min": 0,
+            "max": 32
+        },
+        "uRadius": {
+            "name": "Radius",
+            "type": "int",
+            "value": 1,
+            "min": 0,
+            "max": 5
+        }
+    }
+}
