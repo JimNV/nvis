@@ -245,14 +245,16 @@ void main() {
     ivec2 dimensions = textureSize(uTexture0, 0);
     ivec2 loc2d = ivec2(vTextureCoord * vec2(dimensions));
 
-    Config.MaxScale = (uSharpness >= 0.0 ? 1.25 : 1.75);
-    Config.MinScale = (uSharpness >= 0.0 ? 1.25 : 1.0);
-    Config.LimitScale = (uSharpness >= 0.0 ? 1.25 : 1.0);
+    float sharpness = uSharpness - 0.5;
 
-    Config.kSharpStrengthMin = max(0.0, 0.4 + uSharpness * Config.MinScale * 1.2);
-    Config.kSharpStrengthMax = 1.6 + uSharpness * Config.MaxScale * 1.8;
-    Config.kSharpLimitMin = max(0.1, 0.14 + uSharpness * Config.LimitScale * 0.32);
-    Config.kSharpLimitMax = 0.5 + uSharpness * Config.LimitScale * 0.6;
+    Config.MaxScale = (sharpness >= 0.0 ? 1.25 : 1.75);
+    Config.MinScale = (sharpness >= 0.0 ? 1.25 : 1.0);
+    Config.LimitScale = (sharpness >= 0.0 ? 1.25 : 1.0);
+
+    Config.kSharpStrengthMin = max(0.0, 0.4 + sharpness * Config.MinScale * 1.2);
+    Config.kSharpStrengthMax = 1.6 + sharpness * Config.MaxScale * 1.8;
+    Config.kSharpLimitMin = max(0.1, 0.14 + sharpness * Config.LimitScale * 0.32);
+    Config.kSharpLimitMax = 0.5 + sharpness * Config.LimitScale * 0.6;
 
     Config.kRatioNorm = 1.0 / (kMaxContrastRatio - kMinContrastRatio);
     Config.kSharpScaleY = 1.0 / (kSharpEndY - kSharpStartY);
