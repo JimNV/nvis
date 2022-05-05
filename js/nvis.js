@@ -969,8 +969,8 @@ var nvis = new function () {
         } else if (command == 'stream') {
 
             let streamId = undefined;
-            if (argument.files !== undefined) {
-                streamId = _renderer.loadStream(Array.isArray(argument.files) ? argument.files : [argument.files], argument.name);
+            if (argument.images !== undefined) {
+                streamId = _renderer.loadStream(Array.isArray(argument.images) ? argument.images : [argument.images], argument.name);
             } else if (argument.shader !== undefined) {
                 let shaderId = argument.shader;
                 let newStream = _renderer.addShaderStream(shaderId);
@@ -4160,26 +4160,29 @@ var nvis = new function () {
 
                         let channelValues = this.attributes.channels.values;
                         let stride = this.dimensions.w * this.pixelSize;
-                        let tileOffset = tc.y * tileDimensions.h * stride + tc.x * tileDimensions.w * (channelValues[0].pixelType == this.EXR_HALF ? 2 : 4);
+                        let tileOffset = tc.y * tileDimensions.h * stride + tc.x * tileDimensions.w * (channelValues[0].pixelType == EXR_HALF ? 2 : 4);
 
                         let blockSize = td.w * td.h * this.pixelSize;
                         this.shuffleAndSwizzle(chunkBuffer, blockSize)
 
                         chunkBuffer.reset();                        
                         for (let y = 0; y < td.h; y++) {
+
                             let channelSizeSum = 0;
                             for (let channelId = 0; channelId < numChannels; channelId++) {
                                 let channelSize = (channelValues[channelId].pixelType == EXR_HALF ? 2 : 4);
                                 let scanLineOffset = tileOffset + y * this.dimensions.w * this.pixelSize + this.dimensions.w * channelSizeSum;
                                 this.outputBuffer.seek(scanLineOffset);
+ 
                                 for (let i = 0; i < td.w * channelSize; i++) {
                                     this.outputBuffer.writeUint8(chunkBuffer.readUint8());
                                 }
+
                                 channelSizeSum += channelSize;
                             }
-
                         }
-                            
+
+
                     } else {
 
                         this.shuffleAndSwizzle(chunkBuffer, chunkSize)
