@@ -4133,6 +4133,7 @@ var nvis = new function () {
                         //  not really needed, but we have to consume them from the input stream
                         yCoordinate = b.readUint32();
                     }
+                    let slChunkSize = (version.singleTile ? (this.attributes.tiles.values.sizeX * this.attributes.tiles.values.sizeY) : (Math.min(this.scanLinesPerChunk, this.dimensions.h - yCoordinate) * this.dimensions.w)) * this.pixelSize;
                     pixelDataSize = b.readUint32();
 
                     if (bDebug) {
@@ -4185,8 +4186,8 @@ var nvis = new function () {
 
                     } else {
 
-                        this.shuffleAndSwizzle(chunkBuffer, chunkSize)
-                        this.outputBuffer.copy(chunkBuffer, sl * chunkSize, chunkSize);
+                        this.shuffleAndSwizzle(chunkBuffer, slChunkSize)
+                        this.outputBuffer.copy(chunkBuffer, sl * chunkSize, slChunkSize);
 
                     }
                 }
@@ -6146,7 +6147,7 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
         setStreamPxDimensions(pxDimensions) {
             if (this.streamPxDimensions !== undefined && pxDimensions.w != this.streamPxDimensions.w && pxDimensions.h != this.streamPxDimensions.h) {
-                alert('New stream size mismatch!');
+                console.log('New stream size mismatch!');
             }
             this.streamPxDimensions = pxDimensions;
         }
