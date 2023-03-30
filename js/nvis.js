@@ -311,22 +311,51 @@ var nvis = new function () {
             max: '#frames',
             step: 1,
         },
-        Tonemapping: {
+        ToneMapping: {
             type: 'ruler'
         },
-        bGlobalTonemapping: {
-            name: 'Global tonemapping',
+        bGlobalToneMapping: {
+            name: 'Global tone mapping',
             type: 'bool',
             value: false
         },
-        tonemapper: {
-            name: 'Tonemapper',
+        toneMapper: {
+            name: 'Tone Mapper',
             type: 'dropdown',
             value: 0,
             alternatives: [
-                'Gamma correction'
+                'None (clamp to [0, 1])',
+                'Reinhard',
+                'Modified Reinhard',
+                'Perceptual Quantizer (PQ)',
+                'Heji\'s approximation',
+                'Uncharted 2',
+                'ACES'
             ],
-            condition: 'bGlobalTonemapping'
+            condition: 'bGlobalToneMapping'
+        },
+        maxWhiteLuminance: {
+            name: 'Max white luminance',
+            type: 'int',
+            min: 0,
+            max: 100,
+            value: 50,
+            step: 1,
+            condition: 'bGlobalToneMapping & toneMapper = 2'
+        },
+        maxPQLuminance: {
+            name: 'Max luminance [cd/sq m]',
+            type: 'int',
+            min: 1,
+            max: 100,
+            value: 10,
+            step: 1,
+            condition: 'bGlobalToneMapping & toneMapper = 3'
+        },
+        bGlobalGammaCorrection: {
+            name: 'Global gamma correction',
+            type: 'bool',
+            value: false
         },
         gamma: {
             name: 'Gamma',
@@ -335,7 +364,7 @@ var nvis = new function () {
             max: 4.0,
             value: 2.2,
             step: 0.1,
-            condition: 'bGlobalTonemapping & tonemapper == 0'
+            condition: 'bGlobalGammaCorrection'
         },
         exposure: {
             name: 'Exposure',
@@ -344,7 +373,7 @@ var nvis = new function () {
             max: 10.0,
             value: 1.0,
             step: 0.1,
-            condition: 'bGlobalTonemapping & tonemapper == 0'
+            condition: 'bGlobalGammaCorrection'
         },
         Video: {
             type: 'ruler'
@@ -2267,19 +2296,38 @@ var nvis = new function () {
 
             this.textureFragmentSource = `#version 300 es
             precision highp float;
+
             in vec2 vTextureCoord;
+
             uniform sampler2D uSampler;
             uniform bool uAlphaCheckerboard;
             uniform bool bZoomBox;
             uniform vec4 uZoomBox;
+
+            uniform bool bGammaCorrection;
+            uniform float uGamma;
+            uniform float uExposure;
+
+            uniform int uToneMapper;
+            uniform float uMaxWhiteLuminance;
+            uniform float uMaxPQLuminance;
+
             out vec4 color;
 
             float modi(float a, float b) {
                 return floor(a - floor((a + 0.5) / b) * b);
             }
 
-            void main()
-            {
+            float luminance(vec3 color) {
+                return dot(color.rgb, vec3(0.299, 0.587, 0.114));
+            }
+
+            float pqLuminance(vec3 color) {
+                return dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+            }
+
+            void main() {
+
                 if (vTextureCoord.x < 0.0 || vTextureCoord.x > 1.0 || vTextureCoord.y < 0.0 || vTextureCoord.y > 1.0) {
                     color = vec4(0.1, 0.1, 0.1, 1.0);
                     return;
@@ -2289,6 +2337,76 @@ var nvis = new function () {
 
                 vec4 c = texture(uSampler, vTextureCoord);
                 color = vec4(c.r, c.g, c.b, 1.0);
+
+                //  clamp
+                if (uToneMapper == 0) {
+                    color.rgb = clamp(color.rgb, 0.0, 1.0);
+                }
+
+                //  Reinhard
+                if (uToneMapper == 1) {
+                    // float reinhard = 1.0 / (luminance(color.rgb) + 1.0);
+                    // color.rgb *= reinhard;
+                    color.r *= (1.0 / (color.r + 1.0));
+                    color.g *= (1.0 / (color.g + 1.0));
+                    color.b *= (1.0 / (color.b + 1.0));
+                }
+
+                //  Modified Reinhard
+                if (uToneMapper == 2) {
+                    float luminance = luminance(color.rgb);
+                    float maxWhiteLuminance = uMaxWhiteLuminance / 100.0;
+                    float reinhard = (1.0 + luminance / (maxWhiteLuminance * maxWhiteLuminance)) * (1.0 + luminance);
+                    color.rgb *= reinhard;
+                }
+
+                //  Perceptual Quantizer (PQ)
+                if (uToneMapper == 3) {
+                    // const float L = 10000.0;
+                    // const float m = 78.8438;
+                    // const float n = 0.1593;
+                    // const float c1 = 0.8359;
+                    // const float c2 = 18.8516;
+                    // const float c3 = 18.6875;
+
+                    // float invM = 1.0 / m;
+                    // vec3 pC = pow(color.rgb, vec3(invM));
+
+                    // float invN = 1.0 / n;
+                    // color.rgb = L * pow((pC - c1) / (c2 - c3 * pC), vec3(invN));
+
+                    //  https://ieeexplore.ieee.org/document/8993817
+                    const float L = 10000.0;
+                    // float L = uMaxPQLuminance / 100.0;  //  10000.0
+                    const float m = 1305.0 / 8192.0;
+                    const float n = 2523.0 / 32.0;
+                    const float c1 = 107.0;
+                    const float c2 = 2413.0;
+                    const float c3 = 128.0;
+                    const float c4 = 2392.0;
+                    float Lin = pqLuminance(color.rgb);
+                    float cL = pow(Lin / L, m);
+                    float Lout = pow((c1 + c2 * cL) / (c3 + c4 * cL), n);
+                    color.rgb *= vec3(Lout);
+                }
+
+                //  Heji's approximation
+                if (uToneMapper == 4) {
+                }
+
+                //  Uncharted 2
+                if (uToneMapper == 5) {
+                }
+
+                //  ACES
+                if (uToneMapper == 6) {
+                }
+
+                //  Gamma correction
+                if (bGammaCorrection) {
+                    float invGamma = 1.0 / uGamma;
+                    color.rgb = uExposure * pow(color.rgb, vec3(invGamma));
+                }
 
                 //  gray checkerboard for background
                 if (uAlphaCheckerboard && c.a < 1.0)
@@ -2314,23 +2432,11 @@ var nvis = new function () {
             precision highp float;
             in vec2 vTextureCoord;
             uniform sampler2D uSampler;
-            uniform int uTonemapper;
-            uniform float uGamma;
-            uniform float uExposure;
             out vec4 color;
 
             void main()
             {
                 color = texture(uSampler, vTextureCoord);
-
-                if (uTonemapper == 0) {
-                    float invGamma = 1.0 / uGamma;
-                    float exposure = uExposure;
-                    color.r = exposure * pow(color.r, invGamma);
-                    color.g = exposure * pow(color.g, invGamma);
-                    color.b = exposure * pow(color.b, invGamma);
-                }
-
             }`;
 
             this.textureShader = new NvisShader(glContext, { source: this.textureFragmentSource });
@@ -4576,7 +4682,7 @@ var nvis = new function () {
                         if (equalPosition != -1) {
                             //  numeric conditional
                             bConditionNegated = (condition[equalPosition - 1] == '!');
-                            conditionVariable = condition.substring(0, equalPosition - 1);
+                            conditionVariable = condition.substring(0, equalPosition - (bConditionNegated ? 1 : 0));
                             conditionValue = condition.substring(equalPosition + 1);
                             let conditionValues = conditionValue.split(',');
                             bConditionMet = conditionValues.includes(object[conditionVariable].value.toString())
@@ -4684,7 +4790,7 @@ var nvis = new function () {
                     el = document.createElement('select');
                     el.setAttribute('id', elementId);
                     el.addEventListener('change', (event) => {
-                        nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, false);
+                        nvis.uiUpdateParameter(uniqueId, elementId, rowId, bAllConditionsMet, true);
                     }, true);
                     for (let optionId = 0; optionId < object[key].alternatives.length; optionId++) {
                         let oEl = document.createElement('option');
@@ -4908,52 +5014,6 @@ var nvis = new function () {
             this.apiParameters = {};
 
             this.annotations = new NvisAnnotations(this.glContext);
-
-
-            //  TODO: implement this
-            this.defaultUI = `{
-                'uTonemapper': {
-                    'type': 'dropdown',
-                    'value': 0,
-                    'alternatives' : [
-                        'None',
-                        'Gamma Correction',
-                        'Clamp',
-                        'Log',
-                        'Reinhard',
-                        John Hable',
-                        'Uncharted2',
-                        'ACES'
-                    ]
-                },
-                'uGamma' : {
-                    'type': 'float',
-                    'type': 'float',
-                    'value': 2.2,
-                    'min': 1.0,
-                    'max': 5.0,
-                    'step': 0.01,
-                    'condition': 'uToneMapper==1'
-                },
-                'uExposure' : {
-                    'type': 'float',
-                    'type': 'float',
-                    'value': 1.0,
-                    'min': 0.0,
-                    'max': 100.0,
-                    'step': 0.1,
-                    'condition': 'uToneMapper==1'
-                },
-                'uWhiteScale': {
-                    'name': 'Linear White',
-                    'type': 'float',
-                    'value': 11.2,
-                    'min': 0.001,
-                    'max': 100.0,
-                    'step': 0.01,
-                    'condition': 'uToneMapper==6'
-                }
-            }`;
         }
 
 
@@ -4976,7 +5036,12 @@ var nvis = new function () {
 
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-            return { r: data[0], g: data[1], b: data[2], a: data[3] };
+            return {
+                r: data[0],
+                g: data[1],
+                b: data[2],
+                a: data[3]
+            };
         }
 
 
@@ -5503,19 +5568,6 @@ var nvis = new function () {
                     gl.uniform1i(gl.getUniformLocation(shaderProgram, ('uTexture' + inputId)), inputId);
                 }
 
-            }
-
-            let uTonemapper = gl.getUniformLocation(shaderProgram, 'uTonemapper');
-            if (_settingsUI.bGlobalTonemapping.value) {
-                gl.uniform1i(uTonemapper, _settingsUI.tonemapper.value);
-                if (_settingsUI.tonemapper.value == 0) {
-                    let uGamma = gl.getUniformLocation(shaderProgram, 'uGamma');
-                    gl.uniform1f(uGamma, _settingsUI.gamma.value);
-                    let uExposure = gl.getUniformLocation(shaderProgram, 'uExposure');
-                    gl.uniform1f(uExposure, _settingsUI.exposure.value);
-                }
-            } else {
-                gl.uniform1i(uTonemapper, -1);
             }
 
             gl.viewport(0, 0, streamDims.w, streamDims.h);
@@ -6937,6 +6989,31 @@ YH5TbD+cNrTGp556irMfd9BtBQnDb3HkHuGRRx5h/6TgEgCIAp1I3759Y6WCq+zPd8LNjraCH6KTYgf7
 
                 //  TODO: this shouldn't be necessary, can get dimensions directly in shader
                 gl.uniform2f(gl.getUniformLocation(shaderProgram, 'uDimensions'), streamDims.w, streamDims.h);
+
+                //  Gamma correction
+                gl.uniform1i(gl.getUniformLocation(shaderProgram, 'bGammaCorrection'), _settingsUI.bGlobalGammaCorrection.value);
+                if (_settingsUI.bGlobalGammaCorrection.value) {
+                    let uGamma = gl.getUniformLocation(shaderProgram, 'uGamma');
+                    let uExposure = gl.getUniformLocation(shaderProgram, 'uExposure');
+                    gl.uniform1f(uGamma, _settingsUI.gamma.value);
+                    gl.uniform1f(uExposure, _settingsUI.exposure.value);
+                }
+
+                //  Tone mapping
+                let uToneMapper = gl.getUniformLocation(shaderProgram, 'uToneMapper');
+                if (_settingsUI.bGlobalToneMapping.value) {
+                    gl.uniform1i(uToneMapper, _settingsUI.toneMapper.value);
+                    if (_settingsUI.toneMapper.value == 2) {
+                        //  Modified Reinhard
+                        gl.uniform1f(gl.getUniformLocation(shaderProgram, 'uMaxWhiteLuminance'), _settingsUI.maxWhiteLuminance.value);
+                    }
+                    if (_settingsUI.toneMapper.value == 3) {
+                        //  Perceptual Quantizer
+                        gl.uniform1f(gl.getUniformLocation(shaderProgram, 'uMaxPQLuminance'), _settingsUI.maxPQLuminance.value);
+                    }
+                } else {
+                    gl.uniform1i(uToneMapper, -1);
+                }
 
                 //  Testing zoom-box
                 // if (_state.input.mouse.down && _state.input.keyboard.shift && _state.input.mouse.clickStreamCoords !== undefined) {

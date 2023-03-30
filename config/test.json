@@ -1,0 +1,38 @@
+{
+    "name": "Test configuration",
+    "shaders": [ "glsl/gaussian.json" ],
+    "streams": [
+        {
+            "name": "Reference",
+            "files": [ "images/png/portrait-ref.png" ]
+        },
+        {
+            "name": "Gaussian (r = 1)",
+            "window": true,
+            "shader": 0,
+            "inputs": [ 0 ],
+            "parameters": { "uRadius": 1 }
+        },
+        {
+            "name": "Gaussian (r = 3)",
+            "window": true,
+            "shader": 0,
+            "inputs": [ 0 ],
+            "parameters": { "uRadius": 3 }
+        },
+        {
+            "name": "Gaussian (r = 5)",
+            "window": true,
+            "shader": 0,
+            "inputs": [ 0 ],
+            "parameters": { "uRadius": 5 }
+        },
+        {
+            "name": "Gaussian (r = 7)",
+            "window": true,
+            "shader": 0,
+            "inputs": [ 0 ],
+            "parameters": { "uRadius": 7 }
+        }
+    ]
+}

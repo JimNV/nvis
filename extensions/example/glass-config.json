@@ -1,0 +1,35 @@
+{
+    "name": "nvis example configuration",
+    "layout": {
+        "width": 3
+    },
+    "streams": [
+        {
+            "name": "Input",
+            "window": false,
+            "images": "glass-input.exr"
+        },
+        {
+            "name": "Denoised",
+            "window": true,
+            "images": "glass.exr"
+        },
+        {
+            "name": "Reference",
+            "window": true,
+            "images": "glass-ref.exr"
+        },
+        {
+            "name": "Input/Denoised difference",
+            "window": true,
+            "shader": 0,
+            "inputs": [ 0, 1 ]
+        },
+        {
+            "name": "Input/Reference SSIM",
+            "window": true,
+            "shader": 6,
+            "inputs": [ 0, 2 ]
+        }
+    ]
+}

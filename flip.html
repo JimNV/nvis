@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>nvis</title>
+    <meta charset="utf-8" />
+    <script type="text/javascript" src="js/nvis.js"></script>
+</head>
+<body>
+    <script>
+        nvis.graphs([ "glsl/flip.json" ]);
+        nvis.stream("images/png/portrait-ref.png", true);     //  [0]: reference stream
+        nvis.stream("images/png/portrait-test.png", true);    //  [1]: test stream
+        nvis.graph(0, [ 0, 1 ], {}, true);
+    </script>
+</body>
+</html>

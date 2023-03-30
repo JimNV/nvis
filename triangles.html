@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>nvis</title>
+    <meta charset="utf-8" />
+    <script type="text/javascript" src="js/nvis.js"></script>
+</head>
+<body>
+    <script>
+        nvis.shaders([
+            "glsl/difference.json",
+            "glsl/gaussian.json",
+            "glsl/mixer.json",
+            "glsl/pixelate.json",
+            "glsl/sharpness.json",
+            "glsl/sobel.json",
+            "glsl/ssim.json",
+            "glsl/tiling.json"]);
+
+        nvis.stream(["images/png/triangle.0000.png",
+                "images/png/triangle.0001.png",
+                "images/png/triangle.0002.png",
+                "images/png/triangle.0003.png",
+                "images/png/triangle.0004.png",
+                "images/png/triangle.0005.png",
+                "images/png/triangle.0006.png",
+                "images/png/triangle.0007.png",
+                "images/png/triangle.0008.png"]);
+
+        nvis.annotation("stream", 0, "arrow", { position: { x: 128, y: 200 }, color: { r: 0.5, g: 0.5, b: 1.0 }, size: 128.0, rotation: 30, zoom: false })
+        nvis.annotation("stream", 0, "rectangle", { dimensions: { x: 300, y: 280, w: 128, h: 64 }, rotation: 0, width: 3.0, zoom: true });
+
+    </script>
+</body>
+</html>
